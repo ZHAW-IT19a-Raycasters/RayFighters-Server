@@ -1,0 +1,32 @@
+package utils
+
+import (
+	"errors"
+	"fmt"
+	"io/ioutil"
+
+	"github.com/pelletier/go-toml"
+	"github.zhaw.ch/raycasters/server/web"
+)
+
+const (
+	config = "conf.toml"
+)
+
+// TODO: Add internaly used configuration
+type Configuration struct {
+	Web *web.WebConfig
+}
+
+func ConfigParse() (*Configuration, error) {
+	data, err := ioutil.ReadFile(config)
+	if err != nil {
+		res := errors.Unwrap(fmt.Errorf("During reading of the configuration file happend following error:\n%w", err))
+		return nil, res
+	}
+	conf := Configuration{}
+
+	toml.Unmarshal(data, &conf)
+
+	return &conf, nil
+}
