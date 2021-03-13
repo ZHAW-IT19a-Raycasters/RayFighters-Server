@@ -13,12 +13,11 @@ const (
 	config = "conf.toml"
 )
 
-// TODO: Add internaly used configuration
 type Configuration struct {
 	Web *web.WebConfig
 }
 
-func ConfigParse() (*Configuration, error) {
+func configParse() (*Configuration, error) {
 	data, err := ioutil.ReadFile(config)
 	if err != nil {
 		res := errors.Unwrap(fmt.Errorf("During reading of the configuration file happend following error:\n%w", err))
