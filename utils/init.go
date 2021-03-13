@@ -1,5 +1,10 @@
 package utils
 
+import (
+	"errors"
+	"fmt"
+)
+
 func writeArgsToConfig(conf *Configuration, args *args) {
 
 	if *args.Ip != "" {
@@ -25,6 +30,7 @@ func Setup() *Configuration {
 	conf, err := configParse()
 
 	if err != nil {
+		err = fmt.Errorf("%s -> %w", err.Error(), errors.Unwrap(err))
 		arparser.Usage(err)
 		return nil
 	}

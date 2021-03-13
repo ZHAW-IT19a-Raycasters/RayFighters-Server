@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"errors"
 	"fmt"
 	"io/ioutil"
 
@@ -13,6 +12,19 @@ const (
 	config = "config.toml"
 )
 
+type configurationError struct {
+	msg         string
+	internalErr error
+}
+
+func (ce *configurationError) Error() string {
+	return fmt.Sprintf("during %s of the configuration file happend an error", ce.msg)
+}
+
+func (ce *configurationError) Unwrap() error {
+	return ce.internalErr
+}
+
 type Configuration struct {
 	Web web.WebConfig `toml:"Webconfig"`
 }
@@ -20,13 +32,16 @@ type Configuration struct {
 func configParse() (*Configuration, error) {
 	data, err := ioutil.ReadFile(config)
 	if err != nil {
-		res := errors.Unwrap(fmt.Errorf("During reading of the configuration file happend following error:\n%w", err))
-		return nil, res
+		return nil, &configurationError{internalErr: err, msg: "reading"}
 	}
 
 	conf := Configuration{}
 
-	toml.Unmarshal(data, &conf)
+	err = toml.Unmarshal(data, &conf)
+
+	if err != nil {
+		return nil, &configurationError{internalErr: err, msg: "parsing"}
+	}
 
 	return &conf, nil
 }
