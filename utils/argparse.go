@@ -8,8 +8,9 @@ import (
 )
 
 type args struct {
+	// Will be "" if no ip has been given
+	Ip *string
 	// Will be -1 if no port has been given
-	Ip   *string
 	Port *int
 }
 

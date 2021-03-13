@@ -10,11 +10,11 @@ import (
 )
 
 const (
-	config = "conf.toml"
+	config = "config.toml"
 )
 
 type Configuration struct {
-	Web *web.WebConfig
+	Web web.WebConfig `toml:"Webconfig"`
 }
 
 func configParse() (*Configuration, error) {
@@ -23,6 +23,7 @@ func configParse() (*Configuration, error) {
 		res := errors.Unwrap(fmt.Errorf("During reading of the configuration file happend following error:\n%w", err))
 		return nil, res
 	}
+
 	conf := Configuration{}
 
 	toml.Unmarshal(data, &conf)

@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+
 	"github.zhaw.ch/raycasters/server/utils"
 )
 
@@ -9,4 +11,6 @@ func main() {
 	if conf == nil {
 		return
 	}
+
+	fmt.Println("WebConfig : ", conf.Web.String())
 }
