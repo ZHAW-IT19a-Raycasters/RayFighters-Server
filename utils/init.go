@@ -5,6 +5,7 @@ import (
 	"fmt"
 )
 
+// Will write back the parsed commandline parameters to the configuration data.
 func writeArgsToConfig(conf *Configuration, args *args) {
 
 	if *args.Ip != "" {
@@ -35,11 +36,14 @@ func Setup() *Configuration {
 		return nil
 	}
 
+	writeArgsToConfig(conf, args)
+
+	err = checkIfConfigIsLegal(conf)
+
 	if err != nil {
+		arparser.Usage(err)
 		return nil
 	}
-
-	writeArgsToConfig(conf, args)
 
 	return conf
 }

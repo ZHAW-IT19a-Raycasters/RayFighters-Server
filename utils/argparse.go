@@ -7,6 +7,7 @@ import (
 	"github.com/akamensky/argparse"
 )
 
+// Represents the arguments utilized.
 type args struct {
 	// Will be "" if no ip has been given
 	Ip *string
@@ -14,19 +15,24 @@ type args struct {
 	Port *int
 }
 
+// A wrapper for the argument parser
+// is only used intern the package.
 type argParser struct {
 	parser *argparse.Parser
 }
 
-func (p *argParser) Usage(msg interface{}) {
+// Will print the usage error message to the commandline.
+func (p *argParser) Usage(msg error) {
 	fmt.Print(p.parser.Usage(msg))
 }
 
+// Will parse the command line arguments themselfs.
 func argParse() (*args, *argParser, error) {
 	return rawArgParse(os.Args)
 }
 
-// is split into a sub function for testing puposes
+// Will parse any agument slice.
+// This is split into a sub function for easier testing.
 func rawArgParse(arguments []string) (*args, *argParser, error) {
 	parser := argparse.NewParser("RayServer", "Controlls all the rooms and interactions between the players.")
 	// shutdown parser if not fullfilled
