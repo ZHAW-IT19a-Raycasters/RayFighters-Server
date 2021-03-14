@@ -1,4 +1,4 @@
-package config
+package webconfig
 
 import "testing"
 

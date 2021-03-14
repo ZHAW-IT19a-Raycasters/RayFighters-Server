@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/akamensky/argparse"
+	webconfig "github.zhaw.ch/raycasters/server/web/config"
 )
 
 // Represents the arguments utilized.
@@ -43,7 +44,7 @@ func rawArgParse(arguments []string) (*args, *argParser, error) {
 		Required: false,
 		Validate: func(values []string) error {
 			for _, rawVal := range values {
-				err := checkIfIpValid(rawVal)
+				err := webconfig.CheckIfIpValid(rawVal)
 				if err != nil {
 					return fmt.Errorf("[-p|--port] %w", err)
 				}
@@ -62,7 +63,7 @@ func rawArgParse(arguments []string) (*args, *argParser, error) {
 		Default:  -1,
 		Validate: func(values []string) error {
 			for _, rawVal := range values {
-				err := checkIfPortValid(rawVal, []int{-1})
+				err := webconfig.CheckIfPortValid(rawVal, []int{-1})
 				if err != nil {
 					return fmt.Errorf("[-i|--ip] %w", err)
 				}

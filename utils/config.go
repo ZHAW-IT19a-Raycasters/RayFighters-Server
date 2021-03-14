@@ -5,7 +5,7 @@ import (
 	"io/ioutil"
 
 	"github.com/pelletier/go-toml"
-	"github.zhaw.ch/raycasters/server/web"
+	webconfig "github.zhaw.ch/raycasters/server/web/config"
 )
 
 const (
@@ -41,7 +41,7 @@ func (ce *configurationError) Unwrap() error {
 // As per definition if there is a config file in here
 // It must implement the CheckConfig interface.
 type Configuration struct {
-	Web web.WebConfig `toml:"Webconfig"`
+	Web webconfig.WebConfig `toml:"Webconfig"`
 }
 
 // parses the configuration file and reads the data into a new configuration obj.
