@@ -14,12 +14,12 @@ type Server struct {
 
 func ServingRoute(conf *webconfig.WebConfig) {
 	router := mux.NewRouter()
-	router.HandleFunc("/", f1)
+	router.HandleFunc("/", handleRoot)
 	http.ListenAndServe(conf.String(), router)
 	//router.HandleFunc("/ws",)
 }
 
-func f1(writer http.ResponseWriter, request *http.Request) {
+func handleRoot(writer http.ResponseWriter, request *http.Request) {
 	//ResponseWriter implements io.Writer
 	fmt.Fprintf(writer, "Hello world from %s", request.URL.Path[1:]) //ich will alles ausser 0-te element
 }
