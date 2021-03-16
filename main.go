@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 
 	"github.zhaw.ch/raycasters/server/log"
 <<<<<<< HEAD
@@ -27,6 +28,17 @@ func main() {
 		return
 	}
 
-	fmt.Println("WebConfig : ", conf.Web.String())
-	web.ServingRoute(&conf.Web)
+	server := web.NewServer(&conf.Web)
+	server.Start()
+	sigs := make(chan os.Signal, 1)
+	done := make(chan struct{}, 1)
+	go func() {
+		defer server.Stop()
+		sig := <-sigs
+		fmt.Println()
+		fmt.Println(sig)
+		done <- struct{}{}
+	}()
+	fmt.Println("awaiting signal")
+	<-done
 }
