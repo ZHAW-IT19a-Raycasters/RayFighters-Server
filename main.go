@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/signal"
 
 	"github.zhaw.ch/raycasters/server/log"
 <<<<<<< HEAD
@@ -29,16 +30,37 @@ func main() {
 	}
 
 	server := web.NewServer(&conf.Web)
-	server.Start()
-	sigs := make(chan os.Signal, 1)
-	done := make(chan struct{}, 1)
+
+	done := make(chan struct{})
+	ctx := web.ShutdownContext()
+
 	go func() {
-		defer server.Stop()
-		sig := <-sigs
-		fmt.Println()
-		fmt.Println(sig)
-		done <- struct{}{}
+		sigs := make(chan os.Signal, 1)
+		signal.Notify(sigs, os.Interrupt)
+
+		var sig os.Signal
+
+		select {
+		case sigs <- sig:
+			fmt.Println()
+			fmt.Println(sig)
+		case <-done:
+			return
+		}
+
+		// TODO: global channel shutdown
+		server.ServerStop(ctx)
+		close(done)
 	}()
-	fmt.Println("awaiting signal")
+
+	err = server.Start()
+	if err != nil {
+		done <- struct{}{}
+		close(done)
+		return
+	}
+	fmt.Println("awaiting server shutdown")
+
 	<-done
+	fmt.Println("Shutdown completed")
 }
