@@ -1,4 +1,4 @@
-package utils
+package log
 
 import (
 	"io"
@@ -47,6 +47,10 @@ type logger struct {
 var Logger *logger
 
 func Setup(level Level) error {
+	if Logger != nil {
+		panic("The logger may only be setup once!")
+	}
+
 	file, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
 
 	if err != nil {
@@ -66,7 +70,7 @@ func newLogger(level Level, out io.Writer) *logger {
 }
 
 func (log *logger) checkLevel(level Level) bool {
-	return log.level >= level
+	return level >= log.level
 }
 
 func prependLevel(y Level, x []interface{}) []interface{} {
