@@ -3,18 +3,18 @@ package client
 type ClientOpcode uint8
 
 const (
-	Disconnect          ClientOpcode = 0x00
-	UnknownOpcode       ClientOpcode = 0x01
-	Movement            ClientOpcode = 0x0A
-	Shooting            ClientOpcode = 0x14
-	RequestOtherPlayers ClientOpcode = 0x1E
+	DisconnectOpcode          ClientOpcode = 0x00
+	UnknownOpcode             ClientOpcode = 0x01
+	MovementOpcode            ClientOpcode = 0x0A
+	ShootingOpcode            ClientOpcode = 0x14
+	RequestOtherPlayersOpcode ClientOpcode = 0x1E
 )
 
 var overview = [...]ClientOpcode{
-	Disconnect,
-	Movement,
-	Shooting,
-	RequestOtherPlayers,
+	DisconnectOpcode,
+	MovementOpcode,
+	ShootingOpcode,
+	RequestOtherPlayersOpcode,
 }
 
 func Detect(opcode uint8) ClientOpcode {
@@ -28,3 +28,29 @@ func Detect(opcode uint8) ClientOpcode {
 
 	return UnknownOpcode
 }
+
+type Disconnect struct{}
+
+type Unknown struct{}
+
+type Movement struct {
+	coorX, coorY float64
+}
+
+func (m Movement) CoorX() float64 {
+	return m.coorX
+}
+
+func (m Movement) CoorY() float64 {
+	return m.coorY
+}
+
+type Shooting struct {
+	angPl float64
+}
+
+func (s Shooting) AngPl() float64 {
+	return s.angPl
+}
+
+type RequestOtherPlayers struct{}
