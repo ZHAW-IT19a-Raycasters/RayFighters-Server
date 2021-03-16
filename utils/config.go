@@ -22,13 +22,13 @@ type CheckConfig interface {
 
 // Represents a configuration error
 type configurationError struct {
-	msg         string
+	section     string
 	internalErr error
 }
 
 // The error interface
 func (ce *configurationError) Error() string {
-	return fmt.Sprintf("during %s of the configuration file happend an error", ce.msg)
+	return fmt.Sprintf("during parsing of the configuration file happend an error in the section:\n\t[%s]\n\t[%s]", ce.section, ce.internalErr)
 }
 
 // The error unwrap interface
@@ -48,7 +48,7 @@ type Configuration struct {
 func configParse() (*Configuration, error) {
 	data, err := ioutil.ReadFile(Config)
 	if err != nil {
-		return nil, &configurationError{internalErr: err, msg: "reading"}
+		return nil, &configurationError{internalErr: err, section: "reading"}
 	}
 
 	conf := Configuration{}
@@ -56,7 +56,7 @@ func configParse() (*Configuration, error) {
 	err = toml.Unmarshal(data, &conf)
 
 	if err != nil {
-		return nil, &configurationError{internalErr: err, msg: "parsing"}
+		return nil, &configurationError{internalErr: err, section: "parsing"}
 	}
 
 	return &conf, nil
@@ -66,7 +66,7 @@ func configParse() (*Configuration, error) {
 func checkIfConfigIsLegal(conf *Configuration) error {
 	err := conf.Web.CheckConfiguration()
 	if err != nil {
-		return &configurationError{msg: "Webconfig is misconfigured.", internalErr: err}
+		return &configurationError{section: "Webconfig", internalErr: err}
 	}
 
 	return nil
