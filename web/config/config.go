@@ -25,7 +25,7 @@ func (wc *WebConfig) CheckConfiguration() error {
 
 	allowed := []int{}
 	if CheckIfPortIsAllowed(int(wc.Port), allowed) {
-		return invalidPortError{fmt.Sprintf("%d", wc.Port), true}
+		return nil
 	}
-	return nil
+	return invalidPortError{fmt.Sprintf("%d", wc.Port), true}
 }
