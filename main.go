@@ -4,7 +4,12 @@ import (
 	"fmt"
 
 	"github.zhaw.ch/raycasters/server/log"
+<<<<<<< HEAD
 	"github.zhaw.ch/raycasters/server/setup"
+=======
+	"github.zhaw.ch/raycasters/server/utils"
+	"github.zhaw.ch/raycasters/server/web"
+>>>>>>> Implement router
 )
 
 func main() {
@@ -23,4 +28,5 @@ func main() {
 	}
 
 	fmt.Println("WebConfig : ", conf.Web.String())
+	web.ServingRoute(&conf.Web)
 }
