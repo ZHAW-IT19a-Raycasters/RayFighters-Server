@@ -10,5 +10,4 @@ func DetectClient(opcode uint8) client.ClientOpcode {
 type Bytefy interface {
 	// Will return the by the protocol defined opcode representations.
 	Bytes() []byte
-	PutBytes(data *[]byte)
 }

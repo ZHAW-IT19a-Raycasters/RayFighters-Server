@@ -25,3 +25,30 @@ func TestPlayerBytes(t *testing.T) {
 	}
 
 }
+
+func comparePlayers(got, exp server.Player, t *testing.T) {
+	if exp.UserId() != got.UserId() {
+		t.Fatalf("The Id of the player is incorrect")
+	}
+
+	if exp.Name() != got.Name() {
+		t.Fatalf("The Name of the player is incorrect")
+	}
+}
+
+func TestPlayerFromBytes(t *testing.T) {
+	var id uint8 = 0x42     // 1  Byte
+	name := "SomeoneRandom" // 13 Byte
+	expectedPlayer := server.NewPlayer(id, name)
+	gottenPlayer, _ := server.NewPlayerBytes(expectedPlayer.Bytes())
+	comparePlayers(gottenPlayer, expectedPlayer, t)
+}
+
+func TestPlayerFromBytesMuliple(t *testing.T) {
+	// players := [...]server.Player{
+	// 	server.NewPlayer(1, "Hans"),
+	// 	server.NewPlayer(4, "Peter"),
+	// 	server.NewPlayer(52, "Meier"),
+	// }
+
+}

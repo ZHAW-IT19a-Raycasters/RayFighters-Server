@@ -86,6 +86,16 @@ func NewPlayer(userId uint8, name string) Player {
 	return Player{userId: userId, name: name}
 }
 
+// Will contruct a new player from a byte array.
+// Will return the offset where the player stops.
+func NewPlayerBytes(info []byte) (Player, int) {
+	userId := info[0]
+	lenName := binary.LittleEndian.Uint16(info[1:3])
+	size := 1 + 2 + lenName
+	name := string(info[3 : 3+lenName])
+	return NewPlayer(userId, name), int(size)
+}
+
 func (p Player) UserId() uint8 {
 	return p.userId
 }
@@ -141,4 +151,8 @@ type SendAllPlayerInfo struct {
 
 func (p *SendAllPlayerInfo) Players() []Player {
 	return p.players
+}
+
+func (p *SendAllPlayerInfo) Bytes() []byte {
+	return nil
 }
