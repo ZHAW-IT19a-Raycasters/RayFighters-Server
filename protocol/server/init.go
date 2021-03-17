@@ -1,5 +1,11 @@
 package server
 
+import (
+	"encoding/binary"
+	"fmt"
+	"math"
+)
+
 type ServerOpcode uint8
 
 const (
@@ -72,12 +78,43 @@ type Player struct {
 	name   string
 }
 
+func NewPlayer(userId uint8, name string) Player {
+	if math.MaxInt16 <= len(name) {
+		panic(fmt.Sprintf("Maximum name lenght is a %d", math.MaxInt16))
+	}
+
+	return Player{userId: userId, name: name}
+}
+
 func (p Player) UserId() uint8 {
 	return p.userId
 }
 
 func (p Player) Name() string {
 	return p.name
+}
+
+func (p Player) ByteSize() int {
+	return 1 + 2 + len(p.name)
+}
+
+func (p Player) Bytes() []byte {
+	// UserId NameSize Name
+	data := make([]byte, p.ByteSize())
+	p.PutBytes(data)
+	return data
+}
+
+// This function will write from the zero position on of the slice.
+func (p Player) PutBytes(data []byte) {
+	// early bound check, figure out if this is okay...
+	_ = data[p.ByteSize()-1]
+
+	data[0] = p.userId
+	binary.LittleEndian.PutUint16(data[1:3], uint16(len(p.name)))
+	for i, val := range []byte(p.name) {
+		data[i+3] = val
+	}
 }
 
 type NewPlayerJoined struct {
