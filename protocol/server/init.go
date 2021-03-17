@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"math"
@@ -51,11 +52,31 @@ func Detect(opcode uint8) ServerOpcode {
 
 type Disconnect struct{}
 
+func NewDisconnect() Disconnect {
+	return Disconnect{}
+}
+
+func (d Disconnect) Bytes() []byte {
+	return []byte{DisconnectOpcode.Value()}
+}
+
 type Unknown struct{}
+
+func (u Unknown) Bytes() []byte {
+	return []byte{UnknownOpcode.Value()}
+}
 
 type MovementPlayer struct {
 	userId       uint8
 	coorX, coorY float64
+}
+
+func NewMovementPlayer(userId uint8, coorX, coorY float64) MovementPlayer {
+	return MovementPlayer{
+		userId: userId,
+		coorX:  coorX,
+		coorY:  coorY,
+	}
 }
 
 func (mp MovementPlayer) UserId() uint8 {
@@ -68,6 +89,22 @@ func (mp MovementPlayer) CoorX() float64 {
 
 func (mp MovementPlayer) CoorY() float64 {
 	return mp.coorY
+}
+
+func (mp MovementPlayer) Bytes() []byte {
+	size := 1
+	size += 1
+	size += 8 * 8
+	size += 8 * 8
+
+	// using the buffer write interface for simplisity
+	buffer := bytes.NewBuffer(make([]byte, 0, size))
+	binary.Write(buffer, binary.LittleEndian, MovementPlayerOpcode.Value())
+	binary.Write(buffer, binary.LittleEndian, mp.userId)
+	binary.Write(buffer, binary.LittleEndian, mp.coorX)
+	binary.Write(buffer, binary.LittleEndian, mp.coorY)
+
+	return buffer.Bytes()
 }
 
 type AnOtherPlayerKilled struct {
@@ -86,7 +123,7 @@ type Player struct {
 }
 
 func (p Player) String() string {
-    return fmt.Sprintf("Id: %d\n Name: %s", p.userId, p.name)
+	return fmt.Sprintf("Id: %d\n Name: %s", p.userId, p.name)
 }
 
 func NewPlayer(userId uint8, name string) Player {
@@ -163,27 +200,32 @@ type SendAllPlayerInfo struct {
 }
 
 func NewSendAllPlayerInfo(players []Player) *SendAllPlayerInfo {
-	return &SendAllPlayerInfo{players: players}
+	return &SendAllPlayerInfo{
+		players: players,
+	}
 }
 
 // This assumes the full binary stream to be used
 // so with opcode.
-// Attention this is a function used for testing 
-// purposes only.
+// Attention this is a function used for testing
+// purposes only, so a multitude of security
+// checks are not written.
 func NewSendAllPlayerInfoBytes(data []byte) *SendAllPlayerInfo {
-    // Op PlCount (UserId Name) * PlCount
-    playerCount := data[1]
-    players := make([]Player, 0, playerCount)
+	// Op PlCount (UserId Name) * PlCount
+	playerCount := data[1]
+	players := make([]Player, 0, playerCount)
 
-    // offset
-    count := 2
-    for count < len(data) {
-        player, offset := NewPlayerBytes(data[count:])      
-        players = append(players, player)
-        count += offset
-    }
-        
-    return &SendAllPlayerInfo{players: players}
+	// offset
+	count := 2
+	for count < len(data) {
+		player, offset := NewPlayerBytes(data[count:])
+		players = append(players, player)
+		count += offset
+	}
+
+	return &SendAllPlayerInfo{
+		players: players,
+	}
 }
 
 func (p *SendAllPlayerInfo) Players() []Player {

@@ -38,7 +38,7 @@ func comparePlayers(got, exp server.Player, t *testing.T) bool {
 		t.Errorf("The Name of the player is incorrect")
 		return false
 	}
-    return true
+	return true
 }
 
 func TestPlayerFromBytes(t *testing.T) {
@@ -100,20 +100,61 @@ func TestPlayerFromBytesMuliple(t *testing.T) {
 		server.NewPlayer(4, "Peter"),
 		server.NewPlayer(52, "Meier"),
 	}
-    
-    sapi := server.NewSendAllPlayerInfo(players[:])
-    
-    gottenOpcode := server.NewSendAllPlayerInfoBytes(sapi.Bytes())
-    gottenPlayers := gottenOpcode.Players() 
-    if len(gottenPlayers) != len(players) {
-        t.Errorf("Array lenght is different [%d] - [%d]", len(gottenPlayers), len(players))
-        return
-    }
-    
-    for i := range gottenPlayers {
-        if !comparePlayers(gottenPlayers[i], players[i], t) {
-            t.Errorf("players are not equals\n%s\n%s\n", players[i], gottenPlayers[i])
-            return
-        }
-    }
+
+	sapi := server.NewSendAllPlayerInfo(players[:])
+
+	gottenOpcode := server.NewSendAllPlayerInfoBytes(sapi.Bytes())
+	gottenPlayers := gottenOpcode.Players()
+	if len(gottenPlayers) != len(players) {
+		t.Errorf("Array lenght is different [%d] - [%d]", len(gottenPlayers), len(players))
+		return
+	}
+
+	for i := range gottenPlayers {
+		if !comparePlayers(gottenPlayers[i], players[i], t) {
+			t.Errorf("players are not equals\n%s\n%s\n", players[i], gottenPlayers[i])
+			return
+		}
+	}
+}
+
+func TestMovementPlayerBytes(t *testing.T) {
+	// used https://www.binaryconvert.com/result_double.html?
+	// for manual convertion
+
+	// writing out the values to make sure the
+	// compiler will use the correct size.
+	var userId uint8 = 0x44
+
+	// 1.00000000000000005551115123126E-1
+	// 0x3FB999999999999A
+	var coorX float64 = 0.1
+	// 0x3FC999999999999A
+	// 2.00000000000000011102230246252E-1
+	var coorY float64 = 0.2
+
+	expectedData := [...]byte{
+		server.MovementPlayerOpcode.Value(),
+		userId,
+		// 0x3F 0xB9 0x99 0x99 0x99 0x99 0x99 0x9A
+		0x9A, 0x99, 0x99, 0x99, 0x99, 0x99, 0xB9, 0x3F,
+		// 0x3F 0xC9 0x99 0x99 0x99 0x99 0x99 0x9A
+		0x9A, 0x99, 0x99, 0x99, 0x99, 0x99, 0xC9, 0x3F,
+	}
+	gottenData := server.NewMovementPlayer(userId, coorX, coorY).Bytes()
+
+	if len(expectedData) != len(gottenData) {
+		t.Errorf("Different lenght of results [%d] - [%d]", len(expectedData), len(gottenData))
+		return
+	}
+
+	for i := range expectedData {
+		exp := expectedData[i]
+		got := gottenData[i]
+		if exp != got {
+
+			t.Errorf("Bytes at position [%d] are different [%d] - [%d]", i, exp, got)
+			return
+		}
+	}
 }
