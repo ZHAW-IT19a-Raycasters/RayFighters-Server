@@ -19,6 +19,13 @@ const (
 	SendAllPlayerInfoOpcode   ServerOpcode = 0x82
 )
 
+func (s ServerOpcode) Value() uint8 {
+	// SAFETY: this is safe as the value type of
+	// ServerOpcode is already based on the uinit8
+	// type.
+	return uint8(s)
+}
+
 var overview = [...]ServerOpcode{
 	DisconnectOpcode,
 	UnknownOpcode,
@@ -150,7 +157,6 @@ type SendAllPlayerInfo struct {
 }
 
 func NewSendAllPlayerInfo(players []Player) *SendAllPlayerInfo {
-
 	return &SendAllPlayerInfo{players: players}
 }
 
@@ -168,7 +174,7 @@ func (p *SendAllPlayerInfo) Bytes() []byte {
 	// initialize buffer
 	buffer := make([]byte, size)
 
-	buffer[0] = uint8(SendAllPlayerInfoOpcode)
+	buffer[0] = SendAllPlayerInfoOpcode.Value()
 	buffer[1] = uint8(len(p.players))
 	count := 2 // index location inside the buffer
 	// build up dynamic buffer content
