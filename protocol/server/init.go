@@ -98,6 +98,8 @@ func (p Player) ByteSize() int {
 	return 1 + 2 + len(p.name)
 }
 
+// A wrapper function for PutBytes, where the byte representation is
+// returned instead of written into.
 func (p Player) Bytes() []byte {
 	// UserId NameSize Name
 	data := make([]byte, p.ByteSize())
@@ -106,15 +108,15 @@ func (p Player) Bytes() []byte {
 }
 
 // This function will write from the zero position on of the slice.
+// This function will panic, if the data slice is not at least as long
+// as the Player.ByteSize.
 func (p Player) PutBytes(data []byte) {
 	// early bound check, figure out if this is okay...
 	_ = data[p.ByteSize()-1]
 
 	data[0] = p.userId
 	binary.LittleEndian.PutUint16(data[1:3], uint16(len(p.name)))
-	for i, val := range []byte(p.name) {
-		data[i+3] = val
-	}
+	copy(data[3:], p.name)
 }
 
 type NewPlayerJoined struct {
