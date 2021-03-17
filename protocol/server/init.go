@@ -85,6 +85,10 @@ type Player struct {
 	name   string
 }
 
+func (p Player) String() string {
+    return fmt.Sprintf("Id: %d\n Name: %s", p.userId, p.name)
+}
+
 func NewPlayer(userId uint8, name string) Player {
 	if math.MaxInt16 <= len(name) {
 		panic(fmt.Sprintf("Maximum name lenght is a %d", math.MaxInt16))
@@ -160,6 +164,26 @@ type SendAllPlayerInfo struct {
 
 func NewSendAllPlayerInfo(players []Player) *SendAllPlayerInfo {
 	return &SendAllPlayerInfo{players: players}
+}
+
+// This assumes the full binary stream to be used
+// so with opcode.
+// Attention this is a function used for testing 
+// purposes only.
+func NewSendAllPlayerInfoBytes(data []byte) *SendAllPlayerInfo {
+    // Op PlCount (UserId Name) * PlCount
+    playerCount := data[1]
+    players := make([]Player, 0, playerCount)
+
+    // offset
+    count := 2
+    for count < len(data) {
+        player, offset := NewPlayerBytes(data[count:])      
+        players = append(players, player)
+        count += offset
+    }
+        
+    return &SendAllPlayerInfo{players: players}
 }
 
 func (p *SendAllPlayerInfo) Players() []Player {

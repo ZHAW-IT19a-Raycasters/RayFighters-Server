@@ -28,16 +28,17 @@ func TestPlayerBytes(t *testing.T) {
 
 }
 
-func comparePlayers(got, exp server.Player, t *testing.T) {
+func comparePlayers(got, exp server.Player, t *testing.T) bool {
 	if exp.UserId() != got.UserId() {
 		t.Errorf("The Id of the player is incorrect")
-		return
+		return false
 	}
 
 	if exp.Name() != got.Name() {
 		t.Errorf("The Name of the player is incorrect")
-		return
+		return false
 	}
+    return true
 }
 
 func TestPlayerFromBytes(t *testing.T) {
@@ -94,10 +95,25 @@ func TestSendAllPlayerInfo(t *testing.T) {
 }
 
 func TestPlayerFromBytesMuliple(t *testing.T) {
-	// players := [...]server.Player{
-	// 	server.NewPlayer(1, "Hans"),
-	// 	server.NewPlayer(4, "Peter"),
-	// 	server.NewPlayer(52, "Meier"),
-	// }
-
+	players := [...]server.Player{
+		server.NewPlayer(1, "Hans"),
+		server.NewPlayer(4, "Peter"),
+		server.NewPlayer(52, "Meier"),
+	}
+    
+    sapi := server.NewSendAllPlayerInfo(players[:])
+    
+    gottenOpcode := server.NewSendAllPlayerInfoBytes(sapi.Bytes())
+    gottenPlayers := gottenOpcode.Players() 
+    if len(gottenPlayers) != len(players) {
+        t.Errorf("Array lenght is different [%d] - [%d]", len(gottenPlayers), len(players))
+        return
+    }
+    
+    for i := range gottenPlayers {
+        if !comparePlayers(gottenPlayers[i], players[i], t) {
+            t.Errorf("players are not equals\n%s\n%s\n", players[i], gottenPlayers[i])
+            return
+        }
+    }
 }
