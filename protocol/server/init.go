@@ -151,35 +151,31 @@ type SendAllPlayerInfo struct {
 
 func NewSendAllPlayerInfo(players []Player) *SendAllPlayerInfo {
 
-    return &SendAllPlayerInfo{players:players}
+	return &SendAllPlayerInfo{players: players}
 }
-
-
 
 func (p *SendAllPlayerInfo) Players() []Player {
 	return p.players
 }
 
 func (p *SendAllPlayerInfo) Bytes() []byte {
-    // precalculate bytesize
-    size := 1 // opcode
-    size += 1 // player count
-    for _, player := range p.players {
-        size += player.ByteSize()
-    }
-    // initialize buffer
-    buffer := make([]byte, size)
+	// precalculate bytesize
+	size := 1 // opcode
+	size += 1 // player count
+	for _, player := range p.players {
+		size += player.ByteSize()
+	}
+	// initialize buffer
+	buffer := make([]byte, size)
 
-    buffer[0] = uint8(SendAllPlayerInfoOpcode)
-    buffer[1] = uint8(len(p.players))
-    count := 1 // index location inside the buffer
-    // build up dynamic buffer content
-    for _, player := range p.players {
-        player.PutBytes(buffer[count: count + player.ByteSize()])
-        count += player.ByteSize()
-    }
+	buffer[0] = uint8(SendAllPlayerInfoOpcode)
+	buffer[1] = uint8(len(p.players))
+	count := 2 // index location inside the buffer
+	// build up dynamic buffer content
+	for _, player := range p.players {
+		player.PutBytes(buffer[count : count+player.ByteSize()])
+		count += player.ByteSize()
+	}
 
-	return buffer 
+	return buffer
 }
-
-

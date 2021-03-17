@@ -16,13 +16,13 @@ func TestPlayerBytes(t *testing.T) {
 
 	if len(expected) != len(gotten) {
 		t.Errorf("The lenght of th e arrays are not the same")
-        return
+		return
 	}
 
 	for i := range expected {
 		if expected[i] != gotten[i] {
 			t.Errorf("The byte at position [%d] should be [%d], but is [%d]", i, expected[i], gotten[i])
-            return
+			return
 		}
 	}
 
@@ -31,12 +31,12 @@ func TestPlayerBytes(t *testing.T) {
 func comparePlayers(got, exp server.Player, t *testing.T) {
 	if exp.UserId() != got.UserId() {
 		t.Errorf("The Id of the player is incorrect")
-        return
+		return
 	}
 
 	if exp.Name() != got.Name() {
 		t.Errorf("The Name of the player is incorrect")
-        return
+		return
 	}
 }
 
@@ -51,42 +51,45 @@ func TestPlayerFromBytes(t *testing.T) {
 func TestSendAllPlayerInfo(t *testing.T) {
 	players := [...]server.Player{
 		server.NewPlayer(1, "Hans"),
-	 	server.NewPlayer(4, "Peter"),
-	 	server.NewPlayer(52, "Meier"),
-	 }
-     data := server.NewSendAllPlayerInfo(players[:])
-    gottenData := data.Bytes() 
-    expectedData := []byte {
-        byte(server.SendAllPlayerInfoOpcode),
-        3,
-    }
-    
-    // appending hans
-    expectedData = append(expectedData, 1)
-    expectedData = append(expectedData, byte(len("Hans")))
-    expectedData = append(expectedData, []byte("Hans")...)
+		server.NewPlayer(4, "Peter"),
+		server.NewPlayer(52, "Meier"),
+	}
+	data := server.NewSendAllPlayerInfo(players[:])
+	gottenData := data.Bytes()
+	expectedData := []byte{
+		byte(server.SendAllPlayerInfoOpcode),
+		3,
+	}
 
-   // appending Peter 
-    expectedData = append(expectedData, 4)
-    expectedData = append(expectedData, byte(len("Peter")))
-    expectedData = append(expectedData, []byte("Peter")...)
+	// appending hans
+	expectedData = append(expectedData, 1)
+	expectedData = append(expectedData, byte(len("Hans")))
+	expectedData = append(expectedData, 0)
+	expectedData = append(expectedData, []byte("Hans")...)
 
-    // append Meier
-    expectedData = append(expectedData, 52)
-    expectedData = append(expectedData, byte(len("Meier")))
-    expectedData = append(expectedData, []byte("Meier")...)
+	// appending Peter
+	expectedData = append(expectedData, 4)
+	expectedData = append(expectedData, byte(len("Peter")))
+	expectedData = append(expectedData, 0)
+	expectedData = append(expectedData, []byte("Peter")...)
 
-    if len(gottenData) != len(expectedData) {
-        t.Errorf("The data lenght is different [%d] - [%d]", len(gottenData), len(expectedData))
-        return
-    }
+	// append Meier
+	expectedData = append(expectedData, 52)
+	expectedData = append(expectedData, byte(len("Meier")))
+	expectedData = append(expectedData, 0)
+	expectedData = append(expectedData, []byte("Meier")...)
 
-    for i := range expectedData {
-        if expectedData[i] != gottenData[i] {
-            t.Errorf("the byted at position [%d] are not equals [%d] - [%d]", i, expectedData[i], gottenData[i])
-            return
-        }
-    }
+	if len(gottenData) != len(expectedData) {
+		t.Errorf("The data lenght is different [%d] - [%d]", len(gottenData), len(expectedData))
+		return
+	}
+
+	for i := range expectedData {
+		if expectedData[i] != gottenData[i] {
+			t.Errorf("the byted at position [%d] are not equals [%d] - [%d]", i, expectedData[i], gottenData[i])
+			return
+		}
+	}
 
 }
 
