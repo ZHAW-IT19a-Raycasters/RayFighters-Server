@@ -1,7 +1,6 @@
 package server
 
 import (
-	"bytes"
 	"encoding/binary"
 	"fmt"
 	"math"
@@ -91,20 +90,32 @@ func (mp MovementPlayer) CoorY() float64 {
 	return mp.coorY
 }
 
+func floatToBinary(num float64, data []byte) {
+
+	// convert the float into the int64 representation
+	intRep := math.Float64bits(num)
+
+	// write data back
+	binary.LittleEndian.PutUint64(data, intRep)
+}
+
 func (mp MovementPlayer) Bytes() []byte {
 	size := 1
 	size += 1
-	size += 8 * 8
-	size += 8 * 8
+	size += 8
+	size += 8
 
 	// using the buffer write interface for simplisity
-	buffer := bytes.NewBuffer(make([]byte, 0, size))
-	binary.Write(buffer, binary.LittleEndian, MovementPlayerOpcode.Value())
-	binary.Write(buffer, binary.LittleEndian, mp.userId)
-	binary.Write(buffer, binary.LittleEndian, mp.coorX)
-	binary.Write(buffer, binary.LittleEndian, mp.coorY)
+	buffer := make([]byte, 0, size)
 
-	return buffer.Bytes()
+	buffer = append(buffer, MovementPlayerOpcode.Value())
+	buffer = append(buffer, mp.userId)
+
+	// write floats into the bytes buffer
+	floatToBinary(mp.coorX, buffer[3:12])
+	floatToBinary(mp.coorY, buffer[12:21])
+
+	return buffer
 }
 
 type AnOtherPlayerKilled struct {
