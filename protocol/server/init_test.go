@@ -118,6 +118,29 @@ func TestPlayerFromBytesMuliple(t *testing.T) {
 	}
 }
 
+func TestFloatToBinary(t *testing.T) {
+
+	// 1.00000000000000005551115123126E-1
+	// 0x3FB999999999999A
+	var coorX float64 = 0.1
+	expData := [...]byte{
+		// 0x3F 0xB9 0x99 0x99 0x99 0x99 0x99 0x9A
+		0x9A, 0x99, 0x99, 0x99, 0x99, 0x99, 0xB9, 0x3F,
+	}
+	gotData := make([]byte, 8)
+	server.FloatToBinary(coorX, gotData)
+
+	for i := range expData {
+		got := gotData[i]
+		exp := expData[i]
+		if exp != got {
+			t.Errorf("Bytes at position [%d] are not equals [%d] - [%d]", i, exp, got)
+			return
+		}
+
+	}
+}
+
 func TestMovementPlayerBytes(t *testing.T) {
 	// used https://www.binaryconvert.com/result_double.html?
 	// for manual convertion

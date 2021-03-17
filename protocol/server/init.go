@@ -90,15 +90,6 @@ func (mp MovementPlayer) CoorY() float64 {
 	return mp.coorY
 }
 
-func floatToBinary(num float64, data []byte) {
-
-	// convert the float into the int64 representation
-	intRep := math.Float64bits(num)
-
-	// write data back
-	binary.LittleEndian.PutUint64(data, intRep)
-}
-
 func (mp MovementPlayer) Bytes() []byte {
 	size := 1
 	size += 1
@@ -106,14 +97,14 @@ func (mp MovementPlayer) Bytes() []byte {
 	size += 8
 
 	// using the buffer write interface for simplisity
-	buffer := make([]byte, 0, size)
+	buffer := make([]byte, size)
 
-	buffer = append(buffer, MovementPlayerOpcode.Value())
-	buffer = append(buffer, mp.userId)
+	buffer[0] = MovementPlayerOpcode.Value()
+	buffer[1] = mp.userId
 
 	// write floats into the bytes buffer
-	floatToBinary(mp.coorX, buffer[3:12])
-	floatToBinary(mp.coorY, buffer[12:21])
+	FloatToBinary(mp.coorX, buffer[2:10])
+	FloatToBinary(mp.coorY, buffer[10:18])
 
 	return buffer
 }
@@ -263,4 +254,14 @@ func (p *SendAllPlayerInfo) Bytes() []byte {
 	}
 
 	return buffer
+}
+
+// TODO: Refator into into utils
+func FloatToBinary(num float64, data []byte) {
+
+	// convert the float into the int64 representation
+	intRep := math.Float64bits(num)
+
+	// write data back
+	binary.LittleEndian.PutUint64(data, intRep)
 }
