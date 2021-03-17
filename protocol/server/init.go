@@ -128,7 +128,9 @@ func (p Player) Bytes() []byte {
 // This function will panic, if the data slice is not at least as long
 // as the Player.ByteSize.
 func (p Player) PutBytes(data []byte) {
-	// early bound check, figure out if this is okay...
+	// this eliminates the bound check below
+	// see https://go101.org/article/bounds-check-elimination.html
+	// for more information on the topic.
 	_ = data[p.ByteSize()-1]
 
 	data[0] = p.userId
