@@ -25,7 +25,7 @@ func TestIpInvalid(t *testing.T) {
 
 func TestPortValid(t *testing.T) {
 	allowed := [...]int{-1}
-	ports := [...]string{"111", "-1", "666"}
+	ports := [...]string{"111", "-1", "666", "66"}
 	for _, port := range ports {
 		got := CheckIfPortValid(port, allowed[:])
 		if got != nil {
