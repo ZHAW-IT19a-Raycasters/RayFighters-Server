@@ -1,5 +1,7 @@
 package client
 
+import "fmt"
+
 type ClientOpcode uint8
 
 const (
@@ -17,6 +19,57 @@ var overview = [...]ClientOpcode{
 	RequestOtherPlayersOpcode,
 }
 
+func (o ClientOpcode) Value() uint8 {
+	// This is safe as the original value of o was
+	// a uint8 anyway.
+	return uint8(o)
+}
+
+func (o ClientOpcode) String() string {
+	switch o {
+	case DisconnectOpcode:
+		return "Disconnect"
+	case UnknownOpcode:
+		return "Unknown"
+	case MovementOpcode:
+		return "Movement"
+	case ShootingOpcode:
+		return "Shooting"
+	case RequestOtherPlayersOpcode:
+		return "RequestOtherPlayers"
+	default:
+		// this panic should never be hit,
+		// if it is hit it means there is some
+		// illigal programming state.
+		panic("Unknown client interface")
+	}
+}
+
+func (o ClientOpcode) ByteSize() int {
+	switch o {
+	case DisconnectOpcode:
+		// Opcode
+		return 1
+	case UnknownOpcode:
+		// Opcode
+		return 1
+	case MovementOpcode:
+		// Opcode + 2 * Float64
+		return 1 + 2*8
+	case ShootingOpcode:
+		// Opcode + Flaot64
+		return 1 + 8
+	case RequestOtherPlayersOpcode:
+		// Opcode
+		return 1
+	default:
+		// this panic should never be hit,
+		// if it is hit it means there is some
+		// illigal programming state.
+		panic("Unknown client interface")
+	}
+}
+
 func Detect(opcode uint8) ClientOpcode {
 	parsedOpcode := ClientOpcode(opcode)
 
@@ -27,6 +80,15 @@ func Detect(opcode uint8) ClientOpcode {
 	}
 
 	return UnknownOpcode
+}
+
+type ParsingError struct {
+	opcode ClientOpcode
+	msg    string
+}
+
+func (pe *ParsingError) Error() string {
+	return fmt.Sprintf("Parsing error from %s [%s]", pe.opcode.String(), pe.msg)
 }
 
 type Disconnect struct{}
@@ -53,4 +115,44 @@ func (s Shooting) AngPl() float64 {
 	return s.angPl
 }
 
+func NewShooting(angPl float64) Shooting {
+	return Shooting{
+		angPl: angPl,
+	}
+}
+
+func NewSchootingBytes(data []byte) {
+
+}
+
 type RequestOtherPlayers struct{}
+
+func NewRequestOtherPlayers() RequestOtherPlayers {
+	return RequestOtherPlayers{}
+}
+
+func NewRequestOtherPlayersBytes(data []byte) (*RequestOtherPlayers, error) {
+	// checking length etc
+	// 1 Byte
+	if err := checkOpcodeHelper(RequestOtherPlayersOpcode, data); err != nil {
+		return nil, err
+	}
+
+	val := NewRequestOtherPlayers()
+	return &val, nil
+}
+
+func checkOpcodeHelper(opcode ClientOpcode, data []byte) error {
+	if len(data) != opcode.ByteSize() {
+		return &ParsingError{
+			opcode: opcode,
+			msg:    fmt.Sprintf("must be only [%d] bytes long is [%d]", opcode.ByteSize(), len(data)),
+		}
+	} else if Detect(data[0]) != RequestOtherPlayersOpcode {
+		return &ParsingError{
+			opcode: opcode,
+			msg:    "Incorrect Opcode used.",
+		}
+	}
+	return nil
+}
