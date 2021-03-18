@@ -227,7 +227,7 @@ func TestAnOtherPlayerKilled(t *testing.T) {
 	compareByteArrays(exp[:], got, t)
 }
 
-func TestUnkown(t *testing.T) {
+func TestUnknown(t *testing.T) {
 	exp := [...]byte{
 		server.UnknownOpcode.Value(),
 	}
