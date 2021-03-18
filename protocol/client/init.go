@@ -24,8 +24,8 @@ var overview = [...]ClientOpcode{
 }
 
 func (o ClientOpcode) Value() uint8 {
-	// This is safe as the original value of o was
-	// a uint8 anyway.
+	// SAFETY: This is safe as the original value of
+	// ClientOpcode was a uint8 anyway.
 	return uint8(o)
 }
 

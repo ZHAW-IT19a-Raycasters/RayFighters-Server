@@ -21,7 +21,7 @@ const (
 
 func (s ServerOpcode) Value() uint8 {
 	// SAFETY: this is safe as the value type of
-	// ServerOpcode is already based on the uinit8
+	// ServerOpcode is already based on the uint8
 	// type.
 	return uint8(s)
 }
