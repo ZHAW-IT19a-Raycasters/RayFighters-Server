@@ -61,6 +61,10 @@ func (d Disconnect) Bytes() []byte {
 
 type Unknown struct{}
 
+func NewUnknown() Unknown {
+	return Unknown{}
+}
+
 func (u Unknown) Bytes() []byte {
 	return []byte{UnknownOpcode.Value()}
 }
@@ -113,11 +117,34 @@ type AnOtherPlayerKilled struct {
 	userId uint8
 }
 
+func NewAnotherPlayerKilled(other byte) AnOtherPlayerKilled {
+	return AnOtherPlayerKilled{
+		userId: other,
+	}
+}
+
 func (pk AnOtherPlayerKilled) UserId() uint8 {
 	return pk.userId
 }
 
+func (pk AnOtherPlayerKilled) Bytes() []byte {
+	return []byte{
+		AnOtherPlayerKilledOpcode.Value(),
+		pk.userId,
+	}
+}
+
 type PlayerHimSelfKilled struct{}
+
+func NewPlayerHimSelfKilled() PlayerHimSelfKilled {
+	return PlayerHimSelfKilled{}
+}
+
+func (p PlayerHimSelfKilled) Bytes() []byte {
+	return []byte{
+		PlayerHimSelfKilledOpcode.Value(),
+	}
+}
 
 type Player struct {
 	userId uint8
@@ -185,16 +212,47 @@ type NewPlayerJoined struct {
 	p Player
 }
 
+func NewNewPlayerJoined(p Player) NewPlayerJoined {
+	return NewPlayerJoined{
+		p: p,
+	}
+}
+
 func (p NewPlayerJoined) Player() Player {
 	return p.p
+}
+
+func (p NewPlayerJoined) Bytes() []byte {
+	size := 1                     // opcode
+	size += p.Player().ByteSize() // Player Size
+
+	data := make([]byte, size)
+
+	data[0] = NewPlayerJoinedOpcode.Value()
+	p.p.PutBytes(data[1:])
+
+	return data
 }
 
 type PlayerLeft struct {
 	userId uint8
 }
 
+func NewPlayerLeft(userId uint8) PlayerLeft {
+	return PlayerLeft{
+		userId: userId,
+	}
+}
+
 func (p PlayerLeft) UserId() uint8 {
 	return p.userId
+}
+
+func (p PlayerLeft) Bytes() []byte {
+	return []byte{
+		PlayerLeftOpcode.Value(),
+		p.userId,
+	}
 }
 
 type SendAllPlayerInfo struct {

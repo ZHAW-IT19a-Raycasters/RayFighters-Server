@@ -1,32 +1,12 @@
 package server_test
 
 import (
+	"math"
+	"strings"
 	"testing"
 
 	"github.zhaw.ch/raycasters/server/protocol/server"
 )
-
-func TestPlayerBytes(t *testing.T) {
-	var id uint8 = 0x42     // 1  Byte
-	name := "SomeoneRandom" // 13 Byte
-	player := server.NewPlayer(id, name)
-
-	expected := []byte{0x42, 13, 0, 83, 111, 109, 101, 111, 110, 101, 82, 97, 110, 100, 111, 109}
-	gotten := player.Bytes()
-
-	if len(expected) != len(gotten) {
-		t.Errorf("The lenght of th e arrays are not the same")
-		return
-	}
-
-	for i := range expected {
-		if expected[i] != gotten[i] {
-			t.Errorf("The byte at position [%d] should be [%d], but is [%d]", i, expected[i], gotten[i])
-			return
-		}
-	}
-
-}
 
 func comparePlayers(got, exp server.Player, t *testing.T) bool {
 	if exp.UserId() != got.UserId() {
@@ -41,12 +21,59 @@ func comparePlayers(got, exp server.Player, t *testing.T) bool {
 	return true
 }
 
+func compareByteArrays(expectedData, gottenData []byte, t *testing.T) bool {
+
+	if len(expectedData) != len(gottenData) {
+		t.Errorf("Different lenght of results [%d] - [%d]", len(expectedData), len(gottenData))
+		return false
+	}
+
+	for i := range expectedData {
+		exp := expectedData[i]
+		got := gottenData[i]
+		if exp != got {
+
+			t.Errorf("Bytes at position [%d] are different [%d] - [%d]", i, exp, got)
+			return false
+		}
+	}
+
+	return true
+}
+
+func TestPlayerBytes(t *testing.T) {
+	var id uint8 = 0x42     // 1  Byte
+	name := "SomeoneRandom" // 13 Byte
+	player := server.NewPlayer(id, name)
+
+	expected := []byte{0x42, 13, 0, 83, 111, 109, 101, 111, 110, 101, 82, 97, 110, 100, 111, 109}
+	gotten := player.Bytes()
+
+	if !compareByteArrays(expected, gotten, t) {
+		t.Errorf("happend with\n%s", player.String())
+	}
+}
+
 func TestPlayerFromBytes(t *testing.T) {
 	var id uint8 = 0x42     // 1  Byte
 	name := "SomeoneRandom" // 13 Byte
 	expectedPlayer := server.NewPlayer(id, name)
 	gottenPlayer, _ := server.NewPlayerBytes(expectedPlayer.Bytes())
 	comparePlayers(gottenPlayer, expectedPlayer, t)
+}
+
+func TestPlayerNameTooLong(t *testing.T) {
+	defer func() {
+		err := recover()
+		if err == nil {
+			t.Error("Did not panic as intended")
+		}
+	}()
+
+	var userId byte = 0x66
+	name := strings.Repeat("Long", math.MaxUint16)
+
+	_ = server.NewPlayer(userId, name)
 }
 
 func TestSendAllPlayerInfo(t *testing.T) {
@@ -80,18 +107,7 @@ func TestSendAllPlayerInfo(t *testing.T) {
 	expectedData = append(expectedData, 0)
 	expectedData = append(expectedData, []byte("Meier")...)
 
-	if len(gottenData) != len(expectedData) {
-		t.Errorf("The data lenght is different [%d] - [%d]", len(gottenData), len(expectedData))
-		return
-	}
-
-	for i := range expectedData {
-		if expectedData[i] != gottenData[i] {
-			t.Errorf("the byted at position [%d] are not equals [%d] - [%d]", i, expectedData[i], gottenData[i])
-			return
-		}
-	}
-
+	compareByteArrays(expectedData, gottenData, t)
 }
 
 func TestPlayerFromBytesMuliple(t *testing.T) {
@@ -105,6 +121,7 @@ func TestPlayerFromBytesMuliple(t *testing.T) {
 
 	gottenOpcode := server.NewSendAllPlayerInfoBytes(sapi.Bytes())
 	gottenPlayers := gottenOpcode.Players()
+
 	if len(gottenPlayers) != len(players) {
 		t.Errorf("Array lenght is different [%d] - [%d]", len(gottenPlayers), len(players))
 		return
@@ -130,15 +147,7 @@ func TestFloatToBinary(t *testing.T) {
 	gotData := make([]byte, 8)
 	server.FloatToBinary(coorX, gotData)
 
-	for i := range expData {
-		got := gotData[i]
-		exp := expData[i]
-		if exp != got {
-			t.Errorf("Bytes at position [%d] are not equals [%d] - [%d]", i, exp, got)
-			return
-		}
-
-	}
+	compareByteArrays(expData[:], gotData, t)
 }
 
 func TestMovementPlayerBytes(t *testing.T) {
@@ -166,18 +175,93 @@ func TestMovementPlayerBytes(t *testing.T) {
 	}
 	gottenData := server.NewMovementPlayer(userId, coorX, coorY).Bytes()
 
-	if len(expectedData) != len(gottenData) {
-		t.Errorf("Different lenght of results [%d] - [%d]", len(expectedData), len(gottenData))
-		return
+	compareByteArrays(expectedData[:], gottenData, t)
+}
+
+func TestPlayerLeft(t *testing.T) {
+	var userId uint8 = 0xFF
+	expected := [...]byte{
+		server.PlayerLeftOpcode.Value(),
+		userId,
+	}
+	gotten := server.NewPlayerLeft(userId).Bytes()
+	compareByteArrays(expected[:], gotten, t)
+}
+
+func TestNewPlayerJoined(t *testing.T) {
+	var userId uint8 = 0x42
+	name := "ATotalyRandomName🤬"
+	expected := [...]byte{
+		server.NewPlayerJoinedOpcode.Value(),
+		userId,
+		byte(len(name)),
+		0,
+		// ATotalyRandomName🤬 -> converted with https://onlineutf8tools.com/convert-utf8-to-bytes
+		0x41, 0x54, 0x6f, 0x74, 0x61, 0x6c, 0x79, 0x52, 0x61, 0x6e, 0x64, 0x6f, 0x6d, 0x4e, 0x61, 0x6d, 0x65, 0xf0, 0x9f, 0xa4, 0xac,
 	}
 
-	for i := range expectedData {
-		exp := expectedData[i]
-		got := gottenData[i]
-		if exp != got {
+	gotten := server.NewNewPlayerJoined(server.NewPlayer(userId, name)).Bytes()
 
-			t.Errorf("Bytes at position [%d] are different [%d] - [%d]", i, exp, got)
-			return
+	compareByteArrays(expected[:], gotten, t)
+}
+
+func TestPlayerHasBeenKilled(t *testing.T) {
+	exp := []byte{
+		server.PlayerHimSelfKilledOpcode.Value(),
+	}
+	got := server.NewPlayerHimSelfKilled().Bytes()
+
+	compareByteArrays(exp, got, t)
+}
+
+func TestAnOtherPlayerKilled(t *testing.T) {
+	var userId byte = 0x0A
+
+	exp := [...]byte{
+		server.AnOtherPlayerKilledOpcode.Value(),
+		userId,
+	}
+
+	got := server.NewAnotherPlayerKilled(userId).Bytes()
+
+	compareByteArrays(exp[:], got, t)
+}
+
+func TestUnkown(t *testing.T) {
+	exp := [...]byte{
+		server.UnknownOpcode.Value(),
+	}
+
+	got := server.NewUnknown().Bytes()
+	compareByteArrays(exp[:], got, t)
+}
+
+func TestDisconnect(t *testing.T) {
+	exp := [...]byte{
+		server.DisconnectOpcode.Value(),
+	}
+
+	got := server.NewDisconnect().Bytes()
+	compareByteArrays(exp[:], got, t)
+}
+
+func TestDetect(t *testing.T) {
+	opcodes := [...]server.ServerOpcode{
+		server.DisconnectOpcode,
+		server.DisconnectOpcode,
+		server.UnknownOpcode,
+		server.MovementPlayerOpcode,
+		server.AnOtherPlayerKilledOpcode,
+		server.PlayerHimSelfKilledOpcode,
+		server.NewPlayerJoinedOpcode,
+		server.PlayerLeftOpcode,
+		server.SendAllPlayerInfoOpcode,
+	}
+
+	for _, val := range opcodes {
+		got := server.Detect(val.Value())
+		if val != got {
+			t.Errorf("opcodes are different [%d] - [%d]", val, got)
 		}
 	}
 }
