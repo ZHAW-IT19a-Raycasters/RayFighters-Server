@@ -97,7 +97,39 @@ func (pe *ParsingError) Error() string {
 
 type Disconnect struct{}
 
+func NewDisconnect() Disconnect {
+	return Disconnect{}
+}
+
+// This should actually never be called, but is here for completion.
+func NewDiconnectByte(data []byte) (*Disconnect, error) {
+	// checking length etc
+	// 1 Byte
+	if err := checkOpcodeHelper(DisconnectOpcode, data); err != nil {
+		return nil, err
+	}
+
+	val := NewDisconnect()
+	return &val, nil
+}
+
 type Unknown struct{}
+
+func NewUnknown() Unknown {
+	return Unknown{}
+}
+
+// This should actually never be called, but is here for completion.
+func NewUnknownByte(data []byte) (*Unknown, error) {
+	// checking length etc
+	// 1 Byte
+	if err := checkOpcodeHelper(UnknownOpcode, data); err != nil {
+		return nil, err
+	}
+
+	val := NewUnknown()
+	return &val, nil
+}
 
 type Movement struct {
 	coorX, coorY float64
@@ -109,6 +141,26 @@ func (m Movement) CoorX() float64 {
 
 func (m Movement) CoorY() float64 {
 	return m.coorY
+}
+
+func NewMovement(coorX, coorY float64) Movement {
+	return Movement{
+		coorX: coorX,
+		coorY: coorY,
+	}
+}
+
+func NewMovementByte(data []byte) (*Movement, error) {
+	if err := checkOpcodeHelper(MovementOpcode, data); err != nil {
+		return nil, err
+	}
+
+	coorX := BinaryToFloat(data[1:9])
+	coorY := BinaryToFloat(data[9:])
+
+	val := NewMovement(coorX, coorY)
+
+	return &val, nil
 }
 
 type Shooting struct {
@@ -134,7 +186,7 @@ func NewSchootingBytes(data []byte) (*Shooting, error) {
 	}
 
 	// lenght is now correct
-	angle := BinaryToBloat(data[1:])
+	angle := BinaryToFloat(data[1:])
 
 	val := NewShooting(angle)
 	return &val, nil
@@ -177,7 +229,7 @@ func checkOpcodeHelper(opcode ClientOpcode, data []byte) error {
 // Attention this assumes that the float starts from
 // position 0 on and that the float is formatted
 // according to the IEEE specification.
-func BinaryToBloat(data []byte) float64 {
+func BinaryToFloat(data []byte) float64 {
 
 	// convert the float into the int64 representation
 	intRep := binary.LittleEndian.Uint64(data)

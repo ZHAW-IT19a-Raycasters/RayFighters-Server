@@ -62,7 +62,62 @@ func TestShooting(t *testing.T) {
 	}
 }
 
-func TestBinaryToBloat(t *testing.T) {
+func TestMovement(t *testing.T) {
+	// for manual float conversion
+	// http://www.binaryconvert.com/result_double.html
+	// 0x40 0x84 0xD0 0x00 0x00 0x00 0x00 0x00
+	coorX := 666.0
+	// 0x40 0x8F 0x3F 0xFD 0xF3 0xB6 0x45 0xA2
+	coorY := 999.999
+
+	data := [...]byte{
+		client.MovementOpcode.Value(),
+		// 0x40 0x84 0xD0 0x00 0x00 0x00 0x00 0x00
+		0x00, 0x00, 0x00, 0x00, 0x00, 0xD0, 0x84, 0x40,
+		// 0x40 0x8F 0x3F 0xFD 0xF3 0xB6 0x45 0xA2
+		0xA2, 0x45, 0xB6, 0xF3, 0xFD, 0x3F, 0x8F, 0x40,
+	}
+
+	val, err := client.NewMovementByte(data[:])
+
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	if val.CoorX() != coorX {
+		t.Error("incorrect coordinate X")
+	}
+
+	if val.CoorY() != coorY {
+		t.Error("incorrect coordinate Y")
+	}
+}
+
+func TestUnknown(t *testing.T) {
+	// correct version
+	data := []byte{
+		client.UnknownOpcode.Value(),
+	}
+	_, err := client.NewUnknownByte(data)
+	if err != nil {
+		t.Errorf("Correct version was flaged here\n%s", err)
+		return
+	}
+}
+
+func TestDisconnect(t *testing.T) {
+	// correct version
+	data := []byte{
+		client.DisconnectOpcode.Value(),
+	}
+	_, err := client.NewDiconnectByte(data)
+	if err != nil {
+		t.Errorf("Correct version was flaged here\n%s", err)
+		return
+	}
+}
+func TestBinaryToFloat(t *testing.T) {
 
 	// 1.00000000000000005551115123126E-1
 	// 0x3FB999999999999A
@@ -73,7 +128,7 @@ func TestBinaryToBloat(t *testing.T) {
 		0x9A, 0x99, 0x99, 0x99, 0x99, 0x99, 0xB9, 0x3F,
 	}
 
-	got := client.BinaryToBloat(rawData[:])
+	got := client.BinaryToFloat(rawData[:])
 	if got != expected {
 		t.Errorf("incorrect conversion of number")
 	}
