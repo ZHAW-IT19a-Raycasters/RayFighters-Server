@@ -315,6 +315,11 @@ func (p *SendAllPlayerInfo) Bytes() []byte {
 }
 
 // TODO: Refator into into utils
+// Will insert the num into data, starting
+// from the index 0 on. It will utilize
+// the IEEE specification.
+// Attention this function assumes that
+// the data is already initialized.
 func FloatToBinary(num float64, data []byte) {
 
 	// convert the float into the int64 representation

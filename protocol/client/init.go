@@ -1,6 +1,10 @@
 package client
 
-import "fmt"
+import (
+	"encoding/binary"
+	"fmt"
+	"math"
+)
 
 type ClientOpcode uint8
 
@@ -121,8 +125,19 @@ func NewShooting(angPl float64) Shooting {
 	}
 }
 
-func NewSchootingBytes(data []byte) {
+func NewSchootingBytes(data []byte) (*Shooting, error) {
+	// u8 f64
+	err := checkOpcodeHelper(ShootingOpcode, data)
 
+	if err != nil {
+		return nil, err
+	}
+
+	// lenght is now correct
+	angle := BinaryToBloat(data[1:])
+
+	val := NewShooting(angle)
+	return &val, nil
 }
 
 type RequestOtherPlayers struct{}
@@ -148,11 +163,25 @@ func checkOpcodeHelper(opcode ClientOpcode, data []byte) error {
 			opcode: opcode,
 			msg:    fmt.Sprintf("must be only [%d] bytes long is [%d]", opcode.ByteSize(), len(data)),
 		}
-	} else if Detect(data[0]) != RequestOtherPlayersOpcode {
+	} else if Detect(data[0]) != opcode {
 		return &ParsingError{
 			opcode: opcode,
 			msg:    "Incorrect Opcode used.",
 		}
 	}
 	return nil
+}
+
+// TODO: Refator into into utils
+// Will convert a binary blob into a correct float64.
+// Attention this assumes that the float starts from
+// position 0 on and that the float is formatted
+// according to the IEEE specification.
+func BinaryToBloat(data []byte) float64 {
+
+	// convert the float into the int64 representation
+	intRep := binary.LittleEndian.Uint64(data)
+
+	// convert the raw int representation to
+	return math.Float64frombits(intRep)
 }
