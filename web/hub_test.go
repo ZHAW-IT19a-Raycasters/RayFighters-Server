@@ -25,3 +25,22 @@ func TestHubRegisterClient(t *testing.T) {
 		t.Errorf("Client registration failed!")
 	}
 }
+
+func TestHubUnregisterClient(t *testing.T) {
+	hub := newHub()
+	go hub.run()
+
+	client := &Client{hub: hub, conn: &websocket.Conn{}, send: make(chan []byte, 256)}
+	hub.clients[client] = true
+
+	if !hub.clients[client] {
+		t.Errorf("Clinets map supposed to contain a client")
+	}
+
+	client.hub.unregister <- client
+
+	if len(hub.clients) != 0 {
+		t.Errorf("Clients map supposed to be empty")
+	}
+
+}
