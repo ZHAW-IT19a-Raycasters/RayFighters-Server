@@ -19,7 +19,7 @@ const (
 	MovementPlayerOpcode      ServerOpcode = 0x6E
 	AnOtherPlayerKilledOpcode ServerOpcode = 0x78
 	PlayerHimSelfKilledOpcode ServerOpcode = 0x79
-	NewPlayerJoinedOpcode     ServerOpcode = 0x7A
+	PlayerJoinedOpcode        ServerOpcode = 0x7A
 	PlayerLeftOpcode          ServerOpcode = 0x7B
 	SendAllPlayerInfoOpcode   ServerOpcode = 0x82
 )
@@ -44,7 +44,7 @@ func Detect(opcode uint8) ServerOpcode {
 		MovementPlayerOpcode,
 		AnOtherPlayerKilledOpcode,
 		PlayerHimSelfKilledOpcode,
-		NewPlayerJoinedOpcode,
+		PlayerJoinedOpcode,
 		PlayerLeftOpcode,
 		SendAllPlayerInfoOpcode,
 	}
@@ -89,11 +89,15 @@ func (u Unknown) Bytes() []byte {
 	return []byte{UnknownOpcode.Value()}
 }
 
+// MovementPlayer represents a movement make by a specific player.
+// It contains the user id and the respective offsets sice the last
+// time the command was send.
 type MovementPlayer struct {
 	userId       uint8
 	coorX, coorY float64
 }
 
+// NewMovemementPlayer will construct a new player object.
 func NewMovementPlayer(userId uint8, coorX, coorY float64) MovementPlayer {
 	return MovementPlayer{
 		userId: userId,
@@ -102,18 +106,22 @@ func NewMovementPlayer(userId uint8, coorX, coorY float64) MovementPlayer {
 	}
 }
 
+// UserId will return the user whom has made the given movement.
 func (mp MovementPlayer) UserId() uint8 {
 	return mp.userId
 }
 
+// CoorX is the offset on the x axis done by the player.
 func (mp MovementPlayer) CoorX() float64 {
 	return mp.coorX
 }
 
+// CoorY is the offset on the y axis done by the player.
 func (mp MovementPlayer) CoorY() float64 {
 	return mp.coorY
 }
 
+// Bytes will turn the movement instance into a sendable byte stream.
 func (mp MovementPlayer) Bytes() []byte {
 	size := 1
 	size += 1
@@ -133,20 +141,27 @@ func (mp MovementPlayer) Bytes() []byte {
 	return buffer
 }
 
+// AnOtherPlayerKilled is the counter part to PlayerHimSelfKilledOpcode
+// it is send to any other active clients in the room.
 type AnOtherPlayerKilled struct {
 	userId uint8
 }
 
+// NewAnotherPlayerKilled will initialize the instantiation of
+// NewAnotherPlayerKilled.
 func NewAnotherPlayerKilled(other byte) AnOtherPlayerKilled {
 	return AnOtherPlayerKilled{
 		userId: other,
 	}
 }
 
+// UserId will return the userId of the player that gotten killed.
 func (pk AnOtherPlayerKilled) UserId() uint8 {
 	return pk.userId
 }
 
+// Bytes will turn the AnOtherPlayerKilled instance into a sendable
+// byte stream.
 func (pk AnOtherPlayerKilled) Bytes() []byte {
 	return []byte{
 		AnOtherPlayerKilledOpcode.Value(),
@@ -154,30 +169,46 @@ func (pk AnOtherPlayerKilled) Bytes() []byte {
 	}
 }
 
+// PlayerHimSelfKilled is the counterpart to AnOtherPlayerKilled
+// as it deactivates the players abilities to move or shoot.
 type PlayerHimSelfKilled struct{}
 
+// NewPlayerHimSelfKilled will create the corresponding
+// instance.
 func NewPlayerHimSelfKilled() PlayerHimSelfKilled {
 	return PlayerHimSelfKilled{}
 }
 
+// Bytes will turn the AnOtherPlayerKilled instance into a sendable
+// byte stream.
 func (p PlayerHimSelfKilled) Bytes() []byte {
 	return []byte{
 		PlayerHimSelfKilledOpcode.Value(),
 	}
 }
 
+// Player is an internally used representation of the
+// relative complex data type called player.
 type Player struct {
 	userId uint8
 	name   string
 }
 
+// String will return a printable representation of any
+// given player.
 func (p Player) String() string {
 	return fmt.Sprintf("Id: %d\n Name: %s", p.userId, p.name)
 }
 
+// NewPlayer will create a new player from the given
+// input parameters.
+//
+// Attention this function can panic if the player
+// name is larger then the larges uint16 value possible.
+// (65'535)
 func NewPlayer(userId uint8, name string) Player {
-	if math.MaxInt16 <= len(name) {
-		panic(fmt.Sprintf("Maximum name lenght is a %d", math.MaxInt16))
+	if math.MaxUint16 <= len(name) {
+		panic(fmt.Sprintf("Maximum name lenght is a %d", math.MaxUint16))
 	}
 
 	return Player{userId: userId, name: name}
@@ -185,6 +216,17 @@ func NewPlayer(userId uint8, name string) Player {
 
 // Will contruct a new player from a byte array.
 // Will return the offset where the player stops.
+//
+// Attention this function will not return an
+// error if any of the given lenghts are incorrect,
+// as this function should never actually be used
+// on the server side, but is primarilly used for
+// testing purposes.
+//
+// Needed are:
+//    - UserId           (1 byte)
+//    - StringLength [n] (2 bytes)
+//    - String           (n bytes)
 func NewPlayerBytes(info []byte) (Player, int) {
 	userId := info[0]
 	lenName := binary.LittleEndian.Uint16(info[1:3])
@@ -193,20 +235,24 @@ func NewPlayerBytes(info []byte) (Player, int) {
 	return NewPlayer(userId, name), int(size)
 }
 
+// UserId is a getter for the internal user id.
 func (p Player) UserId() uint8 {
 	return p.userId
 }
 
+// Name is a getter of the player name.
 func (p Player) Name() string {
 	return p.name
 }
 
+// ByteSize is a helper that will return a players size,
+// so that a correctly sized buffer can be preallocated.
 func (p Player) ByteSize() int {
 	return 1 + 2 + len(p.name)
 }
 
-// A wrapper function for PutBytes, where the byte representation is
-// returned instead of written into.
+// Bytes is wrapper function for PutBytes, where the byte
+// representation is returned instead of written into.
 func (p Player) Bytes() []byte {
 	// UserId NameSize Name
 	data := make([]byte, p.ByteSize())
@@ -214,7 +260,8 @@ func (p Player) Bytes() []byte {
 	return data
 }
 
-// This function will write from the zero position on of the slice.
+// PutBytes will write the binary representation of the player into
+// the `data` parameter, from the zero position on of the slice.
 // This function will panic, if the data slice is not at least as long
 // as the Player.ByteSize.
 func (p Player) PutBytes(data []byte) {
@@ -228,46 +275,61 @@ func (p Player) PutBytes(data []byte) {
 	copy(data[3:], p.name)
 }
 
-type NewPlayerJoined struct {
+// PlayerJoined is the opcode that will be send in the case
+// that a new player has joined a room. Just like the name
+// implies.
+type PlayerJoined struct {
 	p Player
 }
 
-func NewNewPlayerJoined(p Player) NewPlayerJoined {
-	return NewPlayerJoined{
+// NewPlayerJoined will create a new instance of the player joined
+// type.
+func NewPlayerJoined(p Player) PlayerJoined {
+	return PlayerJoined{
 		p: p,
 	}
 }
 
-func (p NewPlayerJoined) Player() Player {
+// Player is a getter for the player that has joined the room.
+func (p PlayerJoined) Player() Player {
 	return p.p
 }
 
-func (p NewPlayerJoined) Bytes() []byte {
+// Bytes will return the information needed to write the player
+// informatiom back.
+func (p PlayerJoined) Bytes() []byte {
 	size := 1                     // opcode
 	size += p.Player().ByteSize() // Player Size
 
 	data := make([]byte, size)
 
-	data[0] = NewPlayerJoinedOpcode.Value()
+	data[0] = PlayerJoinedOpcode.Value()
 	p.p.PutBytes(data[1:])
 
 	return data
 }
 
+// PlayerLeft represents a player that left the game.
+// This opcode would also be send after a diconnect
+// timeout.
 type PlayerLeft struct {
 	userId uint8
 }
 
+// NewPlayerLeft create an opcode representing a player leaving the board.
 func NewPlayerLeft(userId uint8) PlayerLeft {
 	return PlayerLeft{
 		userId: userId,
 	}
 }
 
+// UserId of the player leaving is returned.
 func (p PlayerLeft) UserId() uint8 {
 	return p.userId
 }
 
+// Bytes will return the information needed to inform
+// any clients in the room that the player left.
 func (p PlayerLeft) Bytes() []byte {
 	return []byte{
 		PlayerLeftOpcode.Value(),
@@ -275,18 +337,26 @@ func (p PlayerLeft) Bytes() []byte {
 	}
 }
 
+// SendAllPlayerInfo is a request that will have to return any and
+// all player information requiered for operations.
 type SendAllPlayerInfo struct {
 	players []Player
 }
 
+// NewSendAllPlayerInfo will create the corresponding opcode type.
 func NewSendAllPlayerInfo(players []Player) *SendAllPlayerInfo {
 	return &SendAllPlayerInfo{
 		players: players,
 	}
 }
 
+// NewSendAllPlayerInfoBytes will read all the player
+// information from the data stream and return a deserialized
+// overview of all the players.
+//
 // This assumes the full binary stream to be used
 // so with opcode.
+//
 // Attention this is a function used for testing
 // purposes only, so a multitude of security
 // checks are not written.
@@ -308,10 +378,13 @@ func NewSendAllPlayerInfoBytes(data []byte) *SendAllPlayerInfo {
 	}
 }
 
+// Players will reuturn all the players in the current room.
 func (p *SendAllPlayerInfo) Players() []Player {
 	return p.players
 }
 
+// Bytes will return a correct byte stream with all the required
+// player information.
 func (p *SendAllPlayerInfo) Bytes() []byte {
 	// precalculate bytesize
 	size := 1 // opcode
