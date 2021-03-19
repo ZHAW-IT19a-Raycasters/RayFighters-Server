@@ -1,3 +1,5 @@
+// Package server contains all the structs and parsing functionality
+// needed for the server side raycaster protocol.
 package server
 
 import (
@@ -6,6 +8,9 @@ import (
 	"math"
 )
 
+// A Server Opcode represents the internal representations
+// of all the defined server side operational
+// codes that control the game flow.
 type ServerOpcode uint8
 
 const (
@@ -19,6 +24,7 @@ const (
 	SendAllPlayerInfoOpcode   ServerOpcode = 0x82
 )
 
+// Value returns the internal value representation as a uint8.
 func (s ServerOpcode) Value() uint8 {
 	// SAFETY: this is safe as the value type of
 	// ServerOpcode is already based on the uint8
@@ -26,18 +32,24 @@ func (s ServerOpcode) Value() uint8 {
 	return uint8(s)
 }
 
-var overview = [...]ServerOpcode{
-	DisconnectOpcode,
-	UnknownOpcode,
-	MovementPlayerOpcode,
-	AnOtherPlayerKilledOpcode,
-	PlayerHimSelfKilledOpcode,
-	NewPlayerJoinedOpcode,
-	PlayerLeftOpcode,
-	SendAllPlayerInfoOpcode,
-}
-
+// Detect converts from the an external byte into the internally
+// used ServerOpcode type.
+//
+// Will return Unknown when there is no mapping for the given value.
 func Detect(opcode uint8) ServerOpcode {
+
+	var overview = [...]ServerOpcode{
+		DisconnectOpcode,
+		UnknownOpcode,
+		MovementPlayerOpcode,
+		AnOtherPlayerKilledOpcode,
+		PlayerHimSelfKilledOpcode,
+		NewPlayerJoinedOpcode,
+		PlayerLeftOpcode,
+		SendAllPlayerInfoOpcode,
+	}
+
+	// cast into a comparable opcode type
 	parsedOpcode := ServerOpcode(opcode)
 
 	for _, element := range overview {
@@ -49,22 +61,30 @@ func Detect(opcode uint8) ServerOpcode {
 	return UnknownOpcode
 }
 
+// Disconnect represents a server shutdown.
 type Disconnect struct{}
 
+// NewDiconnect creates a new disconnect instance.
 func NewDisconnect() Disconnect {
 	return Disconnect{}
 }
 
+// Bytes will turn the diconnect instance into a sendable byte stream.
 func (d Disconnect) Bytes() []byte {
 	return []byte{DisconnectOpcode.Value()}
 }
 
+// Unknown represents the fallback opcode in case there is a
+// difference of protocol version or if there is an unknown
+// opcode it self send.
 type Unknown struct{}
 
+// Will initialize the Unknown opcode struct.
 func NewUnknown() Unknown {
 	return Unknown{}
 }
 
+// Bytes will turn the unknown instance into a sendable byte stream.
 func (u Unknown) Bytes() []byte {
 	return []byte{UnknownOpcode.Value()}
 }
@@ -315,6 +335,7 @@ func (p *SendAllPlayerInfo) Bytes() []byte {
 }
 
 // TODO: Refator into into utils
+//
 // Will insert the num into data, starting
 // from the index 0 on. It will utilize
 // the IEEE specification.
