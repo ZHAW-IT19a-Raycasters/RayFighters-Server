@@ -177,7 +177,7 @@ func TestNewPlayerJoined(t *testing.T) {
 	var userId uint8 = 0x42
 	name := "ATotalyRandomName🤬"
 	expected := [...]byte{
-		server.NewPlayerJoinedOpcode.Value(),
+		server.PlayerJoinedOpcode.Value(),
 		userId,
 		byte(len(name)),
 		0,
@@ -185,7 +185,7 @@ func TestNewPlayerJoined(t *testing.T) {
 		0x41, 0x54, 0x6f, 0x74, 0x61, 0x6c, 0x79, 0x52, 0x61, 0x6e, 0x64, 0x6f, 0x6d, 0x4e, 0x61, 0x6d, 0x65, 0xf0, 0x9f, 0xa4, 0xac,
 	}
 
-	gotten := server.NewNewPlayerJoined(server.NewPlayer(userId, name)).Bytes()
+	gotten := server.NewPlayerJoined(server.NewPlayer(userId, name)).Bytes()
 
 	compareByteArrays(expected[:], gotten, t)
 }
@@ -238,7 +238,7 @@ func TestDetect(t *testing.T) {
 		server.MovementPlayerOpcode,
 		server.AnOtherPlayerKilledOpcode,
 		server.PlayerHimSelfKilledOpcode,
-		server.NewPlayerJoinedOpcode,
+		server.PlayerJoinedOpcode,
 		server.PlayerLeftOpcode,
 		server.SendAllPlayerInfoOpcode,
 	}
