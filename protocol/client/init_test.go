@@ -50,7 +50,7 @@ func TestShooting(t *testing.T) {
 		//, 0x40, 0x1B, 0x99, 0x99, 0x99, 0x99, 0x99, 0x9A
 		0x9A, 0x99, 0x99, 0x99, 0x99, 0x99, 0x1B, 0x40,
 	}
-	got, err := client.NewSchootingBytes(data[:])
+	got, err := client.NewShootingBytes(data[:])
 
 	if err != nil {
 		t.Error(err)
@@ -111,7 +111,7 @@ func TestDisconnect(t *testing.T) {
 	data := []byte{
 		client.DisconnectOpcode.Value(),
 	}
-	_, err := client.NewDiconnectByte(data)
+	_, err := client.NewDisconnectByte(data)
 	if err != nil {
 		t.Errorf("Correct version was flaged here\n%s", err)
 		return

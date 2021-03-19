@@ -69,7 +69,7 @@ func NewDisconnect() Disconnect {
 	return Disconnect{}
 }
 
-// Bytes will turn the diconnect instance into a sendable byte stream.
+// Bytes will turn the disconnect instance into a sendable byte stream.
 func (d Disconnect) Bytes() []byte {
 	return []byte{DisconnectOpcode.Value()}
 }
@@ -89,8 +89,8 @@ func (u Unknown) Bytes() []byte {
 	return []byte{UnknownOpcode.Value()}
 }
 
-// MovementPlayer represents a movement make by a specific player.
-// It contains the user id and the respective offsets sice the last
+// MovementPlayer represents a movement made by a specific player.
+// It contains the user id and the respective offsets size the last
 // time the command was send.
 type MovementPlayer struct {
 	userId       uint8
@@ -214,13 +214,13 @@ func NewPlayer(userId uint8, name string) Player {
 	return Player{userId: userId, name: name}
 }
 
-// Will contruct a new player from a byte array.
+// Will construct a new player from a byte array.
 // Will return the offset where the player stops.
 //
 // Attention this function will not return an
 // error if any of the given lenghts are incorrect,
 // as this function should never actually be used
-// on the server side, but is primarilly used for
+// on the server side, but is primarily used for
 // testing purposes.
 //
 // Needed are:
@@ -296,7 +296,7 @@ func (p PlayerJoined) Player() Player {
 }
 
 // Bytes will return the information needed to write the player
-// informatiom back.
+// information back.
 func (p PlayerJoined) Bytes() []byte {
 	size := 1                     // opcode
 	size += p.Player().ByteSize() // Player Size
@@ -310,7 +310,7 @@ func (p PlayerJoined) Bytes() []byte {
 }
 
 // PlayerLeft represents a player that left the game.
-// This opcode would also be send after a diconnect
+// This opcode would also be send after a disconnect
 // timeout.
 type PlayerLeft struct {
 	userId uint8
@@ -378,7 +378,7 @@ func NewSendAllPlayerInfoBytes(data []byte) *SendAllPlayerInfo {
 	}
 }
 
-// Players will reuturn all the players in the current room.
+// Players will return all the players in the current room.
 func (p *SendAllPlayerInfo) Players() []Player {
 	return p.players
 }
