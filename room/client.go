@@ -17,12 +17,29 @@ const (
 )
 
 type Client struct {
-	send   chan struct{}
-	recv   chan struct{}
-	wg     sync.WaitGroup
-	status ConnectionStatus
-	info   *ClientGame
-	meta   *ClientMeta
+	// is the one channel that controlls the
+	// input output connections
+	running chan struct{}
+	info    ClientGame
+	meta    ClientMeta
+	status  ConnectionStatus
+	wg      *sync.WaitGroup
+}
+
+func NewClient(meta ClientMeta) *Client {
+	c := Client{
+		running: make(chan struct{}),
+		info:    NewClientGame(NewCoordinate()),
+		status:  Offline,
+		wg:      &sync.WaitGroup{},
+	}
+	return &c
+}
+
+func (c *Client) registerConn(conn ClientMeta) {
+	c.meta = conn
+	c.status = Active
+	// TODO: start receiving and sending here
 }
 
 func (c *Client) Shutdown(ctx context.Context) {
@@ -36,14 +53,10 @@ func (c *Client) Shutdown(ctx context.Context) {
 
 	// Make a waiter that will (hopefully) shutdown soon.
 	go func() {
+		close(c.running)
 		c.wg.Wait()
 		close(runs)
 	}()
-
-	// close the channels, that the sender and
-	// reader listen to.
-	close(c.send)
-	close(c.recv)
 
 	select {
 	case <-runs:
@@ -55,9 +68,16 @@ func (c *Client) Shutdown(ctx context.Context) {
 
 type ClientGame struct {
 	pos    Coordinate
-	meta   ClientMeta
 	kills  uint
 	deaths uint
+}
+
+func NewClientGame(pos Coordinate) ClientGame {
+	return ClientGame{
+		pos:    pos,
+		kills:  0,
+		deaths: 0,
+	}
 }
 
 type ClientMeta struct {

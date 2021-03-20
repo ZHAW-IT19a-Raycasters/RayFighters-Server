@@ -5,3 +5,11 @@ type Coordinate struct {
 	y    float64
 	view float64
 }
+
+func NewCoordinate() Coordinate {
+	return Coordinate{
+		x:    0,
+		y:    0,
+		view: 0,
+	}
+}
