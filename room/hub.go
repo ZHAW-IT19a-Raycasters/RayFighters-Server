@@ -40,19 +40,20 @@ func NewHub(hubId int) (*Hub, chan<- ClientMeta) {
 	return &hub, hub.conn
 }
 
-func (h *Hub) addClient(client ClientMeta) {
+func (h *Hub) addClient(meta ClientMeta) {
 	// TODO: add the new client to the Hub
 	// lock the hub, so that writing is okay
 	h.lock.Lock()
 	defer h.lock.Unlock()
 	// check if client ID already exists.
-	if val, ok := h.clients[client.id]; ok {
+	if val, ok := h.clients[meta.id]; ok {
 		// the person already exisited in the Hub
 		// add him back
-		val.registerConn(client)
+		val.registerConn(meta)
 	} else {
 		// a new client
-
+		client := NewClient(meta)
+		h.clients[meta.id] = client
 	}
 }
 
