@@ -1,9 +1,7 @@
 package room
 
 import (
-	"container/list"
 	"context"
-	"math"
 	"sync"
 	"time"
 
@@ -12,58 +10,51 @@ import (
 
 const ClientShudownTime = 1 * time.Second
 
-// Hub represents a single room.
-type Hub struct {
-	// The channel overwhich a new connection
-	// comes into.
-	conn chan ClientMeta
-	// The room id
-	id int
+type clientManager struct {
 	// an overview of all the clients in the room currently.
 	clients map[uint8]*Client
 	// mapps from the external uuid to the internally used
 	mapping map[uuid.UUID]uint8
-	// The list of currently available user ids
-	// if this is empty all ids have been used.
-	availableIds *list.List
+	// manages all the available ids
+	idManager idManager
 	// Counts the ammount of connections are currently open and
 	// running.
 	wg *sync.WaitGroup
-	// The channel that signals the main loop to shutdown.
-	running chan struct{}
 	// The read writer lock used to block the client list on inserting
 	// or removing a client.
 	// Attention: This lock is only to be used via the internal functions.
 	lock sync.RWMutex
 }
 
-func NewHub(hubId int) (*Hub, chan<- ClientMeta) {
-	hub := Hub{
-		conn:         make(chan ClientMeta),
-		id:           hubId,
-		clients:      make(map[uint8]*Client),
-		availableIds: list.New(),
-		wg:           &sync.WaitGroup{},
-		running:      make(chan struct{}),
-	}
+func newClientManager() clientManager {
 
-	for i := 0; i < math.MaxUint8; i += 1 {
-		hub.availableIds.PushBack(i)
+	return clientManager{
+		clients:   make(map[uint8]*Client),
+		idManager: newIdManager(),
+		wg:        &sync.WaitGroup{},
 	}
-
-	return &hub, hub.conn
 }
 
-func (h *Hub) addClient(meta ClientMeta) {
-	// TODO: add the new client to the Hub
+// mapId will map the client meta information with the internal value.
+// If there is no such person this function will return false and
+// a zero value.
+func (manager *clientManager) mapId(meta ClientMeta) (uint8, bool) {
+	id, ok := manager.mapping[meta.id]
+	return id, ok
+}
+
+// addClient will add a new client to the manager, if the client has
+// once before been added, then the previous connection will be
+// replaced.
+func (manager *clientManager) addClient(meta ClientMeta) {
 	// lock the hub, so that writing is okay
-	h.lock.Lock()
-	defer h.lock.Unlock()
+	manager.lock.Lock()
+	defer manager.lock.Unlock()
 	// check if client ID already exists.
-	if id, ok := h.mapping[meta.id]; ok {
+	if id, ok := manager.mapId(meta); ok {
 		// the person already exisited in the Hub
 		// add him back
-		if val, ok := h.clients[id]; ok {
+		if val, ok := manager.clients[id]; ok {
 			// get client
 			val.registerConn(meta)
 		} else {
@@ -74,22 +65,86 @@ func (h *Hub) addClient(meta ClientMeta) {
 	} else {
 		// a new client
 		// get the new ID for the client
-		elem := h.availableIds.Front()
-		h.availableIds.Remove(elem)
-		id := elem.Value.(uint8)
+		id, _ := manager.idManager.pop()
 
 		// map the UUID to the internaly used
-		h.mapping[meta.id] = id
+		manager.mapping[meta.id] = id
 
 		// create the client with the correct information
 		client := NewClient(id, meta)
-		h.clients[id] = client
+		manager.clients[id] = client
 	}
+}
+
+// removeClient will remove the given client from the manager, this will return an error
+// if the given client does not exist.
+func (manager *clientManager) removeClient(meta ClientMeta) {
+	manager.lock.Lock()
+	defer manager.lock.Unlock()
+	id, ok := manager.mapId(meta)
+	if !ok {
+		// TODO: return a fitting error
+		return
+	}
+	// make sure it is shutdown
+	val := manager.clients[id]
+	cxt, cancel := context.WithTimeout(context.Background(), ClientShudownTime)
+	val.Shutdown(cxt)
+	// wait until done
+	<-cxt.Done()
+
+	cancel()
+
+	// remove from mapping
+	delete(manager.mapping, meta.id)
+	delete(manager.clients, id)
+}
+
+func (manager *clientManager) shutdown(cxt context.Context) {
+	// Will tell all the clients to shutdown in the given shutdown time.
+	childCxt, chancelCxt := context.WithTimeout(cxt, ClientShudownTime)
+
+	// Remove from memory and close any open waiting channels.
+	defer func() {
+		chancelCxt()
+	}()
+
+	for _, key := range manager.clients {
+		key.Shutdown(childCxt)
+	}
+
+	manager.wg.Wait()
+}
+
+// Hub represents a single room.
+type Hub struct {
+	// The channel overwhich a new connection
+	// comes into.
+	conn chan ClientMeta
+	// The room id
+	id int
+	// The manager of the different client with the different connections.
+	clientManager clientManager
+	// The channel that signals the main loop to shutdown.
+	running chan struct{}
+}
+
+func NewHub(hubId int) (*Hub, chan<- ClientMeta) {
+	hub := Hub{
+		conn: make(chan ClientMeta),
+		id:   hubId,
+
+		running: make(chan struct{}),
+	}
+
+	return &hub, hub.conn
 }
 
 // TODO: Add broadcast function that can be called from the clients
 // func (h *Hub) broadCast(msg )
 
+// Run is the main event loop of the hub.
+// TODO: figure out if this approach makes sense
 func (h *Hub) Run() {
 Main:
 	for {
@@ -97,7 +152,7 @@ Main:
 		case <-h.running:
 			break Main
 		case data := <-h.conn:
-			h.addClient(data)
+			h.clientManager.addClient(data)
 		}
 	}
 	// TODO: Shuttingdown log
@@ -108,23 +163,10 @@ Main:
 // connections can be started.
 func (h *Hub) Shutdown(cxt context.Context) {
 	waitCompletion := make(chan struct{})
-	// Will tell all the clients to shutdown in the given shutdown time.
+
 	go func() {
-		childCxt, chancelCxt := context.WithTimeout(cxt, ClientShudownTime)
-
-		// Remove from memory and close any open waiting channels.
-		defer func() {
-			chancelCxt()
-			close(waitCompletion)
-		}()
-
-		for _, key := range h.clients {
-			key.Shutdown(childCxt)
-		}
-
-		// Will wait in here, so that the main room can be shutdown.
-		h.wg.Wait()
-		close(h.running)
+		h.clientManager.shutdown(cxt)
+		close(waitCompletion)
 	}()
 
 	select {
@@ -134,6 +176,7 @@ func (h *Hub) Shutdown(cxt context.Context) {
 
 		// make sure that the main thread is closed
 		close(h.running)
+
 	case <-waitCompletion:
 		// TODO: add relaxed logging messages
 	}
