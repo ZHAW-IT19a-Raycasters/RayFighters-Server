@@ -28,3 +28,6 @@
 
 ### Code ###
 .vscode/*
+
+# logs
+logs.txt
