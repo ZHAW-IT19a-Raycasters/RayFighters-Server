@@ -1,9 +1,13 @@
 package room
 
 import (
+	"container/list"
 	"context"
+	"math"
 	"sync"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 const ClientShudownTime = 1 * time.Second
@@ -17,6 +21,11 @@ type Hub struct {
 	id int
 	// an overview of all the clients in the room currently.
 	clients map[uint8]*Client
+	// mapps from the external uuid to the internally used
+	mapping map[uuid.UUID]uint8
+	// The list of currently available user ids
+	// if this is empty all ids have been used.
+	availableIds *list.List
 	// Counts the ammount of connections are currently open and
 	// running.
 	wg *sync.WaitGroup
@@ -30,11 +39,16 @@ type Hub struct {
 
 func NewHub(hubId int) (*Hub, chan<- ClientMeta) {
 	hub := Hub{
-		conn:    make(chan ClientMeta),
-		id:      hubId,
-		clients: make(map[uint8]*Client),
-		wg:      &sync.WaitGroup{},
-		running: make(chan struct{}),
+		conn:         make(chan ClientMeta),
+		id:           hubId,
+		clients:      make(map[uint8]*Client),
+		availableIds: list.New(),
+		wg:           &sync.WaitGroup{},
+		running:      make(chan struct{}),
+	}
+
+	for i := 0; i < math.MaxUint8; i += 1 {
+		hub.availableIds.PushBack(i)
 	}
 
 	return &hub, hub.conn
@@ -46,14 +60,30 @@ func (h *Hub) addClient(meta ClientMeta) {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 	// check if client ID already exists.
-	if val, ok := h.clients[meta.id]; ok {
+	if id, ok := h.mapping[meta.id]; ok {
 		// the person already exisited in the Hub
 		// add him back
-		val.registerConn(meta)
+		if val, ok := h.clients[id]; ok {
+			// get client
+			val.registerConn(meta)
+		} else {
+			// There was a programming error, never is it allowed that the client
+			// is empty.
+			panic("On an existing UUID mapping did a client not exist.")
+		}
 	} else {
 		// a new client
-		client := NewClient(meta)
-		h.clients[meta.id] = client
+		// get the new ID for the client
+		elem := h.availableIds.Front()
+		h.availableIds.Remove(elem)
+		id := elem.Value.(uint8)
+
+		// map the UUID to the internaly used
+		h.mapping[meta.id] = id
+
+		// create the client with the correct information
+		client := NewClient(id, meta)
+		h.clients[id] = client
 	}
 }
 
