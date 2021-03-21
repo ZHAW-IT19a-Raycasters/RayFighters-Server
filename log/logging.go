@@ -44,10 +44,14 @@ type logger struct {
 	level   Level
 }
 
-var Logger *logger
+var loggerV *logger
+
+func Log() (logger *logger) {
+	return loggerV
+}
 
 func Setup(level Level) error {
-	if Logger != nil {
+	if loggerV != nil {
 		panic("The logger may only be setup once!")
 	}
 
@@ -57,7 +61,7 @@ func Setup(level Level) error {
 		return err
 	}
 
-	Logger = newLogger(level, file)
+	loggerV = newLogger(level, file)
 
 	return nil
 }
