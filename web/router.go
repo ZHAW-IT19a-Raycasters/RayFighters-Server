@@ -17,22 +17,16 @@ type Server struct {
 	endpoint *http.Server
 }
 
-var upgrader = websocket.Upgrader{
-	ReadBufferSize:  1024,
-	WriteBufferSize: 1024,
-}
-
 func NewServer(conf *webconfig.WebConfig) *Server {
 	//TODO replace
 	hub := newHub()
 	go hub.run()
 	router := mux.NewRouter()
 	router.HandleFunc("/", handleRoot)
-	router.HandleFunc("/chat", serveChat)
-
-	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+	router.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 		serveWs(hub, w, r)
 	})
+	router.HandleFunc("/chat", serveChat)
 
 	httpServer := &http.Server{Handler: router, Addr: conf.String(), WriteTimeout: 15 * time.Second, ReadTimeout: 15 * time.Second}
 
@@ -64,11 +58,16 @@ func serveChat(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	http.ServeFile(w, r, "/web/chat.html")
+	http.ServeFile(w, r, "web/chat.html")
 }
 
 // serveWs handles websocket requests from the peer.
 func serveWs(hub *Hub, w http.ResponseWriter, r *http.Request) {
+	var upgrader = websocket.Upgrader{
+		ReadBufferSize:  1024,
+		WriteBufferSize: 1024,
+	}
+
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Println(err)
