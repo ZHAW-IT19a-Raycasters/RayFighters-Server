@@ -10,6 +10,7 @@ import (
 )
 
 const ClientShudownTime = 1 * time.Second
+const ClientTimeoutTime = 5 * time.Second
 
 type clientManager struct {
 	// an overview of all the clients in the room currently.
@@ -168,15 +169,14 @@ func (h *Hub) Shutdown(cxt context.Context) {
 	go func() {
 		h.clientManager.shutdown(cxt)
 		close(waitCompletion)
+		// make sure that the main thread is closed
+		close(h.running)
 	}()
 
 	select {
 	case <-cxt.Done():
 		// TODO: add angry logging messages that
 		// a forced shutdown was made.
-
-		// make sure that the main thread is closed
-		close(h.running)
 
 	case <-waitCompletion:
 		// TODO: add relaxed logging messages

@@ -2,6 +2,7 @@ package helpers
 
 import (
 	"math"
+	"strings"
 	"testing"
 )
 
@@ -16,6 +17,7 @@ func TestIdManagerPop(t *testing.T) {
 	for i := 0; i <= math.MaxUint8; i += 1 {
 		val, err := manager.Pop()
 		if err != nil {
+
 			t.Errorf("Undefined state at iteration [%d]\nError: [%s]", i, err.Error())
 			return
 		}
@@ -30,6 +32,8 @@ func TestIdManagerPop(t *testing.T) {
 	_, err := manager.Pop()
 	if err == nil {
 		t.Error("on the incorrect pop request, there should be an error")
+	} else if !strings.HasPrefix(err.Error(), "Incorrect handling of the idManager") {
+		t.Error("Prefix missing")
 	}
 }
 
