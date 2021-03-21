@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.zhaw.ch/raycasters/server/protocol/client"
+	"github.zhaw.ch/raycasters/server/utils"
 )
 
 func TestRequestOtherPlayers(t *testing.T) {
@@ -128,8 +129,24 @@ func TestBinaryToFloat(t *testing.T) {
 		0x9A, 0x99, 0x99, 0x99, 0x99, 0x99, 0xB9, 0x3F,
 	}
 
-	got := client.BinaryToFloat(rawData[:])
+	got := utils.BinaryToFloat(rawData[:])
 	if got != expected {
 		t.Errorf("incorrect conversion of number")
+	}
+}
+
+func TestName(t *testing.T) {
+	exp := [...]string{
+		"Disconnect",
+		"Unknown",
+		"Movement",
+		"Shooting",
+		"RequestOtherPlayers",
+	}
+	for i, val := range client.Overview {
+		if val.String() != exp[i] {
+			t.Errorf("Name are not as expected.\n[%s] - [%s]", val.String(), exp[i])
+			return
+		}
 	}
 }

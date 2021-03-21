@@ -4,11 +4,11 @@ import (
 	"fmt"
 
 	"github.zhaw.ch/raycasters/server/log"
-	"github.zhaw.ch/raycasters/server/utils"
+	"github.zhaw.ch/raycasters/server/setup"
 )
 
 func main() {
-	conf := utils.Setup()
+	conf := setup.Setup()
 	if conf == nil {
 		return
 	}
