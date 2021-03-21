@@ -29,6 +29,6 @@
 ### Code ###
 .vscode/*
 
-
+### Custom ###
+# logs
 logs.txt
-
