@@ -1,7 +1,9 @@
 package main
 
 import (
+	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
 
@@ -23,7 +25,6 @@ func main() {
 	}
 
 	err := log.Setup(log.Debug)
-
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -38,27 +39,23 @@ func main() {
 		sigs := make(chan os.Signal, 1)
 		signal.Notify(sigs, os.Interrupt)
 
-		var sig os.Signal
-
 		select {
-		case sigs <- sig:
-			fmt.Println()
+		case sig := <-sigs:
 			fmt.Println(sig)
 		case <-done:
 			return
 		}
-
 		// TODO: global channel shutdown
 		server.ServerStop(ctx)
 		close(done)
 	}()
 
 	err = server.Start()
-	if err != nil {
-		done <- struct{}{}
+	if !errors.Is(err, http.ErrServerClosed) {
 		close(done)
-		return
+		fmt.Println(err)
 	}
+
 	fmt.Println("awaiting server shutdown")
 
 	<-done
