@@ -4,6 +4,7 @@ import (
 	"context"
 	"sync"
 
+	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 )
 
@@ -21,15 +22,16 @@ type Client struct {
 	// input output connections
 	running chan struct{}
 	info    ClientGame
-	meta    ClientMeta
+	meta    ClientInternalMeta
 	status  ConnectionStatus
 	wg      *sync.WaitGroup
 }
 
-func NewClient(meta ClientMeta) *Client {
+func NewClient(id uint8, meta ClientMeta) *Client {
 	c := Client{
 		running: make(chan struct{}),
 		info:    NewClientGame(NewCoordinate()),
+		meta:    NewClientInternalMeta(id, meta),
 		status:  Offline,
 		wg:      &sync.WaitGroup{},
 	}
@@ -37,7 +39,7 @@ func NewClient(meta ClientMeta) *Client {
 }
 
 func (c *Client) registerConn(conn ClientMeta) {
-	c.meta = conn
+	c.meta = NewClientInternalMeta(c.meta.id, conn)
 	c.status = Active
 	// TODO: start receiving and sending here
 }
@@ -81,7 +83,21 @@ func NewClientGame(pos Coordinate) ClientGame {
 }
 
 type ClientMeta struct {
+	id   uuid.UUID
+	name string
+	conn *websocket.Conn
+}
+
+type ClientInternalMeta struct {
 	id   uint8
 	name string
 	conn *websocket.Conn
+}
+
+func NewClientInternalMeta(id uint8, client ClientMeta) ClientInternalMeta {
+	return ClientInternalMeta{
+		id:   id,
+		name: client.name,
+		conn: client.conn,
+	}
 }
