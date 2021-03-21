@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.zhaw.ch/raycasters/server/room/helpers"
 )
 
 const ClientShudownTime = 1 * time.Second
@@ -16,7 +17,7 @@ type clientManager struct {
 	// mapps from the external uuid to the internally used
 	mapping map[uuid.UUID]uint8
 	// manages all the available ids
-	idManager idManager
+	idManager helpers.IdManager
 	// Counts the ammount of connections are currently open and
 	// running.
 	wg *sync.WaitGroup
@@ -30,7 +31,7 @@ func newClientManager() clientManager {
 
 	return clientManager{
 		clients:   make(map[uint8]*Client),
-		idManager: newIdManager(),
+		idManager: helpers.NewIdManager(),
 		wg:        &sync.WaitGroup{},
 	}
 }
@@ -65,7 +66,7 @@ func (manager *clientManager) addClient(meta ClientMeta) {
 	} else {
 		// a new client
 		// get the new ID for the client
-		id, _ := manager.idManager.pop()
+		id, _ := manager.idManager.Pop()
 
 		// map the UUID to the internaly used
 		manager.mapping[meta.id] = id
