@@ -31,9 +31,14 @@ type clientManager struct {
 func newClientManager() clientManager {
 	return clientManager{
 		clients:   make(map[uint8]*Client),
+		mapping:   make(map[uuid.UUID]uint8),
 		idManager: helpers.NewIdManager(),
 		wg:        &sync.WaitGroup{},
 	}
+}
+
+func (manager *clientManager) size() int {
+	return len(manager.clients)
 }
 
 // mapId will map the client meta information with the internal value.

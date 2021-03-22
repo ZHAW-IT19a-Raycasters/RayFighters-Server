@@ -5,7 +5,6 @@ import (
 	"sync"
 
 	"github.com/google/uuid"
-	"github.com/gorilla/websocket"
 )
 
 type ConnectionStatus uint
@@ -88,17 +87,17 @@ type ClientMeta struct {
 	conn ClientConnection
 }
 
-func NewClientMeta(id uuid.UUID, name string, conn *websocket.Conn) ClientMeta {
+func NewClientMeta(id uuid.UUID, name string, conn ClientConnection) ClientMeta {
 	return ClientMeta{
 		id:   id,
 		name: name,
 		conn: conn,
 	}
-
 }
 
 type ClientInternalMeta struct {
 	id   uint8
+	eId  uuid.UUID
 	name string
 	conn ClientConnection
 }
@@ -106,6 +105,7 @@ type ClientInternalMeta struct {
 func NewClientInternalMeta(id uint8, client ClientMeta) ClientInternalMeta {
 	return ClientInternalMeta{
 		id:   id,
+		eId:  client.id,
 		name: client.name,
 		conn: client.conn,
 	}
