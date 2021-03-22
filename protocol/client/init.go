@@ -1,9 +1,9 @@
 package client
 
 import (
-	"encoding/binary"
 	"fmt"
-	"math"
+
+	"github.zhaw.ch/raycasters/server/utils"
 )
 
 // A Client Opcode represents the internal representations
@@ -19,8 +19,9 @@ const (
 	RequestOtherPlayersOpcode ClientOpcode = 0x1E
 )
 
-var overview = [...]ClientOpcode{
+var Overview = [...]ClientOpcode{
 	DisconnectOpcode,
+	UnknownOpcode,
 	MovementOpcode,
 	ShootingOpcode,
 	RequestOtherPlayersOpcode,
@@ -89,7 +90,7 @@ func (o ClientOpcode) ByteSize() int {
 func Detect(opcode uint8) ClientOpcode {
 	parsedOpcode := ClientOpcode(opcode)
 
-	for _, element := range overview {
+	for _, element := range Overview {
 		if parsedOpcode == element {
 			return element
 		}
@@ -185,8 +186,8 @@ func NewMovementByte(data []byte) (*Movement, error) {
 		return nil, err
 	}
 
-	coorX := BinaryToFloat(data[1:9])
-	coorY := BinaryToFloat(data[9:])
+	coorX := utils.BinaryToFloat(data[1:9])
+	coorY := utils.BinaryToFloat(data[9:])
 
 	val := NewMovement(coorX, coorY)
 
@@ -221,7 +222,7 @@ func NewShootingBytes(data []byte) (*Shooting, error) {
 	}
 
 	// lenght is now correct
-	angle := BinaryToFloat(data[1:])
+	angle := utils.BinaryToFloat(data[1:])
 
 	val := NewShooting(angle)
 	return &val, nil
@@ -264,18 +265,4 @@ func checkOpcodeHelper(opcode ClientOpcode, data []byte) error {
 		}
 	}
 	return nil
-}
-
-// TODO: Refactor into into utils
-// Will convert a binary blob into a correct float64.
-// Attention this assumes that the float starts from
-// position 0 on and that the float is formatted
-// according to the IEEE specification.
-func BinaryToFloat(data []byte) float64 {
-
-	// convert the float into the int64 representation
-	intRep := binary.LittleEndian.Uint64(data)
-
-	// convert the raw int representation to
-	return math.Float64frombits(intRep)
 }
