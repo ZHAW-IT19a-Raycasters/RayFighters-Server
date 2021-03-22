@@ -2,30 +2,26 @@ package log
 
 import (
 	"bytes"
+	"os"
 	"strings"
 	"testing"
 )
 
-func TestPrependlevel(t *testing.T) {
-	org := []interface{}{"1", "2", "3"}
-	expected := []interface{}{Debug.String(), "1", "2", "3"}
-	res := prependLevel(Debug, org)
-	if len(res) != len(expected) {
-		t.Error("expected lenght not reached")
-	}
-	for i := range res {
-		if res[i] != expected[i] {
-			t.Errorf("[%s] is not equals to [%s]", res[i], expected[i])
-		}
-	}
-}
-
-func TestLogger(t *testing.T) {
+func setup(level Level, t *testing.T) bytes.Buffer {
 	rawBuf := make([]byte, 0, 500)
 
 	buffer := bytes.NewBuffer(rawBuf)
+	iLogger = newInternalLogger(level, buffer)
+	t.Cleanup(func() {
+		iLogger = nil
+	})
+	return *buffer
+}
+func TestLogger(t *testing.T) {
+	buffer := setup(Debug, t)
 
-	logger := newLogger(Debug, buffer)
+	logger := Log()
+
 	logger.Debug("help me")
 
 	const expetedResult string = "DEBUG help me"
@@ -36,14 +32,12 @@ func TestLogger(t *testing.T) {
 	}
 
 }
-
 func TestLoggerNoDebug(t *testing.T) {
-	rawBuf := make([]byte, 0, 500)
+	buffer := setup(Info, t)
 
-	buffer := bytes.NewBuffer(rawBuf)
 	buffer.WriteRune(' ')
 
-	logger := newLogger(Info, buffer)
+	logger := Log()
 	logger.Debug("help me")
 
 	const expetedResult string = "DEBUG help me"
@@ -55,6 +49,11 @@ func TestLoggerNoDebug(t *testing.T) {
 }
 
 func TestDoubleLoggingInit(t *testing.T) {
+	t.Cleanup(func() {
+		// remove the newly created log file, as it is only used for
+		// testing anyway.
+		os.Remove(logFile)
+	})
 	defer func() {
 		r := recover()
 		if r == nil {
