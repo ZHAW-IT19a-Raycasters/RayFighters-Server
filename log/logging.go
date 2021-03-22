@@ -34,13 +34,14 @@ func Log() logger {
 }
 
 // Setup will as the name implies setup the internals for the logger.
-// This function may panic, in case that this function is called more
-// then once.
+// This uses the default logFile.
 func Setup(level Level) error {
-	return SetupLogfile(level, logFile)
+	return SetupLogFile(level, logFile)
 }
 
-func SetupLogfile(level Level, fileName string) error {
+// SetupLogFile will setup the logger with the correct
+// file opened.
+func SetupLogFile(level Level, fileName string) error {
 	if iLogger != nil {
 		return ErrLoggerAlreadySetup
 	}
