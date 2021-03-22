@@ -2,6 +2,7 @@ package log
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"os"
@@ -36,11 +37,15 @@ func Log() logger {
 // This function may panic, in case that this function is called more
 // then once.
 func Setup(level Level) error {
+	return SetupLogfile(level, logFile)
+}
+
+func SetupLogfile(level Level, fileName string) error {
 	if iLogger != nil {
-		panic("The logger may only be setup once!")
+		return ErrLoggerAlreadySetup
 	}
 
-	file, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
+	file, err := os.OpenFile(fileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
 
 	if err != nil {
 		return err
@@ -85,10 +90,7 @@ func (log *logger) Logf(level Level, format string, v ...interface{}) {
 		return
 	}
 
-	// insert before the values
-	v = prependLevel(level, v)
-
-	log.il.Printf(format, v...)
+	log.il.Printf(fmt.Sprintf("%s %s", level.String(), format), v...)
 }
 
 // Debug will write a debug message.
