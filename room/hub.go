@@ -103,7 +103,7 @@ func (manager *clientManager) removeClient(meta ClientMeta) {
 	// make sure it is shutdown
 	val := manager.clients[id]
 	cxt, cancel := context.WithTimeout(context.Background(), ClientShudownTime)
-	val.Shutdown(cxt)
+	go val.Shutdown(cxt)
 	// wait until done
 	<-cxt.Done()
 

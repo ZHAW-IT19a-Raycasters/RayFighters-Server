@@ -35,15 +35,25 @@ func newMockable() Mockable {
 	}
 }
 
-func TestAddClientSigle(t *testing.T) {
-	cm := newClientManager()
-
+func getClientMeta() ClientMeta {
 	uuid := uuid.New()
 	name := "Hans"
 	// Prepare the mocked data
 	mock := newMockable()
 
-	clientMeta := NewClientMeta(uuid, name, &mock)
+	return NewClientMeta(uuid, name, &mock)
+}
+
+func TestAddClientSigle(t *testing.T) {
+	cm := newClientManager()
+
+	// make sure size starts at 0
+	if cm.size() != 0 {
+		t.Error("client manager does not start at zero")
+		return
+	}
+
+	clientMeta := getClientMeta()
 	err := cm.addClient(clientMeta)
 	if err != nil {
 		t.Errorf("An unexpected error occuered, while adding a new client\n[%s]", err.Error())
@@ -61,7 +71,7 @@ func TestAddClientSigle(t *testing.T) {
 		return
 	}
 
-	iId, ok := cm.mapping[uuid]
+	iId, ok := cm.mapping[clientMeta.id]
 	if !ok {
 		t.Error("Client has not been mapped correctly, missing entry in id mapping.")
 		return
@@ -74,26 +84,26 @@ func TestAddClientSigle(t *testing.T) {
 		return
 	}
 
-	if client.meta.eId != uuid {
+	if client.meta.eId != clientMeta.id {
 		t.Error("Wrong uuid has been used, while mapping.")
+	} else if client.meta.name != clientMeta.name {
+		t.Error("Wrong name has been used, while mapping.")
 	}
 }
 
 func TestAddClientTwice(t *testing.T) {
 	cm := newClientManager()
 
-	uuid := uuid.New()
-	name := "Hans"
-	// Prepare the mocked data
-	mock := newMockable()
-
-	clientMeta := NewClientMeta(uuid, name, &mock)
+	clientMeta := getClientMeta()
 	err := cm.addClient(clientMeta)
 	if err != nil {
 		t.Errorf("An unexpected error occuered, while adding a new client\n[%s]", err.Error())
 		return
 	}
-	clientMeta = NewClientMeta(uuid, name, &mock)
+
+	mock := newMockable()
+	clientMeta.conn = &mock
+
 	err = cm.addClient(clientMeta)
 	if err != nil {
 		t.Errorf("An unexpected error occuered, while adding a new client\n[%s]", err.Error())
@@ -149,4 +159,42 @@ func TestMaxClients(t *testing.T) {
 	if err == nil {
 		t.Error("A client was added illigaly here.")
 	}
+}
+
+func TestRemoveClients(t *testing.T) {
+	cm := newClientManager()
+
+	meta := getClientMeta()
+
+	cm.addClient(meta)
+
+	if cm.size() != 1 {
+		t.Error("size is not at 1")
+		return
+	}
+
+	cm.removeClient(meta)
+
+	if cm.size() != 0 {
+		t.Error("size is not at 0")
+		return
+	}
+
+	// check that all the mappings return to normal
+
+	if len(cm.mapping) != 0 {
+		t.Error("mapping size is not at 0")
+		return
+	}
+
+	if len(cm.clients) != 0 {
+		t.Error("clients size is not at 0")
+		return
+	}
+
+	if !cm.idManager.IsFull() {
+		t.Error("id has not been returned to queue")
+		return
+	}
+
 }
