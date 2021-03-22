@@ -29,7 +29,6 @@ type clientManager struct {
 }
 
 func newClientManager() clientManager {
-
 	return clientManager{
 		clients:   make(map[uint8]*Client),
 		idManager: helpers.NewIdManager(),

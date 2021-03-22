@@ -85,13 +85,22 @@ func NewClientGame(pos Coordinate) ClientGame {
 type ClientMeta struct {
 	id   uuid.UUID
 	name string
-	conn *websocket.Conn
+	conn ClientConnection
+}
+
+func NewClientMeta(id uuid.UUID, name string, conn *websocket.Conn) ClientMeta {
+	return ClientMeta{
+		id:   id,
+		name: name,
+		conn: conn,
+	}
+
 }
 
 type ClientInternalMeta struct {
 	id   uint8
 	name string
-	conn *websocket.Conn
+	conn ClientConnection
 }
 
 func NewClientInternalMeta(id uint8, client ClientMeta) ClientInternalMeta {
