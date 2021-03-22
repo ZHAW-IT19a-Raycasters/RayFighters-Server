@@ -1,7 +1,9 @@
 package room
 
 import (
+	"fmt"
 	"io"
+	"math"
 	"testing"
 
 	"github.com/google/uuid"
@@ -20,13 +22,8 @@ func (m *Mockable) NextWriter(messageType int) (io.WriteCloser, error) {
 	return m.funcNextWriter(messageType)
 }
 
-func TestAddClientSigle(t *testing.T) {
-	cm := newClientManager()
-
-	uuid := uuid.New()
-	name := "Hans"
-	// Prepare the mocked data
-	mock := Mockable{
+func newMockable() Mockable {
+	return Mockable{
 		funcNextReader: func() (int, io.Reader, error) {
 
 			return 0, nil, nil
@@ -36,9 +33,22 @@ func TestAddClientSigle(t *testing.T) {
 			return nil, nil
 		},
 	}
+}
+
+func TestAddClientSigle(t *testing.T) {
+	cm := newClientManager()
+
+	uuid := uuid.New()
+	name := "Hans"
+	// Prepare the mocked data
+	mock := newMockable()
 
 	clientMeta := NewClientMeta(uuid, name, &mock)
-	cm.addClient(clientMeta)
+	err := cm.addClient(clientMeta)
+	if err != nil {
+		t.Errorf("An unexpected error occuered, while adding a new client\n[%s]", err.Error())
+		return
+	}
 
 	// check if the client was added
 	lenClients := len(cm.clients)
@@ -67,20 +77,6 @@ func TestAddClientSigle(t *testing.T) {
 	if client.meta.eId != uuid {
 		t.Error("Wrong uuid has been used, while mapping.")
 	}
-
-	// create a new client, with the same id => count should stay the same
-
-	mock = Mockable{
-		funcNextReader: func() (int, io.Reader, error) {
-
-			return 0, nil, nil
-		},
-		funcNextWriter: func(messageType int) (io.WriteCloser, error) {
-
-			return nil, nil
-		},
-	}
-
 }
 
 func TestAddClientTwice(t *testing.T) {
@@ -89,22 +85,20 @@ func TestAddClientTwice(t *testing.T) {
 	uuid := uuid.New()
 	name := "Hans"
 	// Prepare the mocked data
-	mock := Mockable{
-		funcNextReader: func() (int, io.Reader, error) {
-
-			return 0, nil, nil
-		},
-		funcNextWriter: func(messageType int) (io.WriteCloser, error) {
-
-			return nil, nil
-		},
-	}
+	mock := newMockable()
 
 	clientMeta := NewClientMeta(uuid, name, &mock)
-	cm.addClient(clientMeta)
-
+	err := cm.addClient(clientMeta)
+	if err != nil {
+		t.Errorf("An unexpected error occuered, while adding a new client\n[%s]", err.Error())
+		return
+	}
 	clientMeta = NewClientMeta(uuid, name, &mock)
-	cm.addClient(clientMeta)
+	err = cm.addClient(clientMeta)
+	if err != nil {
+		t.Errorf("An unexpected error occuered, while adding a new client\n[%s]", err.Error())
+		return
+	}
 
 	// check if the client was added
 	lenClients := len(cm.clients)
@@ -115,5 +109,44 @@ func TestAddClientTwice(t *testing.T) {
 	} else if lenClients != lenMapping {
 		t.Errorf("map sizes are different client [%d] mapping [%d]", lenClients, lenMapping)
 		return
+	}
+}
+
+func TestMaxClients(t *testing.T) {
+	getMeta := func(i int) ClientMeta {
+
+		// as uuids should be unique, it makes no difference,
+		// if a new one is called here.
+		uuid := uuid.New()
+		name := fmt.Sprintf("id: %d", i)
+		mock := newMockable()
+
+		return NewClientMeta(uuid, name, &mock)
+	}
+
+	cm := newClientManager()
+
+	// no errors here
+	for i := 0; i <= math.MaxUint8; i += 1 {
+		meta := getMeta(i)
+		err := cm.addClient(meta)
+
+		if err != nil {
+			t.Errorf("Durring fill up of client manager, an error happend:\n[%s]", err.Error())
+			return
+		}
+
+		// make sure that the cm size is the same as the i counter
+		if cm.size() != (i + 1) {
+			t.Errorf("There was a size difference at position [%d]", i)
+			return
+		}
+
+	}
+	// add an additional client
+	meta := getMeta(256)
+	err := cm.addClient(meta)
+	if err == nil {
+		t.Error("A client was added illigaly here.")
 	}
 }

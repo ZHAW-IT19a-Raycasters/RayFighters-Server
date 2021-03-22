@@ -52,7 +52,10 @@ func (manager *clientManager) mapId(meta ClientMeta) (uint8, bool) {
 // addClient will add a new client to the manager, if the client has
 // once before been added, then the previous connection will be
 // replaced.
-func (manager *clientManager) addClient(meta ClientMeta) {
+// This will return an error, if there is no more space left in the given
+// room. Attention this will not return an error if the given client
+// already has a profile in the room.
+func (manager *clientManager) addClient(meta ClientMeta) error {
 	// lock the hub, so that writing is okay
 	manager.lock.Lock()
 	defer manager.lock.Unlock()
@@ -71,7 +74,11 @@ func (manager *clientManager) addClient(meta ClientMeta) {
 	} else {
 		// a new client
 		// get the new ID for the client
-		id, _ := manager.idManager.Pop()
+		id, err := manager.idManager.Pop()
+
+		if err != nil {
+			return err
+		}
 
 		// map the UUID to the internaly used
 		manager.mapping[meta.id] = id
@@ -80,6 +87,7 @@ func (manager *clientManager) addClient(meta ClientMeta) {
 		client := NewClient(id, meta)
 		manager.clients[id] = client
 	}
+	return nil
 }
 
 // removeClient will remove the given client from the manager, this will return an error
