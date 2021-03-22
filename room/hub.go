@@ -112,6 +112,14 @@ func (manager *clientManager) removeClient(meta ClientMeta) {
 	// remove from mapping
 	delete(manager.mapping, meta.id)
 	delete(manager.clients, id)
+
+	// add it back to the queue
+	err := manager.idManager.Push(id)
+
+	// if there was an error here there was a programming error
+	if err != nil {
+		panic(err)
+	}
 }
 
 func (manager *clientManager) shutdown(cxt context.Context) {
