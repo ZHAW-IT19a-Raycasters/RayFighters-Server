@@ -23,7 +23,7 @@ func setupTmpFile(level Level, t *testing.T) (string, error) {
 		return "", err
 	}
 
-	err = SetupLogfile(level, tmpFile.Name())
+	err = SetupLogFile(level, tmpFile.Name())
 	if err != nil {
 		t.Errorf("on creating the logger, this happend [%s]", err.Error())
 		return "", err
