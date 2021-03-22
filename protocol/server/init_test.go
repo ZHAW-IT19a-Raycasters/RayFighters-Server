@@ -250,18 +250,3 @@ func TestDetect(t *testing.T) {
 		}
 	}
 }
-
-func TestFloatToBinary(t *testing.T) {
-
-	// 1.00000000000000005551115123126E-1
-	// 0x3FB999999999999A
-	var coorX float64 = 0.1
-	expData := [...]byte{
-		// 0x3F 0xB9 0x99 0x99 0x99 0x99 0x99 0x9A
-		0x9A, 0x99, 0x99, 0x99, 0x99, 0x99, 0xB9, 0x3F,
-	}
-	gotData := make([]byte, 8)
-	server.FloatToBinary(coorX, gotData)
-
-	compareByteArrays(expData[:], gotData, t)
-}

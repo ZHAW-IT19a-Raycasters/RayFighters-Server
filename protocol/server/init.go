@@ -6,6 +6,8 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math"
+
+	"github.zhaw.ch/raycasters/server/utils"
 )
 
 // A Server Opcode represents the internal representations
@@ -24,6 +26,17 @@ const (
 	SendAllPlayerInfoOpcode   ServerOpcode = 0x82
 )
 
+var Overview = [...]ServerOpcode{
+	DisconnectOpcode,
+	UnknownOpcode,
+	MovementPlayerOpcode,
+	AnOtherPlayerKilledOpcode,
+	PlayerHimSelfKilledOpcode,
+	PlayerJoinedOpcode,
+	PlayerLeftOpcode,
+	SendAllPlayerInfoOpcode,
+}
+
 // Value returns the internal value representation as a uint8.
 func (s ServerOpcode) Value() uint8 {
 	// SAFETY: this is safe as the value type of
@@ -37,22 +50,10 @@ func (s ServerOpcode) Value() uint8 {
 //
 // Will return Unknown when there is no mapping for the given value.
 func Detect(opcode uint8) ServerOpcode {
-
-	var overview = [...]ServerOpcode{
-		DisconnectOpcode,
-		UnknownOpcode,
-		MovementPlayerOpcode,
-		AnOtherPlayerKilledOpcode,
-		PlayerHimSelfKilledOpcode,
-		PlayerJoinedOpcode,
-		PlayerLeftOpcode,
-		SendAllPlayerInfoOpcode,
-	}
-
 	// cast into a comparable opcode type
 	parsedOpcode := ServerOpcode(opcode)
 
-	for _, element := range overview {
+	for _, element := range Overview {
 		if parsedOpcode == element {
 			return element
 		}
@@ -135,8 +136,8 @@ func (mp MovementPlayer) Bytes() []byte {
 	buffer[1] = mp.userId
 
 	// write floats into the bytes buffer
-	FloatToBinary(mp.coorX, buffer[2:10])
-	FloatToBinary(mp.coorY, buffer[10:18])
+	utils.FloatToBinary(mp.coorX, buffer[2:10])
+	utils.FloatToBinary(mp.coorY, buffer[10:18])
 
 	return buffer
 }
@@ -405,20 +406,4 @@ func (p *SendAllPlayerInfo) Bytes() []byte {
 	}
 
 	return buffer
-}
-
-// TODO: Refator into into utils
-//
-// Will insert the num into data, starting
-// from the index 0 on. It will utilize
-// the IEEE specification.
-// Attention this function assumes that
-// the data is already initialized.
-func FloatToBinary(num float64, data []byte) {
-
-	// convert the float into the int64 representation
-	intRep := math.Float64bits(num)
-
-	// write data back
-	binary.LittleEndian.PutUint64(data, intRep)
 }
