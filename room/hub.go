@@ -13,6 +13,14 @@ import (
 const ClientShudownTime = 1 * time.Second
 const ClientTimeoutTime = 5 * time.Second
 
+type ErrClientDoesntExist struct {
+	meta ClientMeta
+}
+
+func (err ErrClientDoesntExist) Error() string {
+	return fmt.Sprintf("client doesn't exist [%d] - [%s]", err.meta.id, err.meta.name)
+}
+
 type clientManager struct {
 	// an overview of all the clients in the room currently.
 	clients map[uint8]*Client
@@ -93,11 +101,11 @@ func (manager *clientManager) addClient(meta ClientMeta) error {
 
 // removeClient will remove the given client from the manager, this will return an error
 // if the given client does not exist.
-func (manager *clientManager) removeClient(meta ClientMeta) {
+func (manager *clientManager) removeClient(meta ClientMeta) error {
 	id, ok := manager.mapId(meta)
 	if !ok {
 		// TODO: return a fitting error
-		return
+		return ErrClientDoesntExist{meta}
 	}
 	val := manager.clients[id]
 
@@ -141,12 +149,14 @@ func (manager *clientManager) removeClient(meta ClientMeta) {
 
 	if err != nil {
 		str := fmt.Sprintf(
-			"if there was an error here, there was a programming error"+
+			"if there was a panic here, there was a programming error"+
 				"caused by incorrect id management.\n[%s]",
 			err.Error(),
 		)
 		panic(str)
 	}
+
+	return nil
 }
 
 func (manager *clientManager) shutdown(cxt context.Context) {

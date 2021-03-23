@@ -166,6 +166,11 @@ func TestRemoveClients(t *testing.T) {
 
 	meta := getClientMeta()
 
+	err := cm.removeClient(meta)
+	if err == nil {
+		t.Errorf("there should not be a client in the given map.\n[%s]", err.Error())
+	}
+
 	cm.addClient(meta)
 
 	if cm.size() != 1 {
@@ -173,7 +178,11 @@ func TestRemoveClients(t *testing.T) {
 		return
 	}
 
-	cm.removeClient(meta)
+	err = cm.removeClient(meta)
+	if err != nil {
+		t.Error("there should not be an error during removing a known client.")
+		return
+	}
 
 	if cm.size() != 0 {
 		t.Error("size is not at 0")
