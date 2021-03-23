@@ -2,7 +2,6 @@ package room
 
 import (
 	"context"
-	"fmt"
 	"sync"
 
 	"github.com/google/uuid"
@@ -50,28 +49,32 @@ func (c *Client) registerConn(conn ClientMeta) {
 func (c *Client) Shutdown(ctx context.Context) {
 	// TODO: log message of shutdown
 
-	logger.Debugf("Shutting down client [%d]", c.meta.id)
+	logger.Debugf("Shutting down client [%d]", c.meta.eId)
 
 	// set the state of the client to shutting down
 	c.status = Shuttingdown
 	// set the state of the client to offline
 	defer func() { c.status = Offline }()
+
+	// make a channel on which, we can wait on.
 	runs := make(chan struct{})
 
 	// Make a waiter that will (hopefully) shutdown soon.
 	go func() {
+		// close the running event handler
 		close(c.running)
+		// wait until the workgroup reaches zero
 		c.wg.Wait()
 		close(runs)
 	}()
 
 	select {
 	case <-runs:
-		fmt.Println("done")
 		// TODO: log the a clean shutdown was a success
+		logger.Debugf("Shutdown of client [%d] complete", c.meta.eId)
 	case <-ctx.Done():
-		fmt.Println()
 		// TODO: log the a forced shutdown was made
+		logger.Debugf("forced shutdown of client [%d], due to timeout", c.meta.eId)
 	}
 }
 

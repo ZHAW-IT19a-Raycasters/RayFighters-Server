@@ -2,6 +2,7 @@ package room
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -93,32 +94,58 @@ func (manager *clientManager) addClient(meta ClientMeta) error {
 // removeClient will remove the given client from the manager, this will return an error
 // if the given client does not exist.
 func (manager *clientManager) removeClient(meta ClientMeta) {
-	manager.lock.Lock()
-	defer manager.lock.Unlock()
 	id, ok := manager.mapId(meta)
 	if !ok {
 		// TODO: return a fitting error
 		return
 	}
-	// make sure it is shutdown
 	val := manager.clients[id]
-	cxt, cancel := context.WithTimeout(context.Background(), ClientShudownTime)
-	go val.Shutdown(cxt)
-	// wait until done
-	<-cxt.Done()
 
+	// make sure it is shutdown, at most wait for the timout
+	// afterwards kill it.
+	cxt, cancel := context.WithTimeout(context.Background(), ClientShudownTime)
+
+	waiter := make(chan struct{})
+
+	// run shutdown procedure, while preparing the rest of the system
+	go func() {
+		val.Shutdown(cxt)
+		close(waiter)
+	}()
+
+	// this is run in an internal function, as to
+	// keep the lock for as short as possible
+	remove := func() {
+		// lock the system and remove stuff,
+		// try to keep the lock for as short as possible
+		manager.lock.Lock()
+		defer manager.lock.Unlock()
+		// remove from mapping
+		delete(manager.mapping, meta.id)
+		delete(manager.clients, id)
+	}
+
+	remove()
+
+	<-waiter
 	cancel()
 
-	// remove from mapping
-	delete(manager.mapping, meta.id)
-	delete(manager.clients, id)
-
+	// lock the system and remove stuff,
+	// try to keep the lock for as short as possible
+	manager.lock.Lock()
+	defer manager.lock.Unlock()
+	// free the id as the last point, so that only at the end of the process
+	//
 	// add it back to the queue
 	err := manager.idManager.Push(id)
 
-	// if there was an error here there was a programming error
 	if err != nil {
-		panic(err)
+		str := fmt.Sprintf(
+			"if there was an error here, there was a programming error"+
+				"caused by incorrect id management.\n[%s]",
+			err.Error(),
+		)
+		panic(str)
 	}
 }
 
