@@ -2,6 +2,7 @@ package room
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -192,9 +193,16 @@ func (manager *clientManager) shutdown(cxt context.Context) {
 	}
 }
 
+// HubBufferLimit is the amount of elements, that may be inside the
+// client register channel.
+const HubBufferLimit = 1
+
+// ErrHubIsFull is the error that is returned on an RegisterClient error.
+var ErrHubIsFull = errors.New("the hub is currently filled to capacity")
+
 // Hub represents a single room.
 type Hub struct {
-	// The channel overwhich a new connection
+	// The channel over which a new connection
 	// comes into.
 	conn chan ClientMeta
 	// The room id
@@ -207,13 +215,34 @@ type Hub struct {
 
 func NewHub(hubId int) (*Hub, chan<- ClientMeta) {
 	hub := Hub{
-		conn: make(chan ClientMeta),
-		id:   hubId,
-
+		conn:    make(chan ClientMeta, HubBufferLimit),
+		id:      hubId,
 		running: make(chan struct{}),
 	}
 
 	return &hub, hub.conn
+}
+
+func (h *Hub) Size() int {
+	return h.clientManager.size()
+}
+
+func (h *Hub) Full() bool {
+	return h.clientManager.idManager.IsFull()
+}
+
+func (h *Hub) RegisterClient(meta ClientMeta) error {
+	h.clientManager.lock.Lock()
+	defer h.clientManager.lock.Unlock()
+	// check that adding a client is safe
+	if h.Full() {
+		return ErrHubIsFull
+	}
+
+	// send meta to the hub
+	h.conn <- meta
+
+	return nil
 }
 
 // TODO: Add broadcast function that can be called from the clients
@@ -222,16 +251,16 @@ func NewHub(hubId int) (*Hub, chan<- ClientMeta) {
 // Run is the main event loop of the hub.
 // TODO: figure out if this approach makes sense
 func (h *Hub) Run() {
-Main:
 	for {
 		select {
 		case <-h.running:
-			break Main
+			logger.Infof("Shutting down hub [%d]", h.id)
+			return
 		case data := <-h.conn:
+			logger.Debug("Adding a new player to hub [%d]", h.id)
 			h.clientManager.addClient(data)
 		}
 	}
-	// TODO: Shuttingdown log
 }
 
 // Shutdown will intialize a complete shutdown of any and all clients.
@@ -249,10 +278,8 @@ func (h *Hub) Shutdown(cxt context.Context) {
 
 	select {
 	case <-cxt.Done():
-		// TODO: add angry logging messages that
-		// a forced shutdown was made.
-
+		logger.Infof("Hub [%d] was forcefully shutdown", h.id)
 	case <-waitCompletion:
-		// TODO: add relaxed logging messages
+		logger.Infof("Hub [%d] was successfully shutdown", h.id)
 	}
 }
