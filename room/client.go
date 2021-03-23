@@ -8,16 +8,23 @@ import (
 	"github.zhaw.ch/raycasters/server/log"
 )
 
+var logger = log.Log()
+
 type ConnectionStatus uint
 
 const (
 	Active ConnectionStatus = iota
 	Timeout
-	Shuttingdown
+	ShuttingDown
 	Offline
 )
 
-var logger = log.Log()
+func (c ConnectionStatus) String() string {
+	vals := [...]string{
+		"Active", "Timeout", "ShuttingDown", "Offline",
+	}
+	return vals[c]
+}
 
 type Client struct {
 	// is the one channel that controlls the
@@ -52,7 +59,7 @@ func (c *Client) Shutdown(ctx context.Context) {
 	logger.Debugf("Shutting down client [%d]", c.meta.eId)
 
 	// set the state of the client to shutting down
-	c.status = Shuttingdown
+	c.status = ShuttingDown
 	// set the state of the client to offline
 	defer func() { c.status = Offline }()
 

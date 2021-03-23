@@ -1,9 +1,11 @@
 package room
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"math"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -44,7 +46,7 @@ func getClientMeta() ClientMeta {
 	return NewClientMeta(uuid, name, &mock)
 }
 
-func TestAddClientSigle(t *testing.T) {
+func TestClientManagerAddClientSigle(t *testing.T) {
 	cm := newClientManager()
 
 	// make sure size starts at 0
@@ -91,7 +93,7 @@ func TestAddClientSigle(t *testing.T) {
 	}
 }
 
-func TestAddClientTwice(t *testing.T) {
+func TestClientManagerAddClientTwice(t *testing.T) {
 	cm := newClientManager()
 
 	clientMeta := getClientMeta()
@@ -122,7 +124,7 @@ func TestAddClientTwice(t *testing.T) {
 	}
 }
 
-func TestMaxClients(t *testing.T) {
+func TestClientManagerMaxClients(t *testing.T) {
 	getMeta := func(i int) ClientMeta {
 
 		// as uuids should be unique, it makes no difference,
@@ -161,7 +163,7 @@ func TestMaxClients(t *testing.T) {
 	}
 }
 
-func TestRemoveClients(t *testing.T) {
+func TestClientManagerRemoveClients(t *testing.T) {
 	cm := newClientManager()
 
 	meta := getClientMeta()
@@ -169,6 +171,10 @@ func TestRemoveClients(t *testing.T) {
 	err := cm.removeClient(meta)
 	if err == nil {
 		t.Errorf("there should not be a client in the given map.\n[%s]", err.Error())
+		return
+	} else if !strings.HasPrefix(err.Error(), "client doesn't exist") {
+		t.Errorf("Incorrect prefix has been used:\n[%s]", err.Error())
+		return
 	}
 
 	cm.addClient(meta)
@@ -207,6 +213,35 @@ func TestRemoveClients(t *testing.T) {
 	}
 }
 
-func TestShutdown(t *testing.T) {
+func TestClientManagerShutdown(t *testing.T) {
+	getMeta := func(i int) ClientMeta {
 
+		// as uuids should be unique, it makes no difference,
+		// if a new one is called here.
+		uuid := uuid.New()
+		name := fmt.Sprintf("id: %d", i)
+		mock := newMockable()
+
+		return NewClientMeta(uuid, name, &mock)
+	}
+
+	cm := newClientManager()
+
+	// no errors here
+	for i := 0; i <= math.MaxUint8; i += 1 {
+		// assume this works
+		meta := getMeta(i)
+		_ = cm.addClient(meta)
+
+	}
+
+	// shutdown all the "workers"
+	cm.shutdown(context.Background())
+
+	// check that all the worker state are on shutdown
+	for _, client := range cm.clients {
+		if client.status != Offline {
+			t.Errorf("incorrect state has been used ")
+		}
+	}
 }

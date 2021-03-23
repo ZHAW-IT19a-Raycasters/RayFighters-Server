@@ -77,6 +77,9 @@ func (manager *clientManager) addClient(meta ClientMeta) error {
 			panic("On an existing UUID mapping did a client not exist.")
 		}
 	} else {
+		// add a new client
+		manager.wg.Add(1)
+
 		// a new client
 		// get the new ID for the client
 		id, err := manager.idManager.Pop()
@@ -134,7 +137,10 @@ func (manager *clientManager) removeClient(meta ClientMeta) error {
 	<-waiter
 	cancel()
 
-	// lock the system and remove stuff,
+	// remove client from manager
+	manager.wg.Done()
+
+	// lock the system and remove rest of stuff,
 	// try to keep the lock for as short as possible
 	manager.lock.Lock()
 	defer manager.lock.Unlock()
@@ -167,17 +173,23 @@ func (manager *clientManager) shutdown(cxt context.Context) {
 
 	// start up waiter first
 	go func() {
+		// wait until all the workers have shutdown
 		manager.wg.Wait()
 		close(waiter)
 	}()
 
 	// run shutdown on all clients
-	for _, key := range manager.clients {
+	for _, value := range manager.clients {
 		// run shutdown in it's own threads
 		// do not remove all the clients
 		// as that would use up too much time
 		// for not used data.
-		go key.Shutdown(childCxt)
+		go func(val *Client) {
+			val.Shutdown(childCxt)
+			// Decrement the wait group here
+			// as there is no degregisteation.
+			manager.wg.Done()
+		}(value)
 	}
 
 	select {
