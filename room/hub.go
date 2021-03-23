@@ -164,15 +164,32 @@ func (manager *clientManager) shutdown(cxt context.Context) {
 	childCxt, chancelCxt := context.WithTimeout(cxt, ClientShudownTime)
 
 	// Remove from memory and close any open waiting channels.
+	waiter := make(chan struct{})
 	defer func() {
 		chancelCxt()
 	}()
 
+	// start up waiter first
+	go func() {
+		manager.wg.Wait()
+		close(waiter)
+	}()
+
+	// run shutdown on all clients
 	for _, key := range manager.clients {
-		key.Shutdown(childCxt)
+		// run shutdown in it's own threads
+		// do not remove all the clients
+		// as that would use up too much time
+		// for not used data.
+		go key.Shutdown(childCxt)
 	}
 
-	manager.wg.Wait()
+	select {
+	case <-waiter:
+		logger.Debug("client manager shutdown complete")
+	case <-cxt.Done():
+		logger.Info("client manager was forcefully shutdown")
+	}
 }
 
 // Hub represents a single room.
