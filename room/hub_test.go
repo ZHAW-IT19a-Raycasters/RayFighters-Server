@@ -173,10 +173,6 @@ func TestRemoveClients(t *testing.T) {
 		return
 	}
 
-	// // ignore the ok, as I know it exists
-	// id, _ := cm.mapId(meta)
-	// val := cm.clients[id]
-
 	cm.removeClient(meta)
 
 	if cm.size() != 0 {

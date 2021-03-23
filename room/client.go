@@ -2,9 +2,11 @@ package room
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/google/uuid"
+	"github.zhaw.ch/raycasters/server/log"
 )
 
 type ConnectionStatus uint
@@ -15,6 +17,8 @@ const (
 	Shuttingdown
 	Offline
 )
+
+var logger = log.Log()
 
 type Client struct {
 	// is the one channel that controlls the
@@ -46,6 +50,8 @@ func (c *Client) registerConn(conn ClientMeta) {
 func (c *Client) Shutdown(ctx context.Context) {
 	// TODO: log message of shutdown
 
+	logger.Debugf("Shutting down client [%d]", c.meta.id)
+
 	// set the state of the client to shutting down
 	c.status = Shuttingdown
 	// set the state of the client to offline
@@ -61,8 +67,10 @@ func (c *Client) Shutdown(ctx context.Context) {
 
 	select {
 	case <-runs:
+		fmt.Println("done")
 		// TODO: log the a clean shutdown was a success
 	case <-ctx.Done():
+		fmt.Println()
 		// TODO: log the a forced shutdown was made
 	}
 }

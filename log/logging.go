@@ -73,6 +73,11 @@ func (log logger) checkLevel(level Level) bool {
 
 // Log logs all the levels requested.
 func (log logger) Log(level Level, v ...interface{}) {
+	// if the logger has not been setup just return
+	if !log.isSetup() {
+		return
+	}
+
 	// check if logged level is lower of higher then the set version
 	if !log.checkLevel(level) {
 		return
@@ -86,9 +91,8 @@ func (log logger) Log(level Level, v ...interface{}) {
 
 // Logf logs all the levels and formats the interfaces values.
 func (log logger) Logf(level Level, format string, v ...interface{}) {
-
 	// if the logger has not been setup just return
-	if log.il != nil {
+	if !log.isSetup() {
 		return
 	}
 
@@ -123,7 +127,7 @@ func (log logger) Infof(format string, v ...interface{}) {
 // Error will write an error message.
 func (log logger) Error(v ...interface{}) {
 	// if the logger has not been setup just return
-	if log.il != nil {
+	if !log.isSetup() {
 		return
 	}
 	log.Log(Error, v...)
@@ -132,7 +136,7 @@ func (log logger) Error(v ...interface{}) {
 // Errorf will write and format a error level message.
 func (log logger) Errorf(format string, v ...interface{}) {
 	// if the logger has not been setup just return
-	if log.il != nil {
+	if !log.isSetup() {
 		return
 	}
 	log.Logf(Error, format, v...)
@@ -141,7 +145,7 @@ func (log logger) Errorf(format string, v ...interface{}) {
 // Fatal will write and format a fatal message.
 func (log logger) Fatalf(format string, v ...interface{}) {
 	// if the logger has not been setup just return
-	if log.il != nil {
+	if !log.isSetup() {
 		return
 	}
 	log.il.Fatalf(format, v...)
@@ -151,8 +155,12 @@ func (log logger) Fatalf(format string, v ...interface{}) {
 // ending the program by invoking panic.
 func (log logger) Panicf(format string, v ...interface{}) {
 	// if the logger has not been setup just return
-	if log.il != nil {
+	if !log.isSetup() {
 		return
 	}
 	log.il.Panicf(format, v...)
+}
+
+func (log logger) isSetup() bool {
+	return log.il != nil
 }
