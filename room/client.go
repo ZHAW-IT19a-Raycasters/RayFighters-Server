@@ -5,7 +5,6 @@ import (
 	"errors"
 	"github.zhaw.ch/raycasters/server/protocol"
 	"github.zhaw.ch/raycasters/server/protocol/client"
-	"log"
 	"sync"
 
 	"github.com/google/uuid"
