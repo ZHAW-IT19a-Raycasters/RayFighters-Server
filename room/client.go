@@ -9,17 +9,26 @@ import (
 	"sync"
 
 	"github.com/google/uuid"
-	"github.com/gorilla/websocket"
+	"github.zhaw.ch/raycasters/server/log"
 )
+
+var logger = log.Log()
 
 type ConnectionStatus uint
 
 const (
 	Active ConnectionStatus = iota
 	Timeout
-	Shuttingdown
+	ShuttingDown
 	Offline
 )
+
+func (c ConnectionStatus) String() string {
+	vals := [...]string{
+		"Active", "Timeout", "ShuttingDown", "Offline",
+	}
+	return vals[c]
+}
 
 type Client struct {
 	// is the one channel that controlls the
@@ -50,15 +59,22 @@ func (c *Client) registerConn(conn ClientMeta) {
 
 func (c *Client) Shutdown(ctx context.Context) {
 	// TODO: log message of shutdown
+
+	logger.Debugf("Shutting down client [%d]", c.meta.eId)
+
 	// set the state of the client to shutting down
-	c.status = Shuttingdown
+	c.status = ShuttingDown
 	// set the state of the client to offline
 	defer func() { c.status = Offline }()
+
+	// make a channel on which, we can wait on.
 	runs := make(chan struct{})
 
 	// Make a waiter that will (hopefully) shutdown soon.
 	go func() {
+		// close the running event handler
 		close(c.running)
+		// wait until the workgroup reaches zero
 		c.wg.Wait()
 		close(runs)
 	}()
@@ -66,8 +82,10 @@ func (c *Client) Shutdown(ctx context.Context) {
 	select {
 	case <-runs:
 		// TODO: log the a clean shutdown was a success
+		logger.Debugf("Shutdown of client [%d] complete", c.meta.eId)
 	case <-ctx.Done():
 		// TODO: log the a forced shutdown was made
+		logger.Debugf("forced shutdown of client [%d], due to timeout", c.meta.eId)
 	}
 }
 
@@ -88,18 +106,28 @@ func NewClientGame(pos Coordinate) ClientGame {
 type ClientMeta struct {
 	id   uuid.UUID
 	name string
-	conn *websocket.Conn
+	conn ClientConnection
+}
+
+func NewClientMeta(id uuid.UUID, name string, conn ClientConnection) ClientMeta {
+	return ClientMeta{
+		id:   id,
+		name: name,
+		conn: conn,
+	}
 }
 
 type ClientInternalMeta struct {
 	id   uint8
+	eId  uuid.UUID
 	name string
-	conn *websocket.Conn
+	conn ClientConnection
 }
 
 func NewClientInternalMeta(id uint8, client ClientMeta) ClientInternalMeta {
 	return ClientInternalMeta{
 		id:   id,
+		eId:  client.id,
 		name: client.name,
 		conn: client.conn,
 	}
