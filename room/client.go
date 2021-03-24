@@ -185,7 +185,7 @@ func (c* Client) handleUnknownCode() {
 }
 
 func (c *Client) handleDisconnect(t []byte) {
-	unknown, err := client.NewUnknownByte(t)
+	_, err := client.NewUnknownByte(t)
 	if err != nil {
 		// c.sendData("error")
 	} else {
@@ -194,7 +194,7 @@ func (c *Client) handleDisconnect(t []byte) {
 }
 
 func (c *Client) handleUnknown(t []byte) {
-	unknown, err := client.NewUnknownByte(t)
+	_, err := client.NewUnknownByte(t)
 	if err != nil {
 		// c.sendData("error")
 	} else {
@@ -203,7 +203,7 @@ func (c *Client) handleUnknown(t []byte) {
 }
 
 func (c *Client) handleMovement(t []byte) {
-	movement, err := client.NewMovementByte(t)
+	_, err := client.NewMovementByte(t)
 	if err != nil {
 		// c.sendData(error)
 	} else {
@@ -212,7 +212,7 @@ func (c *Client) handleMovement(t []byte) {
 }
 
 func (c *Client) handleShooting(t []byte) {
-	shooting, err := client.NewShootingBytes(t)
+	_, err := client.NewShootingBytes(t)
 	if err != nil {
 		// c.sendData("error")
 	} else {
@@ -221,7 +221,7 @@ func (c *Client) handleShooting(t []byte) {
 }
 
 func (c *Client) handleRequestOtherPlayer(t []byte) {
-	requestOtherPlayers, err := client.NewRequestOtherPlayersBytes(t)
+	_, err := client.NewRequestOtherPlayersBytes(t)
 	if err != nil {
 		// c.sendData("error")
 	} else {
