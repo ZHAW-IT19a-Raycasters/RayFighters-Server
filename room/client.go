@@ -142,7 +142,7 @@ func (c *Client) ReadClient() () {
 		t := [17]byte{}
 		readBytes, err := message.Read(t[:])
 		if err != nil {
-			log.Fatal(err)
+			// TODO: fail
 		}
 		c.handleRead(t[:readBytes])
 	}
