@@ -2,6 +2,9 @@ package room
 
 import (
 	"context"
+	"errors"
+	"github.zhaw.ch/raycasters/server/protocol"
+	"log"
 	"sync"
 
 	"github.com/google/uuid"
@@ -46,7 +49,6 @@ func (c *Client) registerConn(conn ClientMeta) {
 
 func (c *Client) Shutdown(ctx context.Context) {
 	// TODO: log message of shutdown
-
 	// set the state of the client to shutting down
 	c.status = Shuttingdown
 	// set the state of the client to offline
@@ -101,3 +103,102 @@ func NewClientInternalMeta(id uint8, client ClientMeta) ClientInternalMeta {
 		conn: client.conn,
 	}
 }
+
+func (c *Client) ReadClient() () {
+	for {
+		_, message, err := c.meta.conn.NextReader()
+		if err != nil {
+			// Shutdown()
+		}
+		t := [17]byte{}
+		readBytes, err := message.Read(t[:])
+		if err != nil {
+			log.Fatal(err)
+		}
+		c.handleRead(t[:readBytes])
+	}
+}
+
+func (c *Client) sendData(message protocol.Bytefy) {
+	cw, err := c.meta.conn.NextWriter(1)
+	if err != nil {
+		// return error
+		_ = errors.New("something went wrong with creating NextWriter")
+	} else {
+		_, err = cw.Write(message.Bytes())
+	}
+}
+
+func (c *Client) handleRead(t []byte) {
+	switch client.Detect(t[0]) {
+	case client.DisconnectOpcode:
+		// Received a Disconnect request from client
+		c.handleDisconnect(t)
+	case client.UnknownOpcode:
+		// Client received Unknown request from Server
+		c.handleUnknown(t)
+	case client.MovementOpcode:
+		// Received a Movement request from client
+		c.handleMovement(t)
+	case client.ShootingOpcode:
+		// Received a Shooting request from client
+		c.handleShooting(t)
+	case client.RequestOtherPlayersOpcode:
+		// Received a RequestOtherPlayers request from client
+		c.handleRequestOtherPlayer(t)
+	default:
+		// Received Unknown Code from client
+		c.handleUnknownCode()
+	}
+}
+
+func (c* Client) handleUnknownCode() {
+	// c.sendData("error")
+}
+
+func (c *Client) handleDisconnect(t []byte) {
+	unknown, err := client.NewUnknownByte(t)
+	if err != nil {
+		// c.sendData("error")
+	} else {
+		// TODO: SEND UNKNOWN TO FRONTEND
+	}
+}
+
+func (c *Client) handleUnknown(t []byte) {
+	unknown, err := client.NewUnknownByte(t)
+	if err != nil {
+		// c.sendData("error")
+	} else {
+		// TODO: SEND UNKNOWN TO FRONTEND
+	}
+}
+
+func (c *Client) handleMovement(t []byte) {
+	movement, err := client.NewMovementByte(t)
+	if err != nil {
+		// c.sendData(error)
+	} else {
+		// TODO: SEND MOVEMENT TO SERVER HUB
+	}
+}
+
+func (c *Client) handleShooting(t []byte) {
+	shooting, err := client.NewShootingBytes(t)
+	if err != nil {
+		// c.sendData("error")
+	} else {
+		// TODO: SEND SHOOTING TO SERVER HUB
+	}
+}
+
+func (c *Client) handleRequestOtherPlayer(t []byte) {
+	requestOtherPlayers, err := client.NewRequestOtherPlayersBytes(t)
+	if err != nil {
+		// c.sendData("error")
+	} else {
+		// TODO: SEND REQUESTOTHERPLAYERS TO FRONTEND
+	}
+}
+
+
