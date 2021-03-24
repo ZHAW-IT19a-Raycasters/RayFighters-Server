@@ -1,11 +1,13 @@
 package room
 
 import (
+	"container/list"
 	"context"
 	"fmt"
 	"sync"
 
 	"github.com/google/uuid"
+	"github.zhaw.ch/raycasters/server/protocol/server"
 	"github.zhaw.ch/raycasters/server/room/helpers"
 )
 
@@ -77,16 +79,18 @@ func (manager *clientManager) addClient(meta ClientMeta) error {
 			panic("On an existing UUID mapping did a client not exist.")
 		}
 	} else {
-		// add a new client
-		manager.wg.Add(1)
 
 		// a new client
 		// get the new ID for the client
 		id, err := manager.idManager.Pop()
 
+		// If the hub is filled up
 		if err != nil {
 			return err
 		}
+
+		// add a new client
+		manager.wg.Add(1)
 
 		// map the UUID to the internaly used
 		manager.mapping[meta.id] = id
@@ -197,5 +201,46 @@ func (manager *clientManager) shutdown(cxt context.Context) {
 		logger.Debug("client manager shutdown complete")
 	case <-cxt.Done():
 		logger.Info("client manager was forcefully shutdown")
+	}
+}
+
+// broadCast will send the given message to all the connected clients.
+// This function allows for a blacklist, so that the server does not send
+// the broadcast to those clients.
+func (manager *clientManager) broadCast(msg server.ServerOpcode, except []uint8) {
+	// TODO: implement broadCast
+	// This waits on final client implementation.
+
+	// TODO: write benchmark for this
+	// Attention this might be faster via a different implementation.
+
+	// write except onto linked list, so that removing an element is in O(1)
+	blackList := list.New()
+	for blacklisted := range except {
+		blackList.PushBack(blacklisted)
+	}
+
+	// use a reader lock for this, as any kind of write would be problematic.
+	manager.lock.RLock()
+	defer manager.lock.RUnlock()
+
+	// loop over all the connected clients and internaly over the except
+	for id, client := range manager.clients {
+		// check if client is still active, if not ignore that client
+		if client.status != Active {
+			continue
+		}
+
+		for elem := blackList.Front(); elem != nil; elem = elem.Next() {
+			if elem.Value.(uint8) != id {
+				// TODO: send message to client
+
+			} else {
+				// Remove element from black list to speed up internal loop
+				tmp := elem
+				elem = elem.Next()
+				blackList.Remove(tmp)
+			}
+		}
 	}
 }

@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"time"
+
+	"github.zhaw.ch/raycasters/server/protocol/server"
 )
 
 const ClientShudownTime = 1 * time.Second
@@ -35,7 +37,6 @@ func NewHub(hubId int) (*Hub, chan<- ClientMeta) {
 		id:      hubId,
 		running: make(chan struct{}),
 	}
-
 	return &hub, hub.conn
 }
 
@@ -48,36 +49,28 @@ func (h *Hub) Full() bool {
 }
 
 func (h *Hub) RegisterClient(meta ClientMeta) error {
-	h.clientManager.lock.Lock()
-	defer h.clientManager.lock.Unlock()
-	// check that adding a client is safe
-	if h.Full() {
-		return ErrHubIsFull
-	}
-
-	// send meta to the hub
-	h.conn <- meta
-
-	return nil
+	return h.clientManager.addClient(meta)
 }
 
 // TODO: Add broadcast function that can be called from the clients
-// func (h *Hub) broadCast(msg )
+func (h *Hub) BroadCast(msg server.ServerOpcode) {
+	h.clientManager.broadCast(msg, []byte{})
+}
 
 // Run is the main event loop of the hub.
 // TODO: figure out if this approach makes sense
-func (h *Hub) Run() {
-	for {
-		select {
-		case <-h.running:
-			logger.Infof("Shutting down hub [%d]", h.id)
-			return
-		case data := <-h.conn:
-			logger.Debug("Adding a new player to hub [%d]", h.id)
-			h.clientManager.addClient(data)
-		}
-	}
-}
+// func (h *Hub) Run() {
+// 	for {
+// 		select {
+// 		case <-h.running:
+// 			logger.Infof("Shutting down hub [%d]", h.id)
+// 			return
+// 		case data := <-h.conn:
+// 			logger.Debug("Adding a new player to hub [%d]", h.id)
+// 			h.clientManager.addClient(data)
+// 		}
+// 	}
+// }
 
 // Shutdown will intialize a complete shutdown of any and all clients.
 // With the cxt context a premature cancelation of all client
