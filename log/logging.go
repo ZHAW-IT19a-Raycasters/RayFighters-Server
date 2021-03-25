@@ -2,9 +2,6 @@ package log
 
 import (
 	"errors"
-	"fmt"
-	"io"
-	"log"
 	"os"
 )
 
@@ -18,15 +15,6 @@ var ErrLoggerAlreadySetup = errors.New("the logger has already been setup")
 
 // iLogger is a singleton to the actual logging instance
 var iLogger *internalLogger
-
-// newInternalLogger will create the actual internal logger instance,
-// used for all logging.
-func newInternalLogger(level Level, out io.Writer) *internalLogger {
-	return &internalLogger{
-		ilogger: log.New(out, "", log.Ldate|log.Ltime|log.Lshortfile),
-		level:   level,
-	}
-}
 
 // setILogger will set
 func setILogger(lg *internalLogger) {
@@ -72,15 +60,6 @@ func SetupLogFile(level Level, fileName string) error {
 	return nil
 }
 
-// checkLevel is the function that checks if the requested level
-// is allowed to be used per configuration.
-// Attention this function is not gated by the setup, so it
-// might create a nil pointer segfault. This function is
-// intendet to be used after checking the iLogger state.
-func (log logger) checkLevel(level Level) bool {
-	return iLogger.checkLevel(level)
-}
-
 func (log logger) isSetup() bool {
 	return iLogger != nil
 }
@@ -91,16 +70,7 @@ func (log logger) Log(level Level, v ...interface{}) {
 	if !log.isSetup() {
 		return
 	}
-
-	// check if logged level is lower of higher then the set version
-	if !log.checkLevel(level) {
-		return
-	}
-
-	// insert before the values
-	v = prependLevel(level, v)
-
-	iLogger.Println(v...)
+	iLogger.log(level, v...)
 }
 
 // Logf logs all the levels and formats the interfaces values.
@@ -109,13 +79,7 @@ func (log logger) Logf(level Level, format string, v ...interface{}) {
 	if !log.isSetup() {
 		return
 	}
-
-	// check if logged level is lower of higher then the set version
-	if !log.checkLevel(level) {
-		return
-	}
-
-	iLogger.Printf(fmt.Sprintf("%s %s", level.String(), format), v...)
+	iLogger.logf(level, format, v...)
 }
 
 // Debug will write a debug message.
@@ -150,19 +114,11 @@ func (log logger) Warnf(format string, v ...interface{}) {
 
 // Error will write an error message.
 func (log logger) Error(v ...interface{}) {
-	// if the logger has not been setup just return
-	if !log.isSetup() {
-		return
-	}
 	log.Log(Error, v...)
 }
 
 // Errorf will write and format a error level message.
 func (log logger) Errorf(format string, v ...interface{}) {
-	// if the logger has not been setup just return
-	if !log.isSetup() {
-		return
-	}
 	log.Logf(Error, format, v...)
 }
 
@@ -173,5 +129,5 @@ func (log logger) Panicf(format string, v ...interface{}) {
 	if !log.isSetup() {
 		return
 	}
-	iLogger.Panicf(format, v...)
+	iLogger.panicf(format, v...)
 }

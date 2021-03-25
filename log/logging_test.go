@@ -115,16 +115,37 @@ func TestLoggerDebug(t *testing.T) {
 func TestLoggerNoDebug(t *testing.T) {
 	buffer := setupBufferLogger(Info, t)
 
-	logger := Log()
-	logger.Debug("help me")
+	check := func(f func() string) bool {
+		buffer.Reset()
+		exp := f()
+		res := strings.TrimSpace(buffer.String())
 
-	expetedResult := "DEBUG help me"
-	res := strings.TrimSpace(buffer.String())
-
-	if strings.HasSuffix(res, expetedResult) {
-		t.Errorf("The buffer should be not be filled with %s", expetedResult)
+		if strings.HasSuffix(res, exp) {
+			t.Errorf("The buffer should be not be filled with %s", exp)
+			return false
+		}
+		return true
 	}
 
+	logger := Log()
+	debug := func() string {
+		// doesn't do anything
+		logger.Debug("help me")
+
+		return "DEBUG help me"
+	}
+
+	debugf := func() string {
+
+		logger.Debugf("help me%s", " - please")
+		return "DEBUG help me - please"
+	}
+
+	for _, f := range [...]func() string{debug, debugf} {
+		if !check(f) {
+			return
+		}
+	}
 }
 
 func TestAllLevels(t *testing.T) {
@@ -195,9 +216,14 @@ func TestAllLevels(t *testing.T) {
 }
 
 func TestPanicf(t *testing.T) {
+	logger := Log()
+
+	// testing a not setup logger, so panic can not happen
+	logger.Panicf("PANIC HELP, %s", "I'AM DYING!")
+
 	buffer := setupBufferLogger(Warning, t)
 	exp := "PANIC HELP, I'AM DYING!"
-	logger := Log()
+
 	defer func() {
 		if r := recover(); r == nil {
 			t.Error("Did not panic as expected")
@@ -210,6 +236,8 @@ func TestPanicf(t *testing.T) {
 			}
 		}
 	}()
+
+	// let it panic
 	logger.Panicf("PANIC HELP, %s", "I'AM DYING!")
 }
 

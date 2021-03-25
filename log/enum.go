@@ -27,8 +27,11 @@ func (l Level) String() string {
 // prependLevel is a helper that inserts the level name before
 // the other values.
 func prependLevel(y Level, x []interface{}) []interface{} {
+	// force realloc
 	x = append(x, 0)
+	// move all the values in x to the end
 	copy(x[1:], x)
+	// add the important information to the front
 	x[0] = y.String()
 	return x
 }
