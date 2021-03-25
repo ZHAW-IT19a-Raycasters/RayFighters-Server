@@ -158,9 +158,20 @@ func TestMovementPlayerBytes(t *testing.T) {
 		// 0x3F 0xC9 0x99 0x99 0x99 0x99 0x99 0x9A
 		0x9A, 0x99, 0x99, 0x99, 0x99, 0x99, 0xC9, 0x3F,
 	}
-	gottenData := server.NewMovementPlayer(userId, coorX, coorY).Bytes()
+	mp := server.NewMovementPlayer(userId, coorX, coorY)
+	gottenData := mp.Bytes()
 
 	compareByteArrays(expectedData[:], gottenData, t)
+
+	// make sure the values are correctly set
+	// basically testing getters
+	if userId != mp.UserId() {
+		t.Error("UserId has been wrongly set")
+	} else if coorX != mp.CoorX() {
+		t.Error("CoorX has been wrongly set")
+	} else if coorY != mp.CoorY() {
+		t.Error("CoorY has been wrongly set")
+	}
 }
 
 func TestPlayerLeft(t *testing.T) {
