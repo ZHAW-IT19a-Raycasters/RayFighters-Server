@@ -3,6 +3,7 @@ package log
 import (
 	"bytes"
 	"errors"
+	"io"
 	"io/ioutil"
 	"os"
 	"strings"
@@ -35,19 +36,69 @@ func setupTmpFile(level Level, t *testing.T) (string, error) {
 	return tmpFile.Name(), nil
 }
 
-func setupBuffer(level Level, t *testing.T) bytes.Buffer {
+func setupBuffer() bytes.Buffer {
 	rawBuf := make([]byte, 0, 500)
 
 	buffer := bytes.NewBuffer(rawBuf)
-	iLogger = newInternalLogger(level, buffer)
-	t.Cleanup(func() {
-		iLogger = nil
-	})
 	return *buffer
 }
 
+func setupLogger(level Level, out io.Writer, t *testing.T) {
+	setILogger(newInternalLogger(level, out))
+	t.Cleanup(func() {
+		resetILogger()
+	})
+}
+
+func setupBufferLogger(level Level, t *testing.T) bytes.Buffer {
+	buffer := setupBuffer()
+	setupLogger(level, &buffer, t)
+
+	return buffer
+}
+
 func TestLogger(t *testing.T) {
-	buffer := setupBuffer(Debug, t)
+	buff := setupBuffer()
+	buff.WriteByte(' ')
+
+	lg := Log()
+	lg.Debug("Something")
+	lg.Debugf("Something %s", "2")
+	// nothing happens here
+	res := buff.String()
+	if res != " " {
+		t.Error("Something unexpected happend with the buffer")
+		return
+	}
+	// nothing happens here
+	test := func(check string) bool {
+		res = buff.String()
+		res = strings.TrimSpace(res)
+		if !strings.HasSuffix(res, check) {
+			t.Error("Wrong values have been send by the logger")
+			return false
+		}
+		return true
+	}
+	// remove values from buff
+	buff.Reset()
+
+	setupLogger(Debug, &buff, t)
+
+	lg.Debug("Something")
+	if !test("Something") {
+		return
+	}
+
+	lg.Debugf("Something [%s]", "2")
+	if !test("Something [2]") {
+		return
+	}
+}
+
+func TestLoggerDebug(t *testing.T) {
+
+	buffer := setupBufferLogger(Debug, t)
 
 	logger := Log()
 
@@ -59,11 +110,10 @@ func TestLogger(t *testing.T) {
 	if strings.HasSuffix(res, expetedResult) {
 		t.Errorf("The buffer should be filled with %s", expetedResult)
 	}
-
 }
 
 func TestLoggerNoDebug(t *testing.T) {
-	buffer := setupBuffer(Info, t)
+	buffer := setupBufferLogger(Info, t)
 
 	buffer.WriteRune(' ')
 

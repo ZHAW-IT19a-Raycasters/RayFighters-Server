@@ -19,18 +19,33 @@ var ErrLoggerAlreadySetup = errors.New("the logger has already been setup")
 // iLogger is a singleton to the actual logging instance
 var iLogger *internalLogger
 
-// logger is a wrapper around the internal logger singleton.
-// It can be loaded as a var into the respective files, as
-// it contains a single pointer to a global variable.
-type logger struct {
-	il *internalLogger
+// newInternalLogger will create the actual internal logger instance,
+// used for all logging.
+func newInternalLogger(level Level, out io.Writer) *internalLogger {
+	return &internalLogger{
+		ilogger: log.New(out, "", log.Ldate|log.Ltime|log.Lshortfile),
+		level:   level,
+	}
 }
+
+// setILogger will set
+func setILogger(lg *internalLogger) {
+	iLogger = lg
+}
+
+// resetILogger will set the actall logger to nil.
+func resetILogger() {
+	iLogger = nil
+}
+
+// logger is a pseudo wrapper around the internal logger singleton.
+// It does not contain any values, but the methods written for the
+// logger all point to the internal logger variable one.
+type logger struct{}
 
 // Log returns a copy of the logger.
 func Log() logger {
-	return logger{
-		il: iLogger,
-	}
+	return logger{}
 }
 
 // Setup will as the name implies setup the internals for the logger.
@@ -51,24 +66,23 @@ func SetupLogFile(level Level, fileName string) error {
 	if err != nil {
 		return err
 	}
-	iLogger = newInternalLogger(level, file)
+
+	setILogger(newInternalLogger(level, file))
 
 	return nil
 }
 
-// newInternalLogger will create the actual internal logger instance,
-// used for all logging.
-func newInternalLogger(level Level, out io.Writer) *internalLogger {
-	return &internalLogger{
-		ilogger: log.New(out, "", log.Ldate|log.Ltime|log.Lshortfile),
-		level:   level,
-	}
-}
-
 // checkLevel is the function that checks if the requested level
 // is allowed to be used per configuration.
+// Attention this function is not gated by the setup, so it
+// might create a nil pointer segfault. This function is
+// intendet to be used after checking the iLogger state.
 func (log logger) checkLevel(level Level) bool {
-	return log.il.checkLevel(level)
+	return iLogger.checkLevel(level)
+}
+
+func (log logger) isSetup() bool {
+	return iLogger != nil
 }
 
 // Log logs all the levels requested.
@@ -86,7 +100,7 @@ func (log logger) Log(level Level, v ...interface{}) {
 	// insert before the values
 	v = prependLevel(level, v)
 
-	log.il.Println(v...)
+	iLogger.Println(v...)
 }
 
 // Logf logs all the levels and formats the interfaces values.
@@ -101,7 +115,7 @@ func (log logger) Logf(level Level, format string, v ...interface{}) {
 		return
 	}
 
-	log.il.Printf(fmt.Sprintf("%s %s", level.String(), format), v...)
+	iLogger.Printf(fmt.Sprintf("%s %s", level.String(), format), v...)
 }
 
 // Debug will write a debug message.
@@ -142,15 +156,6 @@ func (log logger) Errorf(format string, v ...interface{}) {
 	log.Logf(Error, format, v...)
 }
 
-// Fatal will write and format a fatal message.
-func (log logger) Fatalf(format string, v ...interface{}) {
-	// if the logger has not been setup just return
-	if !log.isSetup() {
-		return
-	}
-	log.il.Fatalf(format, v...)
-}
-
 // Panicf will write and format a panic message, before
 // ending the program by invoking panic.
 func (log logger) Panicf(format string, v ...interface{}) {
@@ -158,9 +163,5 @@ func (log logger) Panicf(format string, v ...interface{}) {
 	if !log.isSetup() {
 		return
 	}
-	log.il.Panicf(format, v...)
-}
-
-func (log logger) isSetup() bool {
-	return log.il != nil
+	iLogger.Panicf(format, v...)
 }
