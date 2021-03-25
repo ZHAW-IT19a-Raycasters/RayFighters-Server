@@ -138,6 +138,16 @@ func (log logger) Infof(format string, v ...interface{}) {
 	log.Logf(Info, format, v...)
 }
 
+// Info will write an info message.
+func (log logger) Warn(v ...interface{}) {
+	log.Log(Warning, v...)
+}
+
+// Infof will write and format an info message.
+func (log logger) Warnf(format string, v ...interface{}) {
+	log.Logf(Warning, format, v...)
+}
+
 // Error will write an error message.
 func (log logger) Error(v ...interface{}) {
 	// if the logger has not been setup just return

@@ -36,11 +36,11 @@ func setupTmpFile(level Level, t *testing.T) (string, error) {
 	return tmpFile.Name(), nil
 }
 
-func setupBuffer() bytes.Buffer {
+func setupBuffer() *bytes.Buffer {
 	rawBuf := make([]byte, 0, 500)
 
 	buffer := bytes.NewBuffer(rawBuf)
-	return *buffer
+	return buffer
 }
 
 func setupLogger(level Level, out io.Writer, t *testing.T) {
@@ -50,9 +50,9 @@ func setupLogger(level Level, out io.Writer, t *testing.T) {
 	})
 }
 
-func setupBufferLogger(level Level, t *testing.T) bytes.Buffer {
+func setupBufferLogger(level Level, t *testing.T) *bytes.Buffer {
 	buffer := setupBuffer()
-	setupLogger(level, &buffer, t)
+	setupLogger(level, buffer, t)
 
 	return buffer
 }
@@ -83,7 +83,7 @@ func TestLogger(t *testing.T) {
 	// remove values from buff
 	buff.Reset()
 
-	setupLogger(Debug, &buff, t)
+	setupLogger(Debug, buff, t)
 
 	lg.Debug("Something")
 	if !test("Something") {
@@ -115,17 +115,102 @@ func TestLoggerDebug(t *testing.T) {
 func TestLoggerNoDebug(t *testing.T) {
 	buffer := setupBufferLogger(Info, t)
 
-	buffer.WriteRune(' ')
-
 	logger := Log()
 	logger.Debug("help me")
 
-	const expetedResult string = "DEBUG help me"
-	res := buffer.String()
+	expetedResult := "DEBUG help me"
+	res := strings.TrimSpace(buffer.String())
 
 	if strings.HasSuffix(res, expetedResult) {
 		t.Errorf("The buffer should be not be filled with %s", expetedResult)
 	}
+
+}
+
+func TestAllLevels(t *testing.T) {
+	// test all the available logger levels.
+
+	buffer := setupBufferLogger(Debug, t)
+	logger := Log()
+
+	// all functions
+	run := func(f func() string) bool {
+		buffer.Reset()
+		exp := f()
+		res := strings.TrimSpace(buffer.String())
+
+		if !strings.HasSuffix(res, exp) {
+			t.Errorf("The buffer should be filled with %s", exp)
+			return false
+		}
+		return true
+	}
+
+	debug := func() string {
+		logger.Debug("some random text")
+		return "DEBUG some random text"
+	}
+
+	debugf := func() string {
+		logger.Debugf("a number that annoyed me [%d]", 666)
+		return "DEBUG a number that annoyed me [666]"
+	}
+
+	// the info functions
+	info := func() string {
+		logger.Info("test")
+		return "INFO test"
+	}
+
+	infof := func() string {
+		logger.Infof("a string %d", 23)
+		return "INFO a string 23"
+	}
+
+	warn := func() string {
+		logger.Warn("some terrible message threatening mankind")
+		return "WARNING some terrible message threatening mankind"
+	}
+
+	warnf := func() string {
+		logger.Warnf("some terrible message threatening mankind: [%s]", "with an addition")
+		return "WARNING some terrible message threatening mankind: [with an addition]"
+	}
+
+	err := func() string {
+		logger.Error("well I almost crashed... HELP")
+		return "ERROR well I almost crashed... HELP"
+	}
+
+	errf := func() string {
+		logger.Errorf("I am still alive, have some useless numbers: [0x%x]", 0x42)
+		return "ERROR I am still alive, have some useless numbers: [0x42]"
+	}
+
+	for _, f := range [...]func() string{debug, debugf, info, infof, warn, warnf, err, errf} {
+		if !run(f) {
+			return
+		}
+	}
+}
+
+func TestPanicf(t *testing.T) {
+	buffer := setupBufferLogger(Warning, t)
+	exp := "PANIC HELP, I'AM DYING!"
+	logger := Log()
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("Did not panic as expected")
+		} else {
+			// check if it was written into the buffer
+			res := strings.TrimSpace(buffer.String())
+
+			if !strings.HasSuffix(res, exp) {
+				t.Errorf("The buffer should be filled with %s", exp)
+			}
+		}
+	}()
+	logger.Panicf("PANIC HELP, %s", "I'AM DYING!")
 }
 
 func TestDoubleLoggingInit(t *testing.T) {
