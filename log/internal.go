@@ -19,10 +19,6 @@ func (log internalLogger) Printf(format string, v ...interface{}) {
 	log.ilogger.Printf(format, v...)
 }
 
-func (log internalLogger) Fatalf(format string, v ...interface{}) {
-	log.ilogger.Fatalf(format, v...)
-}
-
 func (log internalLogger) Panicf(format string, v ...interface{}) {
 	log.ilogger.Panicf(format, v...)
 }
