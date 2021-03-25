@@ -253,15 +253,23 @@ func NewRequestOtherPlayersBytes(data []byte) (*RequestOtherPlayers, error) {
 // if its invalid a ParsingError will be returned.
 // if its valid Nil will be returned.
 func checkOpcodeHelper(opcode ClientOpcode, data []byte) error {
-	if len(data) != opcode.ByteSize() {
+	// testing detect first, as to see if the opcode even is a opcode
+	// or is unknown.
+
+	if detected := Detect(data[0]); detected != opcode {
+		return &ParsingError{
+			opcode: opcode,
+			msg: fmt.Sprintf("Incorrect Opcode used, should be [%s - %d] is [%s - %d]",
+				opcode.String(),
+				opcode,
+				detected.String(),
+				data[0],
+			),
+		}
+	} else if len(data) != opcode.ByteSize() {
 		return &ParsingError{
 			opcode: opcode,
 			msg:    fmt.Sprintf("must be only [%d] bytes long is [%d]", opcode.ByteSize(), len(data)),
-		}
-	} else if Detect(data[0]) != opcode {
-		return &ParsingError{
-			opcode: opcode,
-			msg:    "Incorrect Opcode used.",
 		}
 	}
 	return nil

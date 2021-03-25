@@ -63,6 +63,8 @@ func (manager *clientManager) mapId(meta ClientMeta) (uint8, bool) {
 // room. Attention this will not return an error if the given client
 // already has a profile in the room.
 func (manager *clientManager) addClient(meta ClientMeta) error {
+	// TODO: Check atomic counter for limit
+
 	// lock the hub, so that writing is okay
 	manager.lock.Lock()
 	defer manager.lock.Unlock()
