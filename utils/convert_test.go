@@ -40,3 +40,20 @@ func TestFloatToBinary(t *testing.T) {
 
 	compareByteArrays(expData[:], gotData, t)
 }
+
+func TestBinaryToFloat(t *testing.T) {
+
+	// 1.00000000000000005551115123126E-1
+	// 0x3FB999999999999A
+	var expected float64 = 0.1
+
+	rawData := [...]byte{
+		// 0x3F 0xB9 0x99 0x99 0x99 0x99 0x99 0x9A
+		0x9A, 0x99, 0x99, 0x99, 0x99, 0x99, 0xB9, 0x3F,
+	}
+
+	got := utils.BinaryToFloat(rawData[:])
+	if got != expected {
+		t.Errorf("incorrect conversion of number")
+	}
+}

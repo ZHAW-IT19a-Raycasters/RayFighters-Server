@@ -2,6 +2,7 @@ package setup
 
 import (
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/akamensky/argparse"
@@ -9,7 +10,7 @@ import (
 )
 
 // Represents the arguments utilized.
-type args struct {
+type commandlineArguments struct {
 	// Will be "" if no ip has been given
 	Ip *string
 	// Will be -1 if no port has been given
@@ -19,22 +20,39 @@ type args struct {
 // A wrapper for the argument parser
 // is only used intern the package.
 type argParser struct {
+	out    io.Writer
 	parser *argparse.Parser
+	coms   *commandlineArguments
+}
+
+// newArgParser will create a new argument parser
+func newArgParser(parser *argparse.Parser, coms *commandlineArguments) argParser {
+	return argParser{
+		parser: parser,
+		out:    os.Stdout,
+		coms:   coms,
+	}
 }
 
 // Will print the usage error message to the commandline.
 func (p *argParser) Usage(msg error) {
-	fmt.Print(p.parser.Usage(msg))
+	fmt.Fprint(p.out, p.parser.Usage(msg))
+}
+
+// Args will return the commandlineArguments parsed out.
+// Attention, if there was an error this will be nil
+func (p *argParser) Args() *commandlineArguments {
+	return p.coms
 }
 
 // Will parse the command line arguments themselfs.
-func argParse() (*args, *argParser, error) {
+func argParse() (argParser, error) {
 	return rawArgParse(os.Args)
 }
 
 // Will parse any agument slice.
 // This is split into a sub function for easier testing.
-func rawArgParse(arguments []string) (*args, *argParser, error) {
+func rawArgParse(arguments []string) (argParser, error) {
 	parser := argparse.NewParser("RayServer", "Controlls all the rooms and interactions between the players.")
 	// shutdown parser if not fullfilled
 	parser.ExitOnHelp(true)
@@ -77,8 +95,8 @@ func rawArgParse(arguments []string) (*args, *argParser, error) {
 	err := parser.Parse(arguments)
 
 	if err != nil {
-		return nil, &argParser{parser}, err
+		return newArgParser(parser, nil), err
 	}
 
-	return &args{Ip: ip, Port: port}, &argParser{parser}, nil
+	return newArgParser(parser, &commandlineArguments{Ip: ip, Port: port}), nil
 }

@@ -1,12 +1,46 @@
 package client_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.zhaw.ch/raycasters/server/protocol/client"
-	"github.zhaw.ch/raycasters/server/utils"
 )
 
+// using value 100 here as this is part of the server opcodes
+// and not the client ones.
+const fakeOpcode = client.ClientOpcode(100)
+
+func TestDetect(t *testing.T) {
+
+	for _, val := range client.Overview {
+		got := client.Detect(val.Value())
+		if val != got {
+			t.Errorf("opcodes are different [%d] - [%d]", val, got)
+		}
+	}
+
+	// Test unsupported opcode
+	if client.Detect(fakeOpcode.Value()) != client.UnknownOpcode {
+		t.Error("Did not get unknown opocode on false opcode.")
+	}
+}
+
+func TestOpcodeString(t *testing.T) {
+	exp := [...]string{
+		"Disconnect",
+		"Unknown",
+		"Movement",
+		"Shooting",
+		"RequestOtherPlayers",
+	}
+	for i, val := range client.Overview {
+		if val.String() != exp[i] {
+			t.Errorf("Name are not as expected.\n[%s] - [%s]", val.String(), exp[i])
+			return
+		}
+	}
+}
 func TestRequestOtherPlayers(t *testing.T) {
 	// correct version
 	data := []byte{
@@ -63,6 +97,42 @@ func TestShooting(t *testing.T) {
 	}
 }
 
+func TestShootingError(t *testing.T) {
+
+	// flaot converted withhttp://www.binaryconvert.com/convert_double.html
+	// 0x401B99999999999A
+	// angle := 6.9
+	data := [...]byte{
+		client.ShootingOpcode.Value(),
+		//, 0x40, 0x1B, 0x99, 0x99, 0x99, 0x99, 0x99, 0x9A
+		0x9A, 0x99, 0x99, 0x99, 0x99, 0x99, 0x1B, 0x40,
+	}
+
+	// Testing case where bytesize is incorrect.
+	_, err := client.NewShootingBytes(data[:len(data)-1])
+
+	if err == nil {
+		t.Error("Incorrect bytesize was accepted as correct")
+		return
+	} else if !strings.HasSuffix(err.Error(), "[must be only [9] bytes long is [8]]") {
+		t.Error("Incorrect suffix has been used")
+		return
+	}
+
+	// Testing case where the wrong opcode has been send.
+	data[0] = fakeOpcode.Value()
+	_, err = client.NewShootingBytes(data[:])
+
+	str := "[Incorrect Opcode used, should be [Shooting - 20] is [Unknown - 100]]"
+
+	if err == nil {
+		t.Error("Incorrect opcode was accepted as correct")
+		return
+	} else if !strings.HasSuffix(err.Error(), str) {
+		t.Error("Incorrect suffix has been used")
+		return
+	}
+}
 func TestMovement(t *testing.T) {
 	// for manual float conversion
 	// http://www.binaryconvert.com/result_double.html
@@ -95,6 +165,33 @@ func TestMovement(t *testing.T) {
 	}
 }
 
+func TestMovementError(t *testing.T) {
+	// for manual float conversion
+	// http://www.binaryconvert.com/result_double.html
+	// 0x40 0x84 0xD0 0x00 0x00 0x00 0x00 0x00
+	// coorX := 666.0
+	// 0x40 0x8F 0x3F 0xFD 0xF3 0xB6 0x45 0xA2
+	// coorY := 999.999
+
+	data := [...]byte{
+		client.MovementOpcode.Value(),
+		// 0x40 0x84 0xD0 0x00 0x00 0x00 0x00 0x00
+		0x00, 0x00, 0x00, 0x00, 0x00, 0xD0, 0x84, 0x40,
+		// 0x40 0x8F 0x3F 0xFD 0xF3 0xB6 0x45 0xA2
+		0xA2, 0x45, 0xB6, 0xF3, 0xFD, 0x3F, 0x8F, 0x40,
+	}
+
+	_, err := client.NewMovementByte(data[:len(data)-1])
+
+	if err == nil {
+		t.Error("Incorrect bytesize was accepted as correct")
+		return
+	} else if !strings.HasSuffix(err.Error(), "[must be only [17] bytes long is [16]]") {
+		t.Error("Incorrect suffix has been used")
+		return
+	}
+}
+
 func TestUnknown(t *testing.T) {
 	// correct version
 	data := []byte{
@@ -103,6 +200,19 @@ func TestUnknown(t *testing.T) {
 	_, err := client.NewUnknownByte(data)
 	if err != nil {
 		t.Errorf("Correct version was flaged here\n%s", err)
+		return
+	}
+}
+
+func TestUnknownError(t *testing.T) {
+	// correct version
+	data := []byte{
+		client.UnknownOpcode.Value(),
+		1,
+	}
+	_, err := client.NewUnknownByte(data)
+	if err == nil {
+		t.Error("Incorrect bytesize was accepted as correct")
 		return
 	}
 }
@@ -117,36 +227,42 @@ func TestDisconnect(t *testing.T) {
 		t.Errorf("Correct version was flaged here\n%s", err)
 		return
 	}
-}
-func TestBinaryToFloat(t *testing.T) {
 
-	// 1.00000000000000005551115123126E-1
-	// 0x3FB999999999999A
-	var expected float64 = 0.1
-
-	rawData := [...]byte{
-		// 0x3F 0xB9 0x99 0x99 0x99 0x99 0x99 0x9A
-		0x9A, 0x99, 0x99, 0x99, 0x99, 0x99, 0xB9, 0x3F,
-	}
-
-	got := utils.BinaryToFloat(rawData[:])
-	if got != expected {
-		t.Errorf("incorrect conversion of number")
-	}
 }
 
-func TestName(t *testing.T) {
-	exp := [...]string{
-		"Disconnect",
-		"Unknown",
-		"Movement",
-		"Shooting",
-		"RequestOtherPlayers",
+func TestDiconnectError(t *testing.T) {
+
+	data := []byte{
+		client.DisconnectOpcode.Value(), 44,
 	}
-	for i, val := range client.Overview {
-		if val.String() != exp[i] {
-			t.Errorf("Name are not as expected.\n[%s] - [%s]", val.String(), exp[i])
-			return
+	_, err := client.NewDisconnectByte(data)
+	if err == nil {
+		t.Error("Incorrect bytesize was accepted as correct")
+		return
+	} else if !strings.HasSuffix(err.Error(), "[must be only [1] bytes long is [2]]") {
+		t.Error("Incorrect suffix has been used")
+		return
+	}
+}
+
+func TestPanicOnNotSupportedTypeByteSize(t *testing.T) {
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Error("Did not panic on fake opcode bytesize")
 		}
-	}
+	}()
+
+	_ = fakeOpcode.ByteSize()
+}
+
+func TestPanicOnNotSupportedTypeString(t *testing.T) {
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Error("Did not panic on fake opcode string")
+		}
+	}()
+
+	_ = fakeOpcode.String()
 }

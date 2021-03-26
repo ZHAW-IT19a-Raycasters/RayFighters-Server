@@ -76,6 +76,16 @@ func TestPlayerNameTooLong(t *testing.T) {
 	_ = server.NewPlayer(userId, name)
 }
 
+func TestPlayerString(t *testing.T) {
+	var id uint8 = 0x42     // 1  Byte
+	name := "SomeoneRandom" // 13 Byte
+	expectedPlayer := server.NewPlayer(id, name)
+	str := "Id: 66\nName: SomeoneRandom"
+	if expectedPlayer.String() != str {
+		t.Error("Incorrect player string generated")
+	}
+}
+
 func TestSendAllPlayerInfo(t *testing.T) {
 	players := [...]server.Player{
 		server.NewPlayer(1, "Hans"),
@@ -158,9 +168,20 @@ func TestMovementPlayerBytes(t *testing.T) {
 		// 0x3F 0xC9 0x99 0x99 0x99 0x99 0x99 0x9A
 		0x9A, 0x99, 0x99, 0x99, 0x99, 0x99, 0xC9, 0x3F,
 	}
-	gottenData := server.NewMovementPlayer(userId, coorX, coorY).Bytes()
+	mp := server.NewMovementPlayer(userId, coorX, coorY)
+	gottenData := mp.Bytes()
 
 	compareByteArrays(expectedData[:], gottenData, t)
+
+	// make sure the values are correctly set
+	// basically testing getters
+	if userId != mp.UserId() {
+		t.Error("UserId has been wrongly set")
+	} else if coorX != mp.CoorX() {
+		t.Error("CoorX has been wrongly set")
+	} else if coorY != mp.CoorY() {
+		t.Error("CoorY has been wrongly set")
+	}
 }
 
 func TestPlayerLeft(t *testing.T) {
@@ -169,8 +190,14 @@ func TestPlayerLeft(t *testing.T) {
 		server.PlayerLeftOpcode.Value(),
 		userId,
 	}
-	gotten := server.NewPlayerLeft(userId).Bytes()
+	pl := server.NewPlayerLeft(userId)
+	gotten := pl.Bytes()
 	compareByteArrays(expected[:], gotten, t)
+
+	// test getter for coverage
+	if userId != pl.UserId() {
+		t.Error("UserId was incorrectly set")
+	}
 }
 
 func TestNewPlayerJoined(t *testing.T) {
@@ -207,9 +234,15 @@ func TestAnOtherPlayerKilled(t *testing.T) {
 		userId,
 	}
 
-	got := server.NewAnotherPlayerKilled(userId).Bytes()
+	pk := server.NewAnotherPlayerKilled(userId)
+	got := pk.Bytes()
 
 	compareByteArrays(exp[:], got, t)
+
+	// testing getters (for coverage)
+	if userId != pk.UserId() {
+		t.Error("UserId was set wrongly")
+	}
 }
 
 func TestUnknown(t *testing.T) {
@@ -231,6 +264,7 @@ func TestDisconnect(t *testing.T) {
 }
 
 func TestDetect(t *testing.T) {
+	// test given values
 	opcodes := [...]server.ServerOpcode{
 		server.DisconnectOpcode,
 		server.DisconnectOpcode,
@@ -247,6 +281,13 @@ func TestDetect(t *testing.T) {
 		got := server.Detect(val.Value())
 		if val != got {
 			t.Errorf("opcodes are different [%d] - [%d]", val, got)
+			return
 		}
+	}
+
+	// test incorrecto value
+	// using 10 here as it is a client send opcode
+	if server.UnknownOpcode != server.Detect(10) {
+		t.Error("Wrong return value on fake opcode")
 	}
 }

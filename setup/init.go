@@ -6,7 +6,7 @@ import (
 )
 
 // Will write back the parsed commandline parameters to the configuration data.
-func writeArgsToConfig(conf *Configuration, args *args) {
+func writeArgsToConfig(conf *Configuration, args *commandlineArguments) {
 
 	if *args.Ip != "" {
 		conf.Web.Ip = *args.Ip
@@ -21,10 +21,10 @@ func writeArgsToConfig(conf *Configuration, args *args) {
 // If there was an error of any kind will print the given help message and return nil.
 func Setup() *Configuration {
 	// shutting of annoying error
-	args, arparser, err := argParse()
+	argParser, err := argParse()
 
 	if err != nil {
-		arparser.Usage(err)
+		argParser.Usage(err)
 		return nil
 	}
 
@@ -32,16 +32,16 @@ func Setup() *Configuration {
 
 	if err != nil {
 		err = fmt.Errorf("%s -> %w", err.Error(), errors.Unwrap(err))
-		arparser.Usage(err)
+		argParser.Usage(err)
 		return nil
 	}
 
-	writeArgsToConfig(conf, args)
+	writeArgsToConfig(conf, argParser.Args())
 
 	err = checkIfConfigIsLegal(conf)
 
 	if err != nil {
-		arparser.Usage(err)
+		argParser.Usage(err)
 		return nil
 	}
 

@@ -198,7 +198,7 @@ type Player struct {
 // String will return a printable representation of any
 // given player.
 func (p Player) String() string {
-	return fmt.Sprintf("Id: %d\n Name: %s", p.userId, p.name)
+	return fmt.Sprintf("Id: %d\nName: %s", p.userId, p.name)
 }
 
 // NewPlayer will create a new player from the given
