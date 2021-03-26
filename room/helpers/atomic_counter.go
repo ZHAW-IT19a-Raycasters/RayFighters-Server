@@ -5,8 +5,12 @@ import (
 	"sync/atomic"
 )
 
+// ErrAtomicAtLimit will be returned in the case that the counters limits
+// have been reached.
 var ErrAtomicAtLimit = errors.New("the atomic variable is all ready at it's limit")
 
+// AtomicUint32 will store the atomic value, as
+// well as the counters limit.
 type AtomicUint32 struct {
 	value uint32
 	limit uint32
@@ -31,7 +35,7 @@ func (counter *AtomicUint32) Limit() uint32 {
 }
 
 // AtLimit will return true, if the counter reached the
-// givne limit.
+// given limit.
 func (counter *AtomicUint32) AtLimit() bool {
 	return atomic.CompareAndSwapUint32(&counter.value, counter.limit, counter.limit)
 }
@@ -39,11 +43,12 @@ func (counter *AtomicUint32) AtLimit() bool {
 // AtZero will return true, if the counter is at it's
 // lower limit a zero.
 func (counter *AtomicUint32) AtZero() bool {
-	// TODO: figure out how to use this with 0
 	return atomic.CompareAndSwapUint32(&counter.value, 0, counter.value)
 }
 
 // Inc will increment the counter by 1.
+// This will return an error if the counter already was at
+// it's limits.
 func (counter *AtomicUint32) Inc() error {
 	if counter.AtLimit() {
 		return ErrAtomicAtLimit
