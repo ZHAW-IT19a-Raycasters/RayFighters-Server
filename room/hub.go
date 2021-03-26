@@ -6,6 +6,7 @@ import (
 	"math"
 
 	"github.zhaw.ch/raycasters/server/protocol/server"
+	"github.zhaw.ch/raycasters/server/room/helpers"
 )
 
 const HubClientLimit = math.MaxUint8
@@ -29,7 +30,7 @@ type Hub struct {
 	// via the client map length, is would have to be accessed
 	// from behind a lock. So to avoid the given overhead an
 	// atomic implementation is used here.
-	counter uint32
+	counter helpers.AtomicUint32
 }
 
 func NewHub(hubId int) *Hub {
@@ -37,28 +38,38 @@ func NewHub(hubId int) *Hub {
 		conn:    make(chan ClientMeta),
 		id:      hubId,
 		running: make(chan struct{}),
-		counter: 0,
+		counter: helpers.NewAtomicUint32(HubClientLimit),
 	}
 }
 
 func (h *Hub) Size() uint32 {
-	return h.counter
+	return h.counter.Value()
 }
 
 func (h *Hub) Full() bool {
-	return h.counter == HubClientLimit
+	return h.counter.AtLimit()
 }
 
 func (h *Hub) RegisterClient(meta ClientMeta) error {
-	if h.Full() {
-		return ErrHubIsFull
-	}
 	// increment the counter
+	err := h.counter.Inc()
 
-	return h.clientManager.addClient(meta)
+	if err != nil {
+		return err
+	}
+
+	h.conn <- meta
+
+	return nil
 }
 
 func (h *Hub) UnregisterClient(meta ClientMeta) error {
+
+	err := h.counter.Dec()
+
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -70,19 +81,18 @@ func (h *Hub) BroadCast(msg server.ServerOpcode) {
 }
 
 // Run is the main event loop of the hub.
-// TODO: figure out if this approach makes sense
-// func (h *Hub) Run() {
-// 	for {
-// 		select {
-// 		case <-h.running:
-// 			logger.Infof("Shutting down hub [%d]", h.id)
-// 			return
-// 		case data := <-h.conn:
-// 			logger.Debug("Adding a new player to hub [%d]", h.id)
-// 			h.clientManager.addClient(data)
-// 		}
-// 	}
-// }
+func (h *Hub) Run() {
+	for {
+		select {
+		case <-h.running:
+			logger.Infof("Shutting down hub [%d]", h.id)
+			return
+		case data := <-h.conn:
+			logger.Debug("Adding a new player to hub [%d]", h.id)
+			h.clientManager.addClient(data)
+		}
+	}
+}
 
 // Shutdown will intialize a complete shutdown of any and all clients.
 // With the cxt context a premature cancelation of all client
