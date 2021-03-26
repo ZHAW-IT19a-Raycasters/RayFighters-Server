@@ -3,17 +3,12 @@ package room
 import (
 	"context"
 	"errors"
-	"time"
+	"math"
 
 	"github.zhaw.ch/raycasters/server/protocol/server"
 )
 
-const ClientShudownTime = 1 * time.Second
-const ClientTimeoutTime = 5 * time.Second
-
-// HubBufferLimit is the amount of elements, that may be inside the
-// client register channel.
-const HubBufferLimit = 1
+const HubClientLimit = math.MaxUint8
 
 // ErrHubIsFull is the error that is returned on an RegisterClient error.
 var ErrHubIsFull = errors.New("the hub is currently filled to capacity")
@@ -23,36 +18,53 @@ type Hub struct {
 	// The channel over which a new connection
 	// comes into.
 	conn chan ClientMeta
-	// The room id
+	// The room id is used to uniquely id the room
 	id int
 	// The manager of the different client with the different connections.
 	clientManager clientManager
 	// The channel that signals the main loop to shutdown.
 	running chan struct{}
+	// Is the player counter, this variable counts the active
+	// player connections, although that number is already availble
+	// via the client map length, is would have to be accessed
+	// from behind a lock. So to avoid the given overhead an
+	// atomic implementation is used here.
+	counter uint32
 }
 
-func NewHub(hubId int) (*Hub, chan<- ClientMeta) {
-	hub := Hub{
-		conn:    make(chan ClientMeta, HubBufferLimit),
+func NewHub(hubId int) *Hub {
+	return &Hub{
+		conn:    make(chan ClientMeta),
 		id:      hubId,
 		running: make(chan struct{}),
+		counter: 0,
 	}
-	return &hub, hub.conn
 }
 
-func (h *Hub) Size() int {
-	return h.clientManager.size()
+func (h *Hub) Size() uint32 {
+	return h.counter
 }
 
 func (h *Hub) Full() bool {
-	return h.clientManager.idManager.IsFull()
+	return h.counter == HubClientLimit
 }
 
 func (h *Hub) RegisterClient(meta ClientMeta) error {
+	if h.Full() {
+		return ErrHubIsFull
+	}
+	// increment the counter
+
 	return h.clientManager.addClient(meta)
 }
 
+func (h *Hub) UnregisterClient(meta ClientMeta) error {
+
+	return nil
+}
+
 // TODO: Add broadcast function that can be called from the clients
+// TODO: figure out if this is the right path to take
 func (h *Hub) BroadCast(msg server.ServerOpcode) {
 	h.clientManager.broadCast(msg, []byte{})
 }

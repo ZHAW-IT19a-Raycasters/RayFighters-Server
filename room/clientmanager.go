@@ -5,11 +5,20 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	"github.zhaw.ch/raycasters/server/protocol/server"
 	"github.zhaw.ch/raycasters/server/room/helpers"
 )
+
+// ClientShutdownTime is the upper limit for a client
+// to remove the connection, before forced termination.
+const ClientShutdownTime = 1 * time.Second
+
+// ClientTimeoutTime is the upper limit for a client
+// to reconnect after a undesired connection loss.
+const ClientTimeoutTime = 5 * time.Second
 
 type ErrClientDoesntExist struct {
 	meta ClientMeta
@@ -116,7 +125,7 @@ func (manager *clientManager) removeClient(meta ClientMeta) error {
 
 	// make sure it is shutdown, at most wait for the timout
 	// afterwards kill it.
-	cxt, cancel := context.WithTimeout(context.Background(), ClientShudownTime)
+	cxt, cancel := context.WithTimeout(context.Background(), ClientShutdownTime)
 
 	waiter := make(chan struct{})
 
@@ -169,7 +178,7 @@ func (manager *clientManager) removeClient(meta ClientMeta) error {
 
 func (manager *clientManager) shutdown(cxt context.Context) {
 	// Will tell all the clients to shutdown in the given shutdown time.
-	childCxt, chancelCxt := context.WithTimeout(cxt, ClientShudownTime)
+	childCxt, chancelCxt := context.WithTimeout(cxt, ClientShutdownTime)
 
 	// Remove from memory and close any open waiting channels.
 	waiter := make(chan struct{})
