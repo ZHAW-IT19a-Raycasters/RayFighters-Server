@@ -10,12 +10,9 @@ import (
 	webconfig "github.zhaw.ch/raycasters/server/web/config"
 )
 
-const (
-	fileName = "conf.toml"
-)
+const fileName = "conf.toml"
 
 func compareConfigs(exp, got Configuration, t *testing.T) bool {
-
 	if got.Web.Ip != exp.Web.Ip {
 		t.Error("The parsed ip is incorrect")
 		return false
@@ -48,7 +45,7 @@ func TestParseConfigLegal(t *testing.T) {
 	confData, err := marshalConfiguration(rawConf)
 
 	if err != nil {
-		t.Errorf("marshalling failed\n%s", err.Error())
+		t.Errorf("marshalling on control failed\n%s", err.Error())
 		return
 	}
 
@@ -70,7 +67,6 @@ func TestParseConfigLegal(t *testing.T) {
 	}
 
 	compareConfigs(rawConf, *conf, t)
-
 }
 
 func TestParseConfigOsErr(t *testing.T) {

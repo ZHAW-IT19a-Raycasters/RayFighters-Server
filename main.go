@@ -8,7 +8,9 @@ import (
 )
 
 func main() {
-	conf := setup.Setup()
+	setUp := setup.NewSetup()
+	conf := setUp.Configuration()
+
 	if conf == nil {
 		return
 	}
