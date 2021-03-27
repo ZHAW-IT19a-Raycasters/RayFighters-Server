@@ -276,6 +276,11 @@ func TestLoggingToFile(t *testing.T) {
 }
 
 func TestIssueOpeningFile(t *testing.T) {
+	// so that the global variable will be returned to it's value after this
+	// test.
+	orgOF := openFile
+	t.Cleanup(func() { openFile = orgOF })
+
 	openFile = func(name string, flag int, perm os.FileMode) (*os.File, error) {
 		return nil, errors.New("an error message from the os")
 	}

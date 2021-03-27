@@ -28,7 +28,9 @@ func Setup() *Configuration {
 		return nil
 	}
 
-	conf, err := configParse()
+	confParser := newConfigParser(Config)
+
+	conf, err := confParser.Parse()
 
 	if err != nil {
 		err = fmt.Errorf("%s -> %w", err.Error(), errors.Unwrap(err))
