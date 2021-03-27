@@ -21,7 +21,7 @@ type Configuration struct {
 func checkIfConfigIsLegal(conf *Configuration) error {
 	err := conf.Web.CheckConfiguration()
 	if err != nil {
-		return &configurationError{section: "Webconfig", internalErr: err}
+		return &ErrConfiguration{section: "Webconfig", internalErr: err}
 	}
 
 	return nil

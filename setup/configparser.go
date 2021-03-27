@@ -15,19 +15,30 @@ type CheckConfig interface {
 }
 
 // Represents a configuration error
-type configurationError struct {
+type ErrConfiguration struct {
 	section     string
 	internalErr error
 }
 
 // The error interface
-func (ce *configurationError) Error() string {
+func (ce ErrConfiguration) Error() string {
 	return fmt.Sprintf("during parsing of the configuration file happend an error in the section:\n\t[%s]\n\t[%s]", ce.section, ce.internalErr)
 }
 
 // The error unwrap interface
-func (ce *configurationError) Unwrap() error {
+func (ce ErrConfiguration) Unwrap() error {
 	return ce.internalErr
+}
+
+// The is configuration controller helps to check if the
+// given error belongs to the written error type.
+func (ce ErrConfiguration) Is(target error) bool {
+	switch target.(type) {
+	case ErrConfiguration:
+		return true
+	default:
+		return false
+	}
 }
 
 // configParser is contains the values responsible for
@@ -51,7 +62,7 @@ func (cp configParser) Parse() (*Configuration, error) {
 	data, err := cp.fileReader(cp.fileName)
 
 	if err != nil {
-		return nil, &configurationError{internalErr: err, section: "reading"}
+		return nil, ErrConfiguration{internalErr: err, section: "reading"}
 	}
 	// create the configuration object
 	conf := &Configuration{}
@@ -60,7 +71,7 @@ func (cp configParser) Parse() (*Configuration, error) {
 	err = toml.Unmarshal(data, conf)
 
 	if err != nil {
-		return nil, &configurationError{internalErr: err, section: "parsing"}
+		return nil, ErrConfiguration{internalErr: err, section: "parsing"}
 	}
 
 	// do a primary check if the configuration is legal.
