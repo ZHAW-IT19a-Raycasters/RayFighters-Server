@@ -58,12 +58,5 @@ func (s Setup) Configuration() *Configuration {
 
 	writeArgsToConfig(conf, argParser.Args())
 
-	err = checkIfConfigIsLegal(conf)
-
-	if err != nil {
-		argParser.Usage(err)
-		return nil
-	}
-
 	return conf
 }
