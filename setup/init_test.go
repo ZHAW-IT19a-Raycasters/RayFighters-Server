@@ -98,3 +98,55 @@ func TestSetupArgsFailed(t *testing.T) {
 		t.Error("usage string has not been shown")
 	}
 }
+
+func TestSetupConfFailed(t *testing.T) {
+	setupEnvironment([]string{"progname", "-p", "88", "-i", "localhost"}, t)
+
+	setup, _, buffer, confParser, err := setupParsers(t)
+
+	if err != nil {
+		// error was already logged
+		return
+	}
+
+	buffer.WriteByte(' ') // control
+
+	// override the reader to return garbage
+	rawConf := newConfigurationLegal()
+	rawConf.Web.Ip = "localho"
+	confData, err := marshalConfiguration(rawConf)
+
+	if err != nil {
+		t.Errorf("marshalling failed\n%s", err.Error())
+		return
+	}
+
+	confParser.fileReader = func(name string) ([]byte, error) {
+		return confData, nil
+	}
+
+	configuration := setup.Configuration()
+
+	if configuration != nil {
+		t.Error("This should not be possible")
+		return
+	}
+
+	// check the line sent to the buffer
+	res := buffer.String()
+
+	if res == "" || res == " " {
+		t.Error("usage string is empty")
+		return
+	}
+
+	if !strings.Contains(res, "->") {
+		t.Error("error string has not been shown")
+		return
+	}
+
+	if !strings.Contains(res, "usage") {
+		t.Error("usage string has not been shown")
+		return
+	}
+}
