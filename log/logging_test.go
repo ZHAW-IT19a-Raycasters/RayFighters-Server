@@ -274,3 +274,14 @@ func TestLoggingToFile(t *testing.T) {
 		t.Errorf("an incorrect suffix was used, for line\n[%s]", str)
 	}
 }
+
+func TestIssueOpeningFile(t *testing.T) {
+	openFile = func(name string, flag int, perm os.FileMode) (*os.File, error) {
+		return nil, errors.New("an error message from the os")
+	}
+
+	err := Setup(Debug)
+	if err == nil {
+		t.Error("Error should have been returned here")
+	}
+}
