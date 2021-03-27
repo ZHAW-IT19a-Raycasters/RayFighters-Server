@@ -23,14 +23,22 @@ func helperNil(t *testing.T, err error, msg string) {
 	}
 }
 
-func TestUsageMessage(t *testing.T) {
-	os.Args = []string{"progname", "-p", "88", "-i", "localhost"}
+func setupArgParser(t *testing.T) (argParser, *bytes.Buffer) {
 	parser, err := argParse()
 	helper(t, err)
 
 	// force the parser to write the buffer
 	buffer := &bytes.Buffer{}
 	parser.out = buffer
+	return parser, buffer
+}
+
+func TestUsageMessage(t *testing.T) {
+	orgs := os.Args
+	t.Cleanup(func() { os.Args = orgs })
+
+	os.Args = []string{"progname", "-p", "88", "-i", "localhost"}
+	parser, buffer := setupArgParser(t)
 
 	exp := "hallo"
 	parser.Usage(errors.New(exp))
@@ -46,7 +54,7 @@ func TestValidArguments(t *testing.T) {
 	// save the old os arguments to the stack and write them back after
 	// the test
 	oldArgs := os.Args
-	defer func() { os.Args = oldArgs }()
+	t.Cleanup(func() { os.Args = oldArgs })
 
 	os.Args = []string{"progname", "-p", "88", "-i", "localhost"}
 	parser, err := argParse()

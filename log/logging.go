@@ -16,15 +16,21 @@ var ErrLoggerAlreadySetup = errors.New("the logger has already been setup")
 // iLogger is a singleton to the actual logging instance
 var iLogger *internalLogger
 
-// setILogger will set
+// setILogger gloabal will be set
 func setILogger(lg *internalLogger) {
 	iLogger = lg
 }
 
 // resetILogger will set the actall logger to nil.
+// Attention this function is used solay for testing.
 func resetILogger() {
 	iLogger = nil
 }
+
+// openFile is the os functionality used for opening files.
+// The function is stored here so that it is possible to mock
+// it and get 100% coverage.
+var openFile = os.OpenFile
 
 // logger is a pseudo wrapper around the internal logger singleton.
 // It does not contain any values, but the methods written for the
@@ -49,7 +55,7 @@ func SetupLogFile(level Level, fileName string) error {
 		return ErrLoggerAlreadySetup
 	}
 
-	file, err := os.OpenFile(fileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
+	file, err := openFile(fileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
 
 	if err != nil {
 		return err
