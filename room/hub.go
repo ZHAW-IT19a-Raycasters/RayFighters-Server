@@ -42,6 +42,11 @@ func NewHub(hubId int) *Hub {
 	}
 }
 
+func (h *Hub) GetAllPlayers() []server.Player{
+	// TODO: Return other Players
+	return nil
+}
+
 func (h *Hub) Size() uint32 {
 	return h.counter.Value()
 }

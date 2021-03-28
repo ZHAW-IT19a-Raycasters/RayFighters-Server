@@ -5,6 +5,7 @@ import (
 	"errors"
 	"github.zhaw.ch/raycasters/server/protocol"
 	"github.zhaw.ch/raycasters/server/protocol/client"
+	"github.zhaw.ch/raycasters/server/protocol/server"
 	"sync"
 
 	"github.com/google/uuid"
@@ -12,6 +13,7 @@ import (
 )
 
 var logger = log.Log()
+var hub HubClientInteraction
 
 type ConnectionStatus uint
 
@@ -27,6 +29,15 @@ func (c ConnectionStatus) String() string {
 		"Active", "Timeout", "ShuttingDown", "Offline",
 	}
 	return vals[c]
+}
+
+type HubClientInteraction interface {
+	GetAllPlayers() []server.Player
+	// TODO: DISCUSS IF THIS SHOULD BE IN HUB OR CLIENT
+	// REASON HUB: MAP IS STORED IN HUB AND NEEDS TO BE CHECKED FOR WALLS
+ 	// bool to check if player was hit
+ 	// server.Player to know which player
+	PlayerGotHit() (bool, server.Player)
 }
 
 type Client struct {
@@ -147,7 +158,7 @@ func (c *Client) ReadClient() () {
 	}
 }
 
-func (c *Client) sendData(message protocol.Bytefy) {
+func (c *Client) SendData(message protocol.Bytefy) {
 	cw, err := c.meta.conn.NextWriter(1)
 	if err != nil {
 		// return error
@@ -164,7 +175,7 @@ func (c *Client) handleRead(t []byte) {
 		c.handleDisconnect(t)
 	case client.UnknownOpcode:
 		// Client received Unknown request from Server
-		c.handleUnknown(t)
+		c.handleUnknownSent(t)
 	case client.MovementOpcode:
 		// Received a Movement request from client
 		c.handleMovement(t)
@@ -176,56 +187,75 @@ func (c *Client) handleRead(t []byte) {
 		c.handleRequestOtherPlayer(t)
 	default:
 		// Received Unknown Code from client
-		c.handleUnknownCode()
+		c.handleUnknownReceived(t)
 	}
 }
 
-func (c* Client) handleUnknownCode() {
-	// c.sendData("error")
+func (c* Client) handleUnknownReceived(t []byte) {
+	_, err := client.NewUnknownByte(t)
+	if err != nil {
+		logger.Info(err)
+		newUnknown := server.NewUnknown()
+		c.SendData(newUnknown)
+	} else {
+		newUnknown := server.NewUnknown()
+		c.SendData(newUnknown)
+	}
 }
 
 func (c *Client) handleDisconnect(t []byte) {
-	_, err := client.NewUnknownByte(t)
+	_, err := client.NewDisconnectByte(t)
 	if err != nil {
-		// c.sendData("error")
+		logger.Info(err)
+		newUnknown := server.NewUnknown()
+		c.SendData(newUnknown)
 	} else {
-		// TODO: SEND UNKNOWN TO FRONTEND
+		newDisconnect := server.NewDisconnect()
+		c.SendData(newDisconnect)
 	}
 }
 
-func (c *Client) handleUnknown(t []byte) {
-	_, err := client.NewUnknownByte(t)
-	if err != nil {
-		// c.sendData("error")
-	} else {
-		// TODO: SEND UNKNOWN TO FRONTEND
-	}
+func (c *Client) handleUnknownSent(t []byte) {
+	logger.Error("Unknown Opcode was sent")
 }
 
 func (c *Client) handleMovement(t []byte) {
-	_, err := client.NewMovementByte(t)
+	movement, err := client.NewMovementByte(t)
 	if err != nil {
-		// c.sendData(error)
+		logger.Info(err)
+		newUnknown := server.NewUnknown()
+		c.SendData(newUnknown)
 	} else {
-		// TODO: SEND MOVEMENT TO SERVER HUB
+		newMovementPlayer := server.NewMovementPlayer(c.meta.id, movement.CoorX(), movement.CoorY())
+		c.SendData(newMovementPlayer)
 	}
 }
 
 func (c *Client) handleShooting(t []byte) {
 	_, err := client.NewShootingBytes(t)
 	if err != nil {
-		// c.sendData("error")
+		logger.Info(err)
+		newUnknown := server.NewUnknown()
+		c.SendData(newUnknown)
 	} else {
-		// TODO: SEND SHOOTING TO SERVER HUB
+		// TODO: CHECK BEST STYLE HOW TO DO THIS
+		hit, player := hub.PlayerGotHit()
+		if hit {
+			newAnotherPlayerKilled := server.NewAnotherPlayerKilled(player.UserId())
+			c.SendData(newAnotherPlayerKilled)
+		}
 	}
 }
 
 func (c *Client) handleRequestOtherPlayer(t []byte) {
 	_, err := client.NewRequestOtherPlayersBytes(t)
 	if err != nil {
-		// c.sendData("error")
+		logger.Info(err)
+		newUnknown := server.NewUnknown()
+		c.SendData(newUnknown)
 	} else {
-		// TODO: SEND REQUESTOTHERPLAYERS TO FRONTEND
+		newPlayerInfo := server.NewSendAllPlayerInfo(hub.GetAllPlayers())
+		c.SendData(newPlayerInfo)
 	}
 }
 
