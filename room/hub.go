@@ -183,6 +183,8 @@ func (h *Hub) removeClient(meta ClientMeta) {
 // Run is the main event loop of the hub.
 // It handles all the clients added and removed
 // from the hub instance.
+// Attention this is a blocking function, so
+// run this in a gorutine.
 func (h *Hub) Run() {
 	// check if the hub is active
 	if h.IsAlive() {
