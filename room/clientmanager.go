@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.zhaw.ch/raycasters/server/protocol/server"
+	"github.zhaw.ch/raycasters/server/protocol"
 	"github.zhaw.ch/raycasters/server/room/helpers"
 )
 
@@ -218,7 +218,7 @@ func (manager *clientManager) shutdown(cxt context.Context) {
 // broadCast will send the given message to all the connected clients.
 // This function allows for a blacklist, so that the server does not send
 // the broadcast to those clients.
-func (manager *clientManager) broadCast(msg server.ServerOpcode, except []uint8) {
+func (manager *clientManager) broadCast(msg protocol.Bytefy, except []uint8) {
 	// TODO: implement broadCast
 	// This waits on final client implementation.
 
@@ -244,8 +244,10 @@ func (manager *clientManager) broadCast(msg server.ServerOpcode, except []uint8)
 
 		for elem := blackList.Front(); elem != nil; elem = elem.Next() {
 			if elem.Value.(uint8) != id {
-				// TODO: send message to client
-
+				// TODO: maybe use a channel here, so to
+				// not block the broadCast too much.
+				meta := manager.clients[id]
+				meta.SendData(msg)
 			} else {
 				// Remove element from black list to speed up internal loop
 				tmp := elem
