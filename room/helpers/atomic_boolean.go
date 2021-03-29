@@ -60,3 +60,19 @@ func (counter *AtomicBool) Set(value bool) bool {
 	old := atomic.SwapUint32(&counter.value, MapBoolToInt(value))
 	return MapIntToBool(old)
 }
+
+// SetTrue will set the value to true and if there was a change to the value
+// will return true, else false.
+func (counter *AtomicBool) SetTrue() bool {
+	// if there was a swap => false to True
+	// this will return true, else false
+	return atomic.CompareAndSwapUint32(&counter.value, False, True)
+}
+
+// SetTrue will set the value to true and if there was a change to the value
+// will return true, else false.
+func (counter *AtomicBool) SetFalse() bool {
+	// if there was a swap => false to True
+	// this will return true, else false
+	return atomic.CompareAndSwapUint32(&counter.value, True, False)
+}
