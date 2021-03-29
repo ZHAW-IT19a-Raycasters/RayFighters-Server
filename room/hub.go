@@ -42,7 +42,9 @@ type Hub struct {
 	// are removed over. This
 	output chan ClientMeta
 	// The channel that signals the main loop to shutdown.
-	running chan struct{}
+	shutdown chan struct{}
+	// If the current hub is running or not.
+	isActive helpers.AtomicBool
 }
 
 // NewHub will initiate a new hub struct.
@@ -50,12 +52,18 @@ type Hub struct {
 // the data structures.
 func NewHub(hubId int) *Hub {
 	return &Hub{
-		input:   make(chan ClientMeta),
-		output:  make(chan ClientMeta),
-		running: make(chan struct{}),
-		id:      hubId,
-		counter: helpers.NewAtomicUint32(HubClientLimit),
+		input:    make(chan ClientMeta),
+		output:   make(chan ClientMeta),
+		shutdown: make(chan struct{}),
+		id:       hubId,
+		counter:  helpers.NewAtomicUint32(HubClientLimit),
+		isActive: helpers.NewAtomicBool(false),
 	}
+}
+
+// IsAlive will check if the current hub is running or not.
+func (h *Hub) IsAlive() bool {
+	return h.isActive.Get()
 }
 
 // GetAllPlayers will generate a slice
@@ -176,9 +184,21 @@ func (h *Hub) removeClient(meta ClientMeta) {
 // It handles all the clients added and removed
 // from the hub instance.
 func (h *Hub) Run() {
+	// check if the hub is active
+	if h.IsAlive() {
+		// do not restart the hub, if it's already running
+		logger.Warnf("Hub [%d] is already running", h.id)
+		return
+	}
+	// set alive bool
+	h.isActive.Set(true)
+	// reset the state of is active, on shutdown or
+	// crash
+	defer h.isActive.Set(false)
+
 	for {
 		select {
-		case <-h.running:
+		case <-h.shutdown:
 			logger.Infof("Shutting down hub [%d]", h.id)
 			return
 		case meta := <-h.input:
@@ -201,7 +221,7 @@ func (h *Hub) Shutdown(cxt context.Context) {
 		h.clientManager.shutdown(cxt)
 		close(waitCompletion)
 		// make sure that the main thread is closed
-		close(h.running)
+		close(h.shutdown)
 	}()
 
 	select {
