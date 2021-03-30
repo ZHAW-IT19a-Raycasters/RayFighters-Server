@@ -96,7 +96,7 @@ type PlayerDeath struct {
 	killedId uint8
 }
 
-// NewDiconnect creates a new disconnect instance.
+// NewDisconnect creates a new disconnect instance.
 func NewPlayerDeath(killerId uint8, killedId uint8) PlayerDeath {
 	return PlayerDeath{
 		killerId: killerId,
@@ -383,6 +383,54 @@ func (yac YouAreCalled) Bytes() []byte {
 		YouAreCalledOpcode.Value(),
 		yac.userId,
 	}
+}
+
+type PlayerKD struct {
+	id uint8
+	kills uint16
+	deaths uint16
+}
+
+type PlayersKD struct {
+	playersKD []PlayerKD
+}
+
+func NewPlayerKD(id uint8, kills, deaths uint16) PlayerKD {
+	return PlayerKD{
+		id: id,
+		kills: kills,
+		deaths: deaths,
+	}
+}
+
+func (p PlayersKD) Bytes() []byte {
+	size := len(p.playersKD) * p.playersKD[0].ByteSize()
+	b := make([]byte, size)
+	for index, playerKD := range p.playersKD {
+		playerKD.PutBytes(b[index*playerKD.ByteSize():])
+	}
+	return b
+}
+
+func NewPlayersKD(players []PlayerKD) PlayersKD {
+	return PlayersKD{
+		playersKD: players,
+	}
+}
+
+func (p PlayerKD) ByteSize() int {
+	return 1 + 2 + 2
+}
+
+func (p PlayerKD) PutBytes(data []byte) {
+	// this eliminates the bound check below
+	// see https://go101.org/article/bounds-check-elimination.html
+	// for more information on the topic.
+	_ = data[p.ByteSize()-1]
+
+	data[0] = p.id
+	binary.LittleEndian.PutUint16(data[1:3], p.kills)
+	binary.LittleEndian.PutUint16(data[3:5], p.deaths)
 }
 
 // SendAllPlayerInfo is a request that will have to return any and

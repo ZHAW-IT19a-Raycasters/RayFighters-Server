@@ -13,9 +13,13 @@ import (
 )
 
 var logger = log.Log()
-var hub HubClientInteraction
 
 type ConnectionStatus uint
+
+type KD struct {
+	id uint8
+	ClientGame
+}
 
 const (
 	Active ConnectionStatus = iota
@@ -32,18 +36,22 @@ func (c ConnectionStatus) String() string {
 }
 
 type HubClientInteraction interface {
+	// Get All Players from Hub
 	GetAllPlayers() []server.Player
-	// TODO: DISCUSS IF THIS SHOULD BE IN HUB OR CLIENT
-	// REASON HUB: MAP IS STORED IN HUB AND NEEDS TO BE CHECKED FOR WALLS
  	// bool to check if player was hit
  	// server.Player to know which player
 	PlayerGotHit() (bool, server.Player)
+
+	PlayersKD() []server.PlayerKD
+
+	UnregisterClient(meta ClientMeta) error
 }
 
 type Client struct {
 	// is the one channel that controlls the
 	// input output connections
 	running chan struct{}
+	hub		HubClientInteraction
 	info    ClientGame
 	meta    ClientInternalMeta
 	status  ConnectionStatus
@@ -134,6 +142,10 @@ type ClientInternalMeta struct {
 	conn ClientConnection
 }
 
+func (c ClientInternalMeta) getMeta() ClientMeta {
+	return NewClientMeta(c.eId, c.name, c.conn)
+}
+
 func NewClientInternalMeta(id uint8, client ClientMeta) ClientInternalMeta {
 	return ClientInternalMeta{
 		id:   id,
@@ -147,12 +159,14 @@ func (c *Client) ReadClient() () {
 	for {
 		_, message, err := c.meta.conn.NextReader()
 		if err != nil {
-			// Shutdown()
+			// Error is useless because we know the client exists
+			_ = c.hub.UnregisterClient(c.meta.getMeta())
 		}
 		t := [17]byte{}
 		readBytes, err := message.Read(t[:])
 		if err != nil {
-			// TODO: fail
+			// TODO: Timer
+			c.status = Timeout
 		}
 		c.handleRead(t[:readBytes])
 	}
@@ -176,6 +190,9 @@ func (c *Client) handleRead(t []byte) {
 	case client.UnknownOpcode:
 		// Client received Unknown request from Server
 		c.handleUnknownSent(t)
+	case client.WhoAmIOpcode:
+		// Received a WhoAmI request from client
+		c.handleWhoAmI(t)
 	case client.MovementOpcode:
 		// Received a Movement request from client
 		c.handleMovement(t)
@@ -183,6 +200,9 @@ func (c *Client) handleRead(t []byte) {
 		// Received a Shooting request from client
 		c.handleShooting(t)
 	case client.RequestOtherPlayersOpcode:
+		// Received a RequestOtherPlayers request from client
+		c.handleRequestOtherPlayer(t)
+	case client.RequestPlayerKDOpcode:
 		// Received a RequestOtherPlayers request from client
 		c.handleRequestOtherPlayer(t)
 	default:
@@ -219,6 +239,18 @@ func (c *Client) handleUnknownSent(t []byte) {
 	logger.Error("Unknown Opcode was sent")
 }
 
+func (c *Client) handleWhoAmI(t []byte) {
+	_, err := client.NewWhoAmIByte(t)
+	if err != nil {
+		logger.Info(err)
+		newUnknown := server.NewUnknown()
+		c.SendData(newUnknown)
+	} else {
+		newYouAreCalled := server.NewYouAreCalled(c.meta.id)
+		c.SendData(newYouAreCalled)
+	}
+}
+
 func (c *Client) handleMovement(t []byte) {
 	movement, err := client.NewMovementByte(t)
 	if err != nil {
@@ -238,8 +270,7 @@ func (c *Client) handleShooting(t []byte) {
 		newUnknown := server.NewUnknown()
 		c.SendData(newUnknown)
 	} else {
-		// TODO: CHECK BEST STYLE HOW TO DO THIS
-		hit, player := hub.PlayerGotHit()
+		hit, player := c.hub.PlayerGotHit()
 		if hit {
 			newAnotherPlayerKilled := server.NewAnotherPlayerKilled(player.UserId())
 			c.SendData(newAnotherPlayerKilled)
@@ -254,8 +285,20 @@ func (c *Client) handleRequestOtherPlayer(t []byte) {
 		newUnknown := server.NewUnknown()
 		c.SendData(newUnknown)
 	} else {
-		newPlayerInfo := server.NewSendAllPlayerInfo(hub.GetAllPlayers())
+		newPlayerInfo := server.NewSendAllPlayerInfo(c.hub.GetAllPlayers())
 		c.SendData(newPlayerInfo)
+	}
+}
+
+func (c *Client) handleRequestPlayerKD(t []byte) {
+	_, err := client.NewRequestPlayerKDByte(t)
+	if err != nil {
+		logger.Info(err)
+		newUnknown := server.NewUnknown()
+		c.SendData(newUnknown)
+	} else {
+		newPlayersKD := server.NewPlayersKD(c.hub.PlayersKD())
+		c.SendData(newPlayersKD)
 	}
 }
 

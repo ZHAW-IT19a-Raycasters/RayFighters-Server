@@ -52,12 +52,13 @@ type Hub struct {
 // the data structures.
 func NewHub(hubId int) *Hub {
 	return &Hub{
-		input:    make(chan ClientMeta),
-		output:   make(chan ClientMeta),
-		shutdown: make(chan struct{}),
-		id:       hubId,
-		counter:  helpers.NewAtomicUint32(HubClientLimit),
-		isActive: helpers.NewAtomicBool(false),
+		input:    		make(chan ClientMeta),
+		output:   		make(chan ClientMeta),
+		shutdown: 		make(chan struct{}),
+		clientManager: 	newClientManager(),
+		id:       		hubId,
+		counter:  		helpers.NewAtomicUint32(HubClientLimit),
+		isActive: 		helpers.NewAtomicBool(false),
 	}
 }
 
