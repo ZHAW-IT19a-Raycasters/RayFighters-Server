@@ -3,8 +3,56 @@ package log
 import (
 	"fmt"
 	"io"
+    "os"
 	"log"
 )
+
+type LoggingHandler interface {
+    checkLevel(level Level) bool    
+    log(level Level, v...interface{})
+    logf(level Level, format string, v ...interface{})
+    panicf(format string, v...interface{})
+}
+
+
+type internalLoggerWrapper struct {
+    handlers []LoggingHandler
+}
+
+func (ilw *internalLoggerWrapper) RegisterHandler(handler LoggingHandler) {
+    ilw.handlers = append(ilw.handlers, handler)
+}
+
+type ConsoleHandler struct {
+    *internalLogger
+}
+
+func NewConsoleHandler(level Level) (ConsoleHandler, error){
+    // TODO:
+    return ConsoleHandler{}, nil
+}
+
+
+type FileHandler struct {
+    fileName string
+    *internalLogger
+}
+
+
+func NewFileHandler(fileName string, level Level) (FileHandler, error) {
+	file, err := openFile(fileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
+
+	if err != nil {
+		return FileHandler{}, err
+	}   
+
+    return FileHandler {
+        fileName: fileName,
+        internalLogger: newInternalLogger(level, file),
+    }, nil
+}
+
+
 
 type internalLogger struct {
 	ilogger *log.Logger
@@ -52,5 +100,8 @@ func (log internalLogger) logf(level Level, format string, v ...interface{}) {
 
 // panicf will log the line then panic the system.
 func (log internalLogger) panicf(format string, v ...interface{}) {
+    // TODO: figure out how to propagate this panic
+    // possibly repepanic per panic?
 	log.ilogger.Panicf(format, v...)
 }
+
