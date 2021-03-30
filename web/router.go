@@ -28,9 +28,7 @@ type Server struct {
 // NewServer registers routes for all exposed endpoints
 // and attaches the appropriate handler functions
 func NewServer(conf *webconfig.WebConfig) *Server {
-
-	// implement only 1 hub for now
-	//hub := room.NewHub(1)
+	// instantiate multiple hubs
 	var hub [hubsCount]*(room.Hub)
 	var i int = 0
 	for ; i < hubsCount; i++ {
@@ -41,22 +39,29 @@ func NewServer(conf *webconfig.WebConfig) *Server {
 	router := mux.NewRouter()
 	router.HandleFunc("/", handleRoot)
 	router.HandleFunc("/auth", serveAuth).Methods("POST")
-	// TODO: improve regex for uint32
-	router.HandleFunc("/ws/{roomID:[0-9]+}", func(w http.ResponseWriter, r *http.Request) {
-		// parse roomID from URL
+
+	router.HandleFunc("/ws/{trash:[^0-9]+}{roomID:[0-9]+}", func(w http.ResponseWriter, r *http.Request) {
+		// note: variables are strings
 		vars := mux.Vars(r)
+
+		if len(vars["trash"]) > 0 {
+			logger.Errorf("invalid URL: expected room-ID as int got some trash: ", vars["trash"])
+			return
+		}
+		// parse roomID from URL
 		roomIDStr := vars["roomID"]
-		//roomID, err := strconv.ParseInt(roomIDStr, 10, 32)
 		roomID, err := strconv.Atoi(roomIDStr)
 		if err != nil {
-			fmt.Printf("couldn't parse roomID from URL: %v\n", err)
+			logger.Errorf("couldn't parse roomID from URL: %v\n", err)
+			return
+		}
+		if roomID >= hubsCount {
+			logger.Errorf("request to join room with illegal room-ID \"%d\"", roomID)
 			return
 		}
 
-		if roomID < hubsCount {
-			logger.Infof("request to join room %d", roomID)
-			serveWs(hub[roomID], w, r)
-		}
+		logger.Infof("%s request to join room %d", r.RemoteAddr, roomID)
+		serveWs(hub[roomID], w, r)
 	})
 	router.HandleFunc("/chat", serveChat)
 
@@ -69,6 +74,7 @@ func NewServer(conf *webconfig.WebConfig) *Server {
 // Start starts listening and serving the configured server.
 // Blocking.
 func (p *Server) Start() error {
+	logger.Infof("Server listening on: %s", p.endpoint.Addr)
 	fmt.Println("Server listening on: ", p.endpoint.Addr)
 	return p.endpoint.ListenAndServe()
 }
@@ -84,13 +90,19 @@ func (p *Server) ServerStop(ctx context.Context) error {
 	return p.endpoint.Shutdown(ctx)
 }
 
+// handleRoot is the handler of "<server listening on>/".
 func handleRoot(writer http.ResponseWriter, request *http.Request) {
 	//ResponseWriter implements io.Writer
-	fmt.Fprintf(writer, "Hello world from %s", request.URL.Path[1:]) //ich will alles ausser 0-te element
+	//server answer to a client
+	fmt.Print(request.URL)
+	fmt.Fprintf(writer, "Hello from RayCasters!\n")
+	fmt.Fprintf(writer, "Don't try \"/chat\".")
 }
 
+// serveChat is the handler of <server listening on>/chat.
+// Used for testing puposes.
 func serveChat(w http.ResponseWriter, r *http.Request) {
-	log.Println(r.URL)
+	logger.Infof("%s requested", r.URL)
 	if r.Method != "GET" {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -107,13 +119,13 @@ func serveWs(hub *room.Hub, w http.ResponseWriter, r *http.Request) {
 
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Println(err)
+		logger.Error(err)
 		return
 	}
 
 	// create client meta
 	uuid := uuid.New()
-	cm := room.NewClientMeta(uuid, "john doe", conn)
+	cm := room.NewClientMeta(uuid, "john dude", conn)
 
 	hub.RegisterClient(cm)
 }
