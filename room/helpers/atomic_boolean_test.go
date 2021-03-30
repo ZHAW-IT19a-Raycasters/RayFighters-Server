@@ -6,7 +6,7 @@ import (
 	"github.zhaw.ch/raycasters/server/room/helpers"
 )
 
-func TestAtomicBool(t *testing.T) {
+func TestAtomicBoolValue(t *testing.T) {
 	ab := helpers.NewAtomicBool(false)
 	if ab.Get() != false {
 		t.Error("Incorrect value has been set while initializing.")
@@ -26,7 +26,65 @@ func TestAtomicBool(t *testing.T) {
 	}
 }
 
-func TestMapBoolToInt(t *testing.T) {
+func TestAtomicBoolSetTrue(t *testing.T) {
+	ab := helpers.NewAtomicBool(false)
+
+	if !ab.SetTrue() {
+		t.Error("Should return true on the first set")
+		return
+	}
+
+	if !ab.Get() {
+		t.Error("Bool should be true after beeing set so")
+		return
+	}
+
+	if ab.SetTrue() {
+		t.Error("Should not return true on any set later")
+		return
+	}
+
+	if !ab.Get() {
+		t.Error("Bool should stil be true after beeing set so")
+		return
+	}
+}
+
+func TestAtomicBoolSetFalse(t *testing.T) {
+	ab := helpers.NewAtomicBool(false)
+
+	if ab.SetFalse() {
+		t.Error("Should return false as the intial condition is so")
+		return
+	}
+
+	if ab.Get() {
+		t.Error("Bool should be false after beeing set so")
+		return
+	}
+
+	ab.Set(true)
+
+	if !ab.Get() {
+		t.Error("Bool should be true after beeing set so")
+		return
+	}
+
+	if !ab.SetFalse() {
+		t.Error("Should return true as the value was true")
+		return
+	}
+
+	if ab.Get() {
+		t.Error("Bool should be false after beeing set so")
+		return
+	}
+
+	if ab.SetFalse() {
+		t.Error("Should not return true since value should be false")
+	}
+}
+func TestAtomicBoolMapBoolToInt(t *testing.T) {
 	got := helpers.MapBoolToInt(false)
 	if got != helpers.False {
 		t.Error("False mapping from bool to int in the case false")

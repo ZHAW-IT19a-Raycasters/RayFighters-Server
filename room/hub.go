@@ -187,16 +187,15 @@ func (h *Hub) removeClient(meta ClientMeta) {
 // run this in a gorutine.
 func (h *Hub) Run() {
 	// check if the hub is active
-	if h.IsAlive() {
+	if !h.isActive.SetTrue() {
 		// do not restart the hub, if it's already running
 		logger.Warnf("Hub [%d] is already running", h.id)
 		return
 	}
 	// set alive bool
-	h.isActive.Set(true)
 	// reset the state of is active, on shutdown or
 	// crash
-	defer h.isActive.Set(false)
+	defer h.isActive.SetFalse()
 
 	for {
 		select {
