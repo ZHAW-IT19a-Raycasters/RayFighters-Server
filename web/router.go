@@ -3,7 +3,6 @@ package web
 import (
 	"context"
 	"fmt"
-	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -11,9 +10,15 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
+	"github.zhaw.ch/raycasters/server/log"
 	"github.zhaw.ch/raycasters/server/room"
+
 	webconfig "github.zhaw.ch/raycasters/server/web/config"
 )
+
+const hubsCount int = 3
+
+var logger = log.Log()
 
 // Server holds all endpoints for a server
 type Server struct {
@@ -25,9 +30,14 @@ type Server struct {
 func NewServer(conf *webconfig.WebConfig) *Server {
 
 	// implement only 1 hub for now
-	hub := room.NewHub(1)
-	go hub.Run()
-	
+	//hub := room.NewHub(1)
+	var hub [hubsCount]*(room.Hub)
+	var i int = 0
+	for ; i < hubsCount; i++ {
+		hub[i] = room.NewHub(i)
+		go hub[i].Run()
+	}
+
 	router := mux.NewRouter()
 	router.HandleFunc("/", handleRoot)
 	router.HandleFunc("/auth", serveAuth).Methods("POST")
@@ -36,15 +46,17 @@ func NewServer(conf *webconfig.WebConfig) *Server {
 		// parse roomID from URL
 		vars := mux.Vars(r)
 		roomIDStr := vars["roomID"]
-		roomID, err := strconv.ParseUint(roomIDStr,10,32)
+		//roomID, err := strconv.ParseInt(roomIDStr, 10, 32)
+		roomID, err := strconv.Atoi(roomIDStr)
 		if err != nil {
 			fmt.Printf("couldn't parse roomID from URL: %v\n", err)
 			return
 		}
-			
-		fmt.Println("request to join room ",roomID)
-		
-		serveWs(hub, w, r)
+
+		if roomID < hubsCount {
+			logger.Infof("request to join room %d", roomID)
+			serveWs(hub[roomID], w, r)
+		}
 	})
 	router.HandleFunc("/chat", serveChat)
 
@@ -57,7 +69,7 @@ func NewServer(conf *webconfig.WebConfig) *Server {
 // Start starts listening and serving the configured server.
 // Blocking.
 func (p *Server) Start() error {
-	fmt.Println("Server listening on: ",p.endpoint.Addr)
+	fmt.Println("Server listening on: ", p.endpoint.Addr)
 	return p.endpoint.ListenAndServe()
 }
 
@@ -101,10 +113,11 @@ func serveWs(hub *room.Hub, w http.ResponseWriter, r *http.Request) {
 
 	// create client meta
 	uuid := uuid.New()
-	cm := room.NewClientMeta(uuid,"john doe",conn)
+	cm := room.NewClientMeta(uuid, "john doe", conn)
 
 	hub.RegisterClient(cm)
 }
 
 func serveAuth(w http.ResponseWriter, r *http.Request) {}
-	// create JWT and uuid here
+
+// create JWT and uuid here
