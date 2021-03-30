@@ -10,6 +10,14 @@ import (
 	"testing"
 )
 
+// resetILogger will renew the internal logger
+// down to no configurations.
+// Attention this function is used solay for testing.
+func resetILogger() {
+	// remove all the
+	iLogger = newInternalLogger()
+}
+
 func cleanUpTmpFile(name string) {
 	iLogger = nil
 	if _, err := os.Stat(name); errors.Is(err, os.ErrExist) {
@@ -44,7 +52,7 @@ func setupBuffer() *bytes.Buffer {
 }
 
 func setupLogger(level Level, out io.Writer, t *testing.T) {
-	setILogger(newInternalLogger(level, out))
+	setILogger(newRawLogger(level, out))
 	t.Cleanup(func() {
 		resetILogger()
 	})
