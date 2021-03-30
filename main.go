@@ -8,12 +8,8 @@ import (
 	"os/signal"
 
 	"github.zhaw.ch/raycasters/server/log"
-<<<<<<< HEAD
 	"github.zhaw.ch/raycasters/server/setup"
-=======
-	"github.zhaw.ch/raycasters/server/utils"
 	"github.zhaw.ch/raycasters/server/web"
->>>>>>> Implement router
 )
 
 func main() {

@@ -5,25 +5,45 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
+	"github.zhaw.ch/raycasters/server/room"
 	webconfig "github.zhaw.ch/raycasters/server/web/config"
 )
 
-// ZIEL: ein neuer ROUTER
+// Server holds all endpoints for a server
 type Server struct {
 	endpoint *http.Server
 }
 
+// NewServer registers routes for all exposed endpoints
+// and attaches the appropriate handler functions
 func NewServer(conf *webconfig.WebConfig) *Server {
-	//TODO replace
-	hub := newHub()
-	go hub.run()
+
+	// implement only 1 hub for now
+	hub := room.NewHub(1)
+	go hub.Run()
+	
 	router := mux.NewRouter()
 	router.HandleFunc("/", handleRoot)
-	router.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+	router.HandleFunc("/auth", serveAuth).Methods("POST")
+	// TODO: improve regex for uint32
+	router.HandleFunc("/ws/{roomID:[0-9]+}", func(w http.ResponseWriter, r *http.Request) {
+		// parse roomID from URL
+		vars := mux.Vars(r)
+		roomIDStr := vars["roomID"]
+		roomID, err := strconv.ParseUint(roomIDStr,10,32)
+		if err != nil {
+			fmt.Printf("couldn't parse roomID from URL: %v\n", err)
+			return
+		}
+			
+		fmt.Println("request to join room ",roomID)
+		
 		serveWs(hub, w, r)
 	})
 	router.HandleFunc("/chat", serveChat)
@@ -34,14 +54,19 @@ func NewServer(conf *webconfig.WebConfig) *Server {
 	return server
 }
 
+// Start starts listening and serving the configured server.
+// Blocking.
 func (p *Server) Start() error {
+	fmt.Println("Server listening on: ",p.endpoint.Addr)
 	return p.endpoint.ListenAndServe()
 }
 
+// ShutdownContext returns server's shutdown context.
 func ShutdownContext() context.Context {
 	return context.Background()
 }
 
+// ServerStop will initialize a graceful shutdown of the server.
 func (p *Server) ServerStop(ctx context.Context) error {
 	// TODO: Gracful shutdown
 	return p.endpoint.Shutdown(ctx)
@@ -62,7 +87,7 @@ func serveChat(w http.ResponseWriter, r *http.Request) {
 }
 
 // serveWs handles websocket requests from the peer.
-func serveWs(hub *Hub, w http.ResponseWriter, r *http.Request) {
+func serveWs(hub *room.Hub, w http.ResponseWriter, r *http.Request) {
 	var upgrader = websocket.Upgrader{
 		ReadBufferSize:  1024,
 		WriteBufferSize: 1024,
@@ -73,11 +98,13 @@ func serveWs(hub *Hub, w http.ResponseWriter, r *http.Request) {
 		log.Println(err)
 		return
 	}
-	client := &Client{hub: hub, conn: conn, send: make(chan []byte, 256)}
-	client.hub.register <- client
 
-	// Allow collection of memory referenced by the caller by doing all work in
-	// new goroutines.
-	go client.writePump()
-	go client.readPump()
+	// create client meta
+	uuid := uuid.New()
+	cm := room.NewClientMeta(uuid,"john doe",conn)
+
+	hub.RegisterClient(cm)
 }
+
+func serveAuth(w http.ResponseWriter, r *http.Request) {}
+	// create JWT and uuid here
