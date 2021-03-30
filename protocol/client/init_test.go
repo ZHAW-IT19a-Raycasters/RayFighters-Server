@@ -230,12 +230,66 @@ func TestDisconnect(t *testing.T) {
 
 }
 
-func TestDiconnectError(t *testing.T) {
+func TestDisconnectError(t *testing.T) {
 
 	data := []byte{
 		client.DisconnectOpcode.Value(), 44,
 	}
 	_, err := client.NewDisconnectByte(data)
+	if err == nil {
+		t.Error("Incorrect bytesize was accepted as correct")
+		return
+	} else if !strings.HasSuffix(err.Error(), "[must be only [1] bytes long is [2]]") {
+		t.Error("Incorrect suffix has been used")
+		return
+	}
+}
+
+func TestWhoAmI(t *testing.T) {
+	// correct version
+	data := []byte{
+		client.WhoAmIOpcode.Value(),
+	}
+	_, err := client.NewWhoAmIByte(data)
+	if err != nil {
+		t.Errorf("Correct version was flaged here\n%s", err)
+		return
+	}
+}
+
+func TestWhoAmIError(t *testing.T) {
+
+	data := []byte{
+		client.WhoAmIOpcode.Value(), 44,
+	}
+	_, err := client.NewWhoAmIByte(data)
+	if err == nil {
+		t.Error("Incorrect bytesize was accepted as correct")
+		return
+	} else if !strings.HasSuffix(err.Error(), "[must be only [1] bytes long is [2]]") {
+		t.Error("Incorrect suffix has been used")
+		return
+	}
+}
+
+func TestRequestPlayerKD(t *testing.T) {
+	// correct version
+	data := []byte{
+		client.RequestPlayerKDOpcode.Value(),
+	}
+	_, err := client.NewRequestPlayerKDByte(data)
+	if err != nil {
+		t.Errorf("Correct version was flaged here\n%s", err)
+		return
+	}
+}
+
+func TestRequestPlayerKDError(t *testing.T) {
+
+	data := []byte{
+		client.RequestPlayerKDOpcode.Value(), 44,
+	}
+	_, err := client.NewRequestPlayerKDByte(data)
 	if err == nil {
 		t.Error("Incorrect bytesize was accepted as correct")
 		return

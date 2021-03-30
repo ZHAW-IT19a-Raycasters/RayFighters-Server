@@ -19,10 +19,10 @@ const (
 	DisconnectOpcode          ServerOpcode = 0x64
 	UnknownOpcode             ServerOpcode = 0x65
 	MovementPlayerOpcode      ServerOpcode = 0x6E
-	AnOtherPlayerKilledOpcode ServerOpcode = 0x78
-	PlayerHimSelfKilledOpcode ServerOpcode = 0x79
-	PlayerJoinedOpcode        ServerOpcode = 0x7A
-	PlayerLeftOpcode          ServerOpcode = 0x7B
+	PlayerDeathOpcode      	  ServerOpcode = 0x78
+	NewPlayerJoinedOpcode 	  ServerOpcode = 0x7A
+	PlayerLeftOpcode		  ServerOpcode = 0x7B
+	YouAreCalledOpcode		  ServerOpcode = 0x7C
 	SendAllPlayerInfoOpcode   ServerOpcode = 0x82
 )
 
@@ -30,10 +30,10 @@ var Overview = [...]ServerOpcode{
 	DisconnectOpcode,
 	UnknownOpcode,
 	MovementPlayerOpcode,
-	AnOtherPlayerKilledOpcode,
-	PlayerHimSelfKilledOpcode,
-	PlayerJoinedOpcode,
+	PlayerDeathOpcode,
+	NewPlayerJoinedOpcode,
 	PlayerLeftOpcode,
+	YouAreCalledOpcode,
 	SendAllPlayerInfoOpcode,
 }
 
@@ -88,6 +88,36 @@ func NewUnknown() Unknown {
 // Bytes will turn the unknown instance into a sendable byte stream.
 func (u Unknown) Bytes() []byte {
 	return []byte{UnknownOpcode.Value()}
+}
+
+// Disconnect represents a server shutdown.
+type PlayerDeath struct {
+	killerId uint8
+	killedId uint8
+}
+
+// NewDiconnect creates a new disconnect instance.
+func NewPlayerDeath(killerId uint8, killedId uint8) PlayerDeath {
+	return PlayerDeath{
+		killerId: killerId,
+		killedId: killedId,
+	}
+}
+
+// Bytes will turn the disconnect instance into a sendable byte stream.
+func (pd PlayerDeath) Bytes() []byte {
+	size := 1
+	size += 1
+	size += 1
+
+	// using the buffer write interface for simplisity
+	buffer := make([]byte, size)
+
+	buffer[0] = PlayerDeathOpcode.Value()
+	buffer[1] = pd.killerId
+	buffer[2] = pd.killedId
+
+	return buffer
 }
 
 // MovementPlayer represents a movement made by a specific player.
@@ -165,7 +195,7 @@ func (pk AnOtherPlayerKilled) UserId() uint8 {
 // byte stream.
 func (pk AnOtherPlayerKilled) Bytes() []byte {
 	return []byte{
-		AnOtherPlayerKilledOpcode.Value(),
+		PlayerDeathOpcode.Value(),
 		pk.userId,
 	}
 }
@@ -184,7 +214,7 @@ func NewPlayerHimSelfKilled() PlayerHimSelfKilled {
 // byte stream.
 func (p PlayerHimSelfKilled) Bytes() []byte {
 	return []byte{
-		PlayerHimSelfKilledOpcode.Value(),
+		PlayerDeathOpcode.Value(),
 	}
 }
 
@@ -304,7 +334,7 @@ func (p PlayerJoined) Bytes() []byte {
 
 	data := make([]byte, size)
 
-	data[0] = PlayerJoinedOpcode.Value()
+	data[0] = NewPlayerJoinedOpcode.Value()
 	p.p.PutBytes(data[1:])
 
 	return data
@@ -335,6 +365,23 @@ func (p PlayerLeft) Bytes() []byte {
 	return []byte{
 		PlayerLeftOpcode.Value(),
 		p.userId,
+	}
+}
+
+type YouAreCalled struct  {
+	userId uint8
+}
+
+func NewYouAreCalled(userId uint8) YouAreCalled {
+	return YouAreCalled{
+		userId: userId,
+	}
+}
+
+func (yac YouAreCalled) Bytes() []byte {
+	return []byte{
+		YouAreCalledOpcode.Value(),
+		yac.userId,
 	}
 }
 

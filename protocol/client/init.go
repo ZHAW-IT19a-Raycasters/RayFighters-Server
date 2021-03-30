@@ -14,17 +14,21 @@ type ClientOpcode uint8
 const (
 	DisconnectOpcode          ClientOpcode = 0x00
 	UnknownOpcode             ClientOpcode = 0x01
+	WhoAmIOpcode              ClientOpcode = 0x02
 	MovementOpcode            ClientOpcode = 0x0A
 	ShootingOpcode            ClientOpcode = 0x14
 	RequestOtherPlayersOpcode ClientOpcode = 0x1E
+	RequestPlayerKDOpcode	  ClientOpcode = 0x1F
 )
 
 var Overview = [...]ClientOpcode{
 	DisconnectOpcode,
 	UnknownOpcode,
+	WhoAmIOpcode,
 	MovementOpcode,
 	ShootingOpcode,
 	RequestOtherPlayersOpcode,
+	RequestPlayerKDOpcode,
 }
 
 // Value returns the internal value representation as a uint8.
@@ -42,12 +46,16 @@ func (o ClientOpcode) String() string {
 		return "Disconnect"
 	case UnknownOpcode:
 		return "Unknown"
+	case WhoAmIOpcode:
+		return "WhoAmI"
 	case MovementOpcode:
 		return "Movement"
 	case ShootingOpcode:
 		return "Shooting"
 	case RequestOtherPlayersOpcode:
 		return "RequestOtherPlayers"
+	case RequestPlayerKDOpcode:
+		return "RequestPlayerKD"
 	default:
 		// this panic should never be hit,
 		// if it is hit it means there is some
@@ -66,6 +74,9 @@ func (o ClientOpcode) ByteSize() int {
 	case UnknownOpcode:
 		// Opcode
 		return 1
+	case WhoAmIOpcode:
+		// Opcode
+		return 1
 	case MovementOpcode:
 		// Opcode + 2 * Float64
 		return 1 + 2*8
@@ -73,6 +84,9 @@ func (o ClientOpcode) ByteSize() int {
 		// Opcode + Flaot64
 		return 1 + 8
 	case RequestOtherPlayersOpcode:
+		// Opcode
+		return 1
+	case RequestPlayerKDOpcode:
 		// Opcode
 		return 1
 	default:
@@ -156,6 +170,27 @@ func NewUnknownByte(data []byte) (*Unknown, error) {
 	return &val, nil
 }
 
+// Disconnect represents a request for a Player.
+type WhoAmI struct {}
+
+// Will initialize the WhoAmI struct.
+func NewWhoAmI() WhoAmI {
+	return WhoAmI{}
+}
+
+// NewWhoAmIByte returns a pointer from a new WhoAmI object based on data.
+// If an error occurs Nil will be returned.
+func NewWhoAmIByte(data []byte) (*WhoAmI, error) {
+	// checking length etc
+	// 1 Byte
+	if err := checkOpcodeHelper(WhoAmIOpcode, data); err != nil {
+		return nil, err
+	}
+
+	val := NewWhoAmI()
+	return &val, nil
+}
+
 // Movement represents a user Movement.
 type Movement struct {
 	coorX, coorY float64
@@ -234,6 +269,27 @@ type RequestOtherPlayers struct{}
 // NewRequestOtherPlayers creates a new RequestOtherPlayers instance.
 func NewRequestOtherPlayers() RequestOtherPlayers {
 	return RequestOtherPlayers{}
+}
+
+// Disconnect represents a request for a Player.
+type RequestPlayerKD struct {}
+
+// Will initialize the WhoAmI struct.
+func NewRequestPlayerKD() RequestPlayerKD {
+	return RequestPlayerKD{}
+}
+
+// NewWhoAmIByte returns a pointer from a new WhoAmI object based on data.
+// If an error occurs Nil will be returned.
+func NewRequestPlayerKDByte(data []byte) (*RequestPlayerKD, error) {
+	// checking length etc
+	// 1 Byte
+	if err := checkOpcodeHelper(RequestPlayerKDOpcode, data); err != nil {
+		return nil, err
+	}
+
+	val := NewRequestPlayerKD()
+	return &val, nil
 }
 
 // NewRequestOtherPlayersBytes returns a pointer from a new RequestOtherPlayers object based on data
