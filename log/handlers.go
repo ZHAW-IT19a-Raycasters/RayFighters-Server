@@ -2,27 +2,33 @@ package log
 
 import (
 	"io"
-	"io/fs"
 	"os"
 )
 
 type WriterHandler struct {
-	*rawLogger
+	level Level
+	out   io.Writer
 }
 
 func NewWriterHandler(level Level, writer io.Writer) WriterHandler {
 	return WriterHandler{
-		rawLogger: newRawLogger(level, writer),
+		level: level,
+		out:   writer,
 	}
 }
 
+func (wh WriterHandler) Build() (LogHandler, error) {
+	return newRawLogger(wh.level, wh.out), nil
+
+}
+
 type ConsoleHandler struct {
-	*rawLogger
+	WriterHandler
 }
 
 func NewConsoleHandler(level Level) ConsoleHandler {
 	return ConsoleHandler{
-		rawLogger: newRawLogger(level, os.Stdout),
+		WriterHandler: NewWriterHandler(level, os.Stdout),
 	}
 }
 
@@ -30,28 +36,34 @@ type FileHandler struct {
 	// openFile is the os functionality used for opening files.
 	// The function is stored here so that it is possible to mock
 	// it and get 100% coverage.
-	openFile func(name string, flag int, perm fs.FileMode) (*os.File, error)
+	openFile func() (*os.File, error)
 	// fileName where to the log will be stored to
 	fileName string
-	*rawLogger
+	level    Level
 }
 
-func NewFileHandler(fileName string, level Level) (FileHandler, error) {
-	fh := FileHandler{
+func NewFileHandler(level Level, fileName string) FileHandler {
+	return FileHandler{
 		fileName: fileName,
+		level:    level,
+		openFile: func() (*os.File, error) {
+			return os.OpenFile(fileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
+		},
 	}
-
-	file, err := fh.openFile(fileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
-
-	if err != nil {
-		return fh, err
-	}
-
-	fh.rawLogger = newRawLogger(level, file)
-
-	return fh, nil
 }
 
-func (fh *FileHandler) FileName() string {
+func (fh FileHandler) Level() Level {
+	return fh.level
+}
+
+func (fh FileHandler) FileName() string {
 	return fh.fileName
+}
+
+func (fh FileHandler) Build() (LogHandler, error) {
+	out, err := fh.openFile()
+	if err != nil {
+		return nil, err
+	}
+	return newRawLogger(fh.Level(), out), nil
 }

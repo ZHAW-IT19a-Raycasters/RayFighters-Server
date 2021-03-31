@@ -12,36 +12,32 @@ import (
 
 // resetILogger will renew the internal logger
 // down to no configurations.
-// Attention this function is used solay for testing.
+// Attention this function is used only for testing.
 func resetILogger() {
-	// remove all the
+	// remove all the previous configuration
 	iLogger = newInternalLogger()
 }
 
 func cleanUpTmpFile(name string) {
-	iLogger = nil
 	if _, err := os.Stat(name); errors.Is(err, os.ErrExist) {
 		os.Remove(name)
 	}
 }
 
-func setupTmpFile(level Level, t *testing.T) (string, error) {
+func setupTmpFile(level Level, t *testing.T) (*FileHandler, error) {
 	tmpFile, err := ioutil.TempFile("", "log*.txt")
 	if err != nil {
 		t.Errorf("on creating the tmp file, this happend [%s]", err.Error())
-		return "", err
+		return nil, err
 	}
 
-	err = SetupLogFile(level, tmpFile.Name())
-	if err != nil {
-		t.Errorf("on creating the logger, this happend [%s]", err.Error())
-		return "", err
-	}
+	fh := NewFileHandler(level, tmpFile.Name())
 
 	t.Cleanup(func() {
 		cleanUpTmpFile(tmpFile.Name())
 	})
-	return tmpFile.Name(), nil
+
+	return &fh, nil
 }
 
 func setupBuffer() *bytes.Buffer {
@@ -51,18 +47,34 @@ func setupBuffer() *bytes.Buffer {
 	return buffer
 }
 
-func setupLogger(level Level, out io.Writer, t *testing.T) {
-	setILogger(newRawLogger(level, out))
-	t.Cleanup(func() {
-		resetILogger()
-	})
+func setupWriteLogger(level Level, out io.Writer, t *testing.T) WriterHandler {
+	return NewWriterHandler(level, out)
 }
 
-func setupBufferLogger(level Level, t *testing.T) *bytes.Buffer {
+func setupBufferLogger(level Level, t *testing.T) (WriterHandler, *bytes.Buffer) {
 	buffer := setupBuffer()
-	setupLogger(level, buffer, t)
+	wh := setupWriteLogger(level, buffer, t)
 
-	return buffer
+	return wh, buffer
+}
+
+func setupLogger(handlers []BuildLogHandler, t *testing.T) error {
+	b := NewBuilder()
+
+	for _, handler := range handlers {
+		if err := b.RegisterHandler(handler); err != nil {
+			return err
+		}
+	}
+
+	err := b.Build()
+	if err != nil {
+		return err
+	}
+
+	t.Cleanup(resetILogger)
+
+	return nil
 }
 
 func TestLogger(t *testing.T) {
@@ -91,7 +103,13 @@ func TestLogger(t *testing.T) {
 	// remove values from buff
 	buff.Reset()
 
-	setupLogger(Debug, buff, t)
+	wh := setupWriteLogger(Debug, buff, t)
+	err := setupLogger([]BuildLogHandler{wh}, t)
+	if err != nil {
+		t.Errorf("There was an error during logger setup\n%s", err.Error())
+
+		return
+	}
 
 	lg.Debug("Something")
 	if !test("Something") {
@@ -106,7 +124,13 @@ func TestLogger(t *testing.T) {
 
 func TestLoggerDebug(t *testing.T) {
 
-	buffer := setupBufferLogger(Debug, t)
+	wh, buffer := setupBufferLogger(Debug, t)
+
+	err := setupLogger([]BuildLogHandler{wh}, t)
+	if err != nil {
+		t.Errorf("There was an error while setting up the logger\n%s", err.Error())
+		return
+	}
 
 	logger := Log()
 
@@ -121,7 +145,13 @@ func TestLoggerDebug(t *testing.T) {
 }
 
 func TestLoggerNoDebug(t *testing.T) {
-	buffer := setupBufferLogger(Info, t)
+	wh, buffer := setupBufferLogger(Info, t)
+
+	err := setupLogger([]BuildLogHandler{wh}, t)
+	if err != nil {
+		t.Errorf("There was an error while setting up the logger\n%s", err.Error())
+		return
+	}
 
 	check := func(f func() string) bool {
 		buffer.Reset()
@@ -159,7 +189,14 @@ func TestLoggerNoDebug(t *testing.T) {
 func TestAllLevels(t *testing.T) {
 	// test all the available logger levels.
 
-	buffer := setupBufferLogger(Debug, t)
+	wh, buffer := setupBufferLogger(Debug, t)
+
+	err := setupLogger([]BuildLogHandler{wh}, t)
+	if err != nil {
+		t.Errorf("There was an error while setting up the logger\n%s", err.Error())
+		return
+	}
+
 	logger := Log()
 
 	// all functions
@@ -206,7 +243,7 @@ func TestAllLevels(t *testing.T) {
 		return "WARNING some terrible message threatening mankind: [with an addition]"
 	}
 
-	err := func() string {
+	erf := func() string {
 		logger.Error("well I almost crashed... HELP")
 		return "ERROR well I almost crashed... HELP"
 	}
@@ -216,13 +253,14 @@ func TestAllLevels(t *testing.T) {
 		return "ERROR I am still alive, have some useless numbers: [0x42]"
 	}
 
-	for _, f := range [...]func() string{debug, debugf, info, infof, warn, warnf, err, errf} {
+	for _, f := range [...]func() string{debug, debugf, info, infof, warn, warnf, erf, errf} {
 		if !run(f) {
 			return
 		}
 	}
 }
 
+/*
 func TestPanicf(t *testing.T) {
 	logger := Log()
 
@@ -298,3 +336,4 @@ func TestIssueOpeningFile(t *testing.T) {
 		t.Error("Error should have been returned here")
 	}
 }
+*/

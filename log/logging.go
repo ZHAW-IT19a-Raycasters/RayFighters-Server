@@ -4,9 +4,6 @@ import (
 	"errors"
 )
 
-// logFile is the file, where to the logs shall be logged to
-const logFile string = "logs.txt"
-
 // ErrLoggerAlreadySetup is the error, that will be returned,
 // in the case that the logger has already been setup once
 // before.
@@ -15,18 +12,29 @@ var ErrLoggerAlreadySetup = errors.New("the logger has already been setup")
 // iLogger is a singleton to the actual logging instance
 var iLogger internalLogger = newInternalLogger()
 
+// builder handles all the configurations for
+// the global logger.
 type builder struct {
-	handlers []LoggingHandler
+	handlers []LogHandler
 }
 
+// NewBuilder will create a builder that is used to create
+// and manage the global logger instance.
 func NewBuilder() builder {
 	return builder{
-		handlers: make([]LoggingHandler, handlerStartLen, handlerStartCap),
+		handlers: make([]LogHandler, handlerStartLen, handlerStartCap),
 	}
 }
 
-func (b *builder) RegisterHandler(handler LoggingHandler) {
-	b.handlers = append(b.handlers, handler)
+// RegisterHandler will register a logging handler to the builder.
+// This will not yet register the handler with the global logger.
+func (b *builder) RegisterHandler(handler BuildLogHandler) error {
+	lh, err := handler.Build()
+	if err != nil {
+		return err
+	}
+	b.handlers = append(b.handlers, lh)
+	return nil
 }
 
 // Build will setup the logger, but only a single time,

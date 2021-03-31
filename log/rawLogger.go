@@ -28,7 +28,7 @@ func (log rawLogger) Level() Level {
 // checkLevel is the function that checks if the requested level
 // is allowed to be used per configuration.
 func (log rawLogger) checkLevel(level Level) bool {
-	return level >= log.level
+	return level >= log.Level()
 }
 
 // Log logs all the levels requested.
