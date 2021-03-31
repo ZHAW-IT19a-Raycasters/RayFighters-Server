@@ -37,6 +37,7 @@ func NewHub(hubId int) *Hub {
 	return &Hub{
 		conn:    make(chan ClientMeta),
 		id:      hubId,
+		clientManager: newClientManager(),
 		running: make(chan struct{}),
 		counter: helpers.NewAtomicUint32(HubClientLimit),
 	}
