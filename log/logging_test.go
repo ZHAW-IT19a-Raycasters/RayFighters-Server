@@ -260,57 +260,42 @@ func TestAllLevels(t *testing.T) {
 	}
 }
 
-/*
-func TestPanicf(t *testing.T) {
-	logger := Log()
-
-	// testing a not setup logger, so panic can not happen
-	logger.Panicf("PANIC HELP, %s", "I'AM DYING!")
-
-	buffer := setupBufferLogger(Warning, t)
-	exp := "PANIC HELP, I'AM DYING!"
-
-	defer func() {
-		if r := recover(); r == nil {
-			t.Error("Did not panic as expected")
-		} else {
-			// check if it was written into the buffer
-			res := strings.TrimSpace(buffer.String())
-
-			if !strings.HasSuffix(res, exp) {
-				t.Errorf("The buffer should be filled with %s", exp)
-			}
-		}
-	}()
-
-	// let it panic
-	logger.Panicf("PANIC HELP, %s", "I'AM DYING!")
-}
-
 func TestDoubleLoggingInit(t *testing.T) {
 	// Attention this calles Setup already
-	_, err := setupTmpFile(Debug, t)
+	fh, err := setupTmpFile(Debug, t)
 	if err != nil {
 		t.Errorf("There should have not been an error here.\n%s", err.Error())
 		return
 	}
-	err = Setup(Debug)
+
+	err = setupLogger([]BuildLogHandler{fh}, t)
+	if err != nil {
+		t.Errorf("There was an error that happend while creating the logger.\n%s", err.Error())
+		return
+	}
+	err = setupLogger([]BuildLogHandler{fh}, t)
 	if err == nil {
 		t.Error("The error for a double setup is missing.")
 	}
 }
 
 func TestLoggingToFile(t *testing.T) {
-	filename, err := setupTmpFile(Debug, t)
+	fh, err := setupTmpFile(Debug, t)
 	if err != nil {
+		t.Errorf("There was an error while setting up the file.\n%s", err.Error())
 		return
 	}
 
-	Setup(Debug)
+	err = setupLogger([]BuildLogHandler{fh}, t)
+	if err != nil {
+		t.Errorf("There was an error while setting up the logger.\n%s", err.Error())
+		return
+	}
+
 	log := Log()
 	log.Infof("the value %d", 42)
 
-	data, err := os.ReadFile(filename)
+	data, err := os.ReadFile(fh.FileName())
 	if err != nil {
 		t.Errorf("Unexpected file error happend.\n%s", err.Error())
 		return
@@ -324,16 +309,13 @@ func TestLoggingToFile(t *testing.T) {
 func TestIssueOpeningFile(t *testing.T) {
 	// so that the global variable will be returned to it's value after this
 	// test.
-	orgOF := openFile
-	t.Cleanup(func() { openFile = orgOF })
-
-	openFile = func(name string, flag int, perm os.FileMode) (*os.File, error) {
+	fh := NewFileHandler(Debug, "notExistingFile.log")
+	fh.openFile = func() (*os.File, error) {
 		return nil, errors.New("an error message from the os")
 	}
 
-	err := Setup(Debug)
+	err := setupLogger([]BuildLogHandler{fh}, t)
 	if err == nil {
 		t.Error("Error should have been returned here")
 	}
 }
-*/
