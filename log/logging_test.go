@@ -349,3 +349,46 @@ func TestConsoleHandler(t *testing.T) {
 		t.Errorf("The buffer should be filled with %s", expetedResult)
 	}
 }
+
+func TestMultiDestination(t *testing.T) {
+	test := func(data []byte) bool {
+		str := strings.TrimSpace(string(data))
+		if !strings.HasSuffix(str, "the value 42") {
+			t.Errorf("an incorrect suffix was used, for line\n[%s]", str)
+			return false
+		}
+		return true
+	}
+
+	wh, buffer := setupBufferLogger(Debug, t)
+	fh, err := setupTmpFile(Debug, t)
+	if err != nil {
+		t.Errorf("There was an error while setting up the file.\n%s", err.Error())
+		return
+	}
+
+	err = setupLogger([]BuildLogHandler{fh, wh}, t)
+	if err != nil {
+		t.Errorf("There was an error while setting up the logger.\n%s", err.Error())
+		return
+	}
+
+	log := Log()
+	log.Infof("the value %d", 42)
+
+	data, err := os.ReadFile(fh.FileName())
+	if err != nil {
+		t.Errorf("Unexpected file error happend.\n%s", err.Error())
+		return
+	}
+
+	// test file
+	if !test(data) {
+		return
+	}
+
+	// test buff
+	if !test(buffer.Bytes()) {
+		return
+	}
+}
