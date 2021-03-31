@@ -40,14 +40,10 @@ func NewServer(conf *webconfig.WebConfig) *Server {
 	router.HandleFunc("/", handleRoot)
 	router.HandleFunc("/auth", serveAuth).Methods("POST")
 
-	router.HandleFunc("/ws/{trash:[^0-9]+}{roomID:[0-9]+}", func(w http.ResponseWriter, r *http.Request) {
+	router.HandleFunc("/ws/{roomID:[0-9]+}", func(w http.ResponseWriter, r *http.Request) {
 		// note: variables are strings
 		vars := mux.Vars(r)
 
-		if len(vars["trash"]) > 0 {
-			logger.Errorf("invalid URL: expected room-ID as int got some trash: ", vars["trash"])
-			return
-		}
 		// parse roomID from URL
 		roomIDStr := vars["roomID"]
 		roomID, err := strconv.Atoi(roomIDStr)
