@@ -37,6 +37,7 @@ func NewServer(conf *webconfig.WebConfig) *Server {
 	}
 
 	router := mux.NewRouter()
+
 	router.HandleFunc("/", handleRoot)
 	router.HandleFunc("/auth", serveAuth).Methods("POST")
 
@@ -51,7 +52,7 @@ func NewServer(conf *webconfig.WebConfig) *Server {
 			logger.Errorf("couldn't parse roomID from URL: %v\n", err)
 			return
 		}
-		if roomID >= hubsCount {
+		if (roomID < 0) && (roomID >= hubsCount) {
 			logger.Errorf("request to join room with illegal room-ID \"%d\"", roomID)
 			return
 		}
