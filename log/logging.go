@@ -2,11 +2,7 @@ package log
 
 import (
 	"errors"
-	"os"
 )
-
-// logFile is the file, where to the logs shall be logged to
-const logFile string = "logs.txt"
 
 // ErrLoggerAlreadySetup is the error, that will be returned,
 // in the case that the logger has already been setup once
@@ -14,23 +10,39 @@ const logFile string = "logs.txt"
 var ErrLoggerAlreadySetup = errors.New("the logger has already been setup")
 
 // iLogger is a singleton to the actual logging instance
-var iLogger *internalLogger
+var iLogger internalLogger = newInternalLogger()
 
-// setILogger gloabal will be set
-func setILogger(lg *internalLogger) {
-	iLogger = lg
+// builder handles all the configurations for
+// the global logger.
+type builder struct {
+	handlers []LogHandler
 }
 
-// resetILogger will set the actall logger to nil.
-// Attention this function is used solay for testing.
-func resetILogger() {
-	iLogger = nil
+// NewBuilder will create a builder that is used to create
+// and manage the global logger instance.
+func NewBuilder() builder {
+	return builder{
+		handlers: make([]LogHandler, handlerStartLen, handlerStartCap),
+	}
 }
 
-// openFile is the os functionality used for opening files.
-// The function is stored here so that it is possible to mock
-// it and get 100% coverage.
-var openFile = os.OpenFile
+// RegisterHandler will register a logging handler to the builder.
+// This will not yet register the handler with the global logger.
+func (b *builder) RegisterHandler(handler BuildLogHandler) error {
+	lh, err := handler.Build()
+	if err != nil {
+		return err
+	}
+	b.handlers = append(b.handlers, lh)
+	return nil
+}
+
+// Build will setup the logger, but only a single time,
+// if the logger has already been setup before, then
+// this will return an error.
+func (b *builder) Build() error {
+	return iLogger.copy(b.handlers)
+}
 
 // logger is a pseudo wrapper around the internal logger singleton.
 // It does not contain any values, but the methods written for the
@@ -42,49 +54,13 @@ func Log() logger {
 	return logger{}
 }
 
-// Setup will as the name implies setup the internals for the logger.
-// This uses the default logFile.
-func Setup(level Level) error {
-	return SetupLogFile(level, logFile)
-}
-
-// SetupLogFile will setup the logger with the correct
-// file opened.
-func SetupLogFile(level Level, fileName string) error {
-	if iLogger != nil {
-		return ErrLoggerAlreadySetup
-	}
-
-	file, err := openFile(fileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
-
-	if err != nil {
-		return err
-	}
-
-	setILogger(newInternalLogger(level, file))
-
-	return nil
-}
-
-func (log logger) isSetup() bool {
-	return iLogger != nil
-}
-
 // Log logs all the levels requested.
 func (log logger) Log(level Level, v ...interface{}) {
-	// if the logger has not been setup just return
-	if !log.isSetup() {
-		return
-	}
 	iLogger.log(level, v...)
 }
 
 // Logf logs all the levels and formats the interfaces values.
 func (log logger) Logf(level Level, format string, v ...interface{}) {
-	// if the logger has not been setup just return
-	if !log.isSetup() {
-		return
-	}
 	iLogger.logf(level, format, v...)
 }
 
@@ -126,14 +102,4 @@ func (log logger) Error(v ...interface{}) {
 // Errorf will write and format a error level message.
 func (log logger) Errorf(format string, v ...interface{}) {
 	log.Logf(Error, format, v...)
-}
-
-// Panicf will write and format a panic message, before
-// ending the program by invoking panic.
-func (log logger) Panicf(format string, v ...interface{}) {
-	// if the logger has not been setup just return
-	if !log.isSetup() {
-		return
-	}
-	iLogger.panicf(format, v...)
 }
