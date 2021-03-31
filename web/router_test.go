@@ -15,7 +15,7 @@ func TestAPIRoot(t *testing.T) {
 	}
 	// We create a ResponseRecorder (which satisfies http.ResponseWriter) to record the response.
 	rr := httptest.NewRecorder()
-	handler := http.HandlerFunc(handleRoot)
+	handler := http.HandlerFunc(serveRoot)
 
 	// Our handlers satisfy http.Handler, so we can call their ServeHTTP method
 	// directly and pass in our Request and ResponseRecorder.
