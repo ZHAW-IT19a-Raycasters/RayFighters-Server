@@ -10,30 +10,34 @@ import (
 	"testing"
 )
 
+// resetILogger will renew the internal logger
+// down to no configurations.
+// Attention this function is used only for testing.
+func resetILogger() {
+	// remove all the previous configuration
+	iLogger = newInternalLogger()
+}
+
 func cleanUpTmpFile(name string) {
-	iLogger = nil
 	if _, err := os.Stat(name); errors.Is(err, os.ErrExist) {
 		os.Remove(name)
 	}
 }
 
-func setupTmpFile(level Level, t *testing.T) (string, error) {
+func setupTmpFile(level Level, t *testing.T) (*FileHandler, error) {
 	tmpFile, err := ioutil.TempFile("", "log*.txt")
 	if err != nil {
 		t.Errorf("on creating the tmp file, this happend [%s]", err.Error())
-		return "", err
+		return nil, err
 	}
 
-	err = SetupLogFile(level, tmpFile.Name())
-	if err != nil {
-		t.Errorf("on creating the logger, this happend [%s]", err.Error())
-		return "", err
-	}
+	fh := NewFileHandler(level, tmpFile.Name())
 
 	t.Cleanup(func() {
 		cleanUpTmpFile(tmpFile.Name())
 	})
-	return tmpFile.Name(), nil
+
+	return &fh, nil
 }
 
 func setupBuffer() *bytes.Buffer {
@@ -43,18 +47,43 @@ func setupBuffer() *bytes.Buffer {
 	return buffer
 }
 
-func setupLogger(level Level, out io.Writer, t *testing.T) {
-	setILogger(newInternalLogger(level, out))
-	t.Cleanup(func() {
-		resetILogger()
-	})
+func setupConsoleCapture(level Level, t *testing.T) (ConsoleHandler, *bytes.Buffer) {
+	buff := setupBuffer()
+
+	ch := NewConsoleHandler(level)
+	ch.out = buff
+
+	return ch, buff
 }
 
-func setupBufferLogger(level Level, t *testing.T) *bytes.Buffer {
-	buffer := setupBuffer()
-	setupLogger(level, buffer, t)
+func setupWriteLogger(level Level, out io.Writer, t *testing.T) WriterHandler {
+	return NewWriterHandler(level, out)
+}
 
-	return buffer
+func setupBufferLogger(level Level, t *testing.T) (WriterHandler, *bytes.Buffer) {
+	buffer := setupBuffer()
+	wh := setupWriteLogger(level, buffer, t)
+
+	return wh, buffer
+}
+
+func setupLogger(handlers []BuildLogHandler, t *testing.T) error {
+	b := NewBuilder()
+
+	for _, handler := range handlers {
+		if err := b.RegisterHandler(handler); err != nil {
+			return err
+		}
+	}
+
+	err := b.Build()
+	if err != nil {
+		return err
+	}
+
+	t.Cleanup(resetILogger)
+
+	return nil
 }
 
 func TestLogger(t *testing.T) {
@@ -83,7 +112,13 @@ func TestLogger(t *testing.T) {
 	// remove values from buff
 	buff.Reset()
 
-	setupLogger(Debug, buff, t)
+	wh := setupWriteLogger(Debug, buff, t)
+	err := setupLogger([]BuildLogHandler{wh}, t)
+	if err != nil {
+		t.Errorf("There was an error during logger setup\n%s", err.Error())
+
+		return
+	}
 
 	lg.Debug("Something")
 	if !test("Something") {
@@ -98,7 +133,13 @@ func TestLogger(t *testing.T) {
 
 func TestLoggerDebug(t *testing.T) {
 
-	buffer := setupBufferLogger(Debug, t)
+	wh, buffer := setupBufferLogger(Debug, t)
+
+	err := setupLogger([]BuildLogHandler{wh}, t)
+	if err != nil {
+		t.Errorf("There was an error while setting up the logger\n%s", err.Error())
+		return
+	}
 
 	logger := Log()
 
@@ -113,7 +154,13 @@ func TestLoggerDebug(t *testing.T) {
 }
 
 func TestLoggerNoDebug(t *testing.T) {
-	buffer := setupBufferLogger(Info, t)
+	wh, buffer := setupBufferLogger(Info, t)
+
+	err := setupLogger([]BuildLogHandler{wh}, t)
+	if err != nil {
+		t.Errorf("There was an error while setting up the logger\n%s", err.Error())
+		return
+	}
 
 	check := func(f func() string) bool {
 		buffer.Reset()
@@ -151,7 +198,14 @@ func TestLoggerNoDebug(t *testing.T) {
 func TestAllLevels(t *testing.T) {
 	// test all the available logger levels.
 
-	buffer := setupBufferLogger(Debug, t)
+	wh, buffer := setupBufferLogger(Debug, t)
+
+	err := setupLogger([]BuildLogHandler{wh}, t)
+	if err != nil {
+		t.Errorf("There was an error while setting up the logger\n%s", err.Error())
+		return
+	}
+
 	logger := Log()
 
 	// all functions
@@ -198,7 +252,7 @@ func TestAllLevels(t *testing.T) {
 		return "WARNING some terrible message threatening mankind: [with an addition]"
 	}
 
-	err := func() string {
+	erf := func() string {
 		logger.Error("well I almost crashed... HELP")
 		return "ERROR well I almost crashed... HELP"
 	}
@@ -208,63 +262,49 @@ func TestAllLevels(t *testing.T) {
 		return "ERROR I am still alive, have some useless numbers: [0x42]"
 	}
 
-	for _, f := range [...]func() string{debug, debugf, info, infof, warn, warnf, err, errf} {
+	for _, f := range [...]func() string{debug, debugf, info, infof, warn, warnf, erf, errf} {
 		if !run(f) {
 			return
 		}
 	}
 }
 
-func TestPanicf(t *testing.T) {
-	logger := Log()
-
-	// testing a not setup logger, so panic can not happen
-	logger.Panicf("PANIC HELP, %s", "I'AM DYING!")
-
-	buffer := setupBufferLogger(Warning, t)
-	exp := "PANIC HELP, I'AM DYING!"
-
-	defer func() {
-		if r := recover(); r == nil {
-			t.Error("Did not panic as expected")
-		} else {
-			// check if it was written into the buffer
-			res := strings.TrimSpace(buffer.String())
-
-			if !strings.HasSuffix(res, exp) {
-				t.Errorf("The buffer should be filled with %s", exp)
-			}
-		}
-	}()
-
-	// let it panic
-	logger.Panicf("PANIC HELP, %s", "I'AM DYING!")
-}
-
 func TestDoubleLoggingInit(t *testing.T) {
 	// Attention this calles Setup already
-	_, err := setupTmpFile(Debug, t)
+	fh, err := setupTmpFile(Debug, t)
 	if err != nil {
 		t.Errorf("There should have not been an error here.\n%s", err.Error())
 		return
 	}
-	err = Setup(Debug)
+
+	err = setupLogger([]BuildLogHandler{fh}, t)
+	if err != nil {
+		t.Errorf("There was an error that happend while creating the logger.\n%s", err.Error())
+		return
+	}
+	err = setupLogger([]BuildLogHandler{fh}, t)
 	if err == nil {
 		t.Error("The error for a double setup is missing.")
 	}
 }
 
 func TestLoggingToFile(t *testing.T) {
-	filename, err := setupTmpFile(Debug, t)
+	fh, err := setupTmpFile(Debug, t)
 	if err != nil {
+		t.Errorf("There was an error while setting up the file.\n%s", err.Error())
 		return
 	}
 
-	Setup(Debug)
+	err = setupLogger([]BuildLogHandler{fh}, t)
+	if err != nil {
+		t.Errorf("There was an error while setting up the logger.\n%s", err.Error())
+		return
+	}
+
 	log := Log()
 	log.Infof("the value %d", 42)
 
-	data, err := os.ReadFile(filename)
+	data, err := os.ReadFile(fh.FileName())
 	if err != nil {
 		t.Errorf("Unexpected file error happend.\n%s", err.Error())
 		return
@@ -278,15 +318,77 @@ func TestLoggingToFile(t *testing.T) {
 func TestIssueOpeningFile(t *testing.T) {
 	// so that the global variable will be returned to it's value after this
 	// test.
-	orgOF := openFile
-	t.Cleanup(func() { openFile = orgOF })
-
-	openFile = func(name string, flag int, perm os.FileMode) (*os.File, error) {
+	fh := NewFileHandler(Debug, "notExistingFile.log")
+	fh.openFile = func() (*os.File, error) {
 		return nil, errors.New("an error message from the os")
 	}
 
-	err := Setup(Debug)
+	err := setupLogger([]BuildLogHandler{fh}, t)
 	if err == nil {
 		t.Error("Error should have been returned here")
+	}
+}
+
+func TestConsoleHandler(t *testing.T) {
+	ch, buffer := setupConsoleCapture(Debug, t)
+
+	err := setupLogger([]BuildLogHandler{ch}, t)
+	if err != nil {
+		t.Errorf("There was an error while setting up the logger\n%s", err.Error())
+		return
+	}
+
+	logger := Log()
+
+	logger.Debug("help me")
+
+	const expetedResult string = "DEBUG help me"
+	res := buffer.String()
+
+	if strings.HasSuffix(res, expetedResult) {
+		t.Errorf("The buffer should be filled with %s", expetedResult)
+	}
+}
+
+func TestMultiDestination(t *testing.T) {
+	test := func(data []byte) bool {
+		str := strings.TrimSpace(string(data))
+		if !strings.HasSuffix(str, "the value 42") {
+			t.Errorf("an incorrect suffix was used, for line\n[%s]", str)
+			return false
+		}
+		return true
+	}
+
+	wh, buffer := setupBufferLogger(Debug, t)
+	fh, err := setupTmpFile(Debug, t)
+	if err != nil {
+		t.Errorf("There was an error while setting up the file.\n%s", err.Error())
+		return
+	}
+
+	err = setupLogger([]BuildLogHandler{fh, wh}, t)
+	if err != nil {
+		t.Errorf("There was an error while setting up the logger.\n%s", err.Error())
+		return
+	}
+
+	log := Log()
+	log.Infof("the value %d", 42)
+
+	data, err := os.ReadFile(fh.FileName())
+	if err != nil {
+		t.Errorf("Unexpected file error happend.\n%s", err.Error())
+		return
+	}
+
+	// test file
+	if !test(data) {
+		return
+	}
+
+	// test buff
+	if !test(buffer.Bytes()) {
+		return
 	}
 }

@@ -7,6 +7,21 @@ import (
 	"github.zhaw.ch/raycasters/server/setup"
 )
 
+// logFile is the file, where to the logs shall be logged to
+const logFile string = "logs.txt"
+
+func setupLogger() error {
+	b := log.NewBuilder()
+
+	// TODO:
+
+	// register file handler
+
+	// register console handler
+
+	return b.Build()
+}
+
 func main() {
 	setUp := setup.NewSetup()
 	conf := setUp.Configuration()
@@ -15,10 +30,9 @@ func main() {
 		return
 	}
 
-	err := log.Setup(log.Debug)
+	err := setupLogger()
 
 	if err != nil {
-		fmt.Println(err)
 		return
 	}
 
