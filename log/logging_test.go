@@ -47,6 +47,15 @@ func setupBuffer() *bytes.Buffer {
 	return buffer
 }
 
+func setupConsoleCapture(level Level, t *testing.T) (ConsoleHandler, *bytes.Buffer) {
+	buff := setupBuffer()
+
+	ch := NewConsoleHandler(level)
+	ch.out = buff
+
+	return ch, buff
+}
+
 func setupWriteLogger(level Level, out io.Writer, t *testing.T) WriterHandler {
 	return NewWriterHandler(level, out)
 }
@@ -317,5 +326,26 @@ func TestIssueOpeningFile(t *testing.T) {
 	err := setupLogger([]BuildLogHandler{fh}, t)
 	if err == nil {
 		t.Error("Error should have been returned here")
+	}
+}
+
+func TestConsoleHandler(t *testing.T) {
+	ch, buffer := setupConsoleCapture(Debug, t)
+
+	err := setupLogger([]BuildLogHandler{ch}, t)
+	if err != nil {
+		t.Errorf("There was an error while setting up the logger\n%s", err.Error())
+		return
+	}
+
+	logger := Log()
+
+	logger.Debug("help me")
+
+	const expetedResult string = "DEBUG help me"
+	res := buffer.String()
+
+	if strings.HasSuffix(res, expetedResult) {
+		t.Errorf("The buffer should be filled with %s", expetedResult)
 	}
 }
