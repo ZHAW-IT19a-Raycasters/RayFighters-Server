@@ -91,8 +91,7 @@ func handleRoot(writer http.ResponseWriter, request *http.Request) {
 	//ResponseWriter implements io.Writer
 	//server answer to a client
 	fmt.Print(request.URL)
-	fmt.Fprintf(writer, "Hello from RayCasters!\n")
-	fmt.Fprintf(writer, "Don't try \"/chat\".")
+	fmt.Fprintf(writer, "Hello from RayCasters!")
 }
 
 // serveChat is the handler of <server listening on>/chat.
