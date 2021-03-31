@@ -1,9 +1,14 @@
 package web
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
+
+	"github.com/gorilla/websocket"
+	webconfig "github.zhaw.ch/raycasters/server/web/config"
 )
 
 func TestAPIRoot(t *testing.T) {
@@ -32,5 +37,38 @@ func TestAPIRoot(t *testing.T) {
 	if rr.Body.String() != expected {
 		t.Errorf("handler returned unexpected body: got %v want %v",
 			rr.Body.String(), expected)
+	}
+}
+
+func TestWebSocketHandshake(t *testing.T) {
+	// runs the server and establishes a websocket connection
+
+	// TODO: couldn't read config via utils. do manually for now:
+	var conf = webconfig.WebConfig{
+		Ip: "localhost",
+		Port: 8081,
+	}
+
+	server := NewServer(&conf)
+
+	go func(){
+		server.Start()
+	}()
+	defer server.ServerStop(ShutdownContext())
+
+	u := url.URL{Scheme: "ws", Host: conf.String(), Path: "/ws/1",}
+	fmt.Printf("connecting to %s", u.String())
+
+	c, res, err := websocket.DefaultDialer.Dial(u.String(), nil)
+	defer c.Close()
+
+
+	if err != nil {
+		fmt.Print("Error during handshake",err)
+	}
+
+	if res.StatusCode != http.StatusSwitchingProtocols {
+		t.Errorf("handler returned wrong status code during handshake: got %v want %v",
+		res.StatusCode, http.StatusSwitchingProtocols)
 	}
 }

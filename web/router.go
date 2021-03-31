@@ -37,13 +37,12 @@ func NewServer(conf *webconfig.WebConfig) *Server {
 
 	router := mux.NewRouter()
 	router.HandleFunc("/", serveRoot)
-	router.HandleFunc("/auth", serveAuth).Methods("POST")
+	// router.HandleFunc("/auth", serveAuth).Methods("POST")
 	router.HandleFunc("/ws/{roomID:[0-9]+}", func(w http.ResponseWriter, r *http.Request) {
 		// TODO: get a hub reference from handler function via HubManager
 		// handle with a wrapper lambda for now
 		serveWs(hubs[:], w, r)
 	})
-	router.HandleFunc("/chat", serveChat)
 
 	httpServer := &http.Server{Handler: router, Addr: conf.String(), WriteTimeout: 15 * time.Second, ReadTimeout: 15 * time.Second}
 
@@ -74,16 +73,6 @@ func serveRoot(writer http.ResponseWriter, request *http.Request) {
 	//ResponseWriter implements io.Writer
 	//server answer to a client
 	fmt.Fprintf(writer, "Hello from RayCasters!")
-}
-
-// serveChat statically serves a chat.html for testing websockets.
-func serveChat(w http.ResponseWriter, r *http.Request) {
-	logger.Infof("%s requested", r.URL)
-	if r.Method != "GET" {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-	http.ServeFile(w, r, "web/chat.html")
 }
 
 // serveWs upgrades HTTP request to WebSocket connection
@@ -120,6 +109,6 @@ func serveWs(hubs []*room.Hub, w http.ResponseWriter, r *http.Request) {
 }
 
 
-func serveAuth(w http.ResponseWriter, r *http.Request) {}
+// func serveAuth(w http.ResponseWriter, r *http.Request) {}
 
 // create JWT and uuid here
