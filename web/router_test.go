@@ -2,12 +2,15 @@ package web
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"testing"
 
+	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
+	"github.zhaw.ch/raycasters/server/room"
 	webconfig "github.zhaw.ch/raycasters/server/web/config"
 )
 
@@ -57,7 +60,7 @@ func TestWebSocketHandshake(t *testing.T) {
 	defer server.ServerStop(ShutdownContext())
 
 	u := url.URL{Scheme: "ws", Host: conf.String(), Path: "/ws/1",}
-	fmt.Printf("connecting to %s", u.String())
+	fmt.Printf("connecting to %s\n", u.String())
 
 	c, res, err := websocket.DefaultDialer.Dial(u.String(), nil)
 	defer c.Close()
@@ -70,5 +73,38 @@ func TestWebSocketHandshake(t *testing.T) {
 	if res.StatusCode != http.StatusSwitchingProtocols {
 		t.Errorf("handler returned wrong status code during handshake: got %v want %v",
 		res.StatusCode, http.StatusSwitchingProtocols)
+	}
+}
+
+func TestWSBadRoomID(t *testing.T) {
+	req := httptest.NewRequest("GET", "/ws/123", nil)
+	rr := httptest.NewRecorder()
+	// Need to create a router that we can pass the request through so that the vars will be added to the context
+	router := mux.NewRouter()
+    router.HandleFunc("/ws/{roomID:[0-9]+}", func(rw http.ResponseWriter, r *http.Request) {serveWs([]*room.Hub{} ,rw, r)})
+	router.ServeHTTP(rr, req)
+	res := rr.Result()
+	body, _ := io.ReadAll(res.Body)
+	t.Log(string(body))
+	if res.StatusCode != http.StatusForbidden {
+		t.Errorf("handler returned wrong status code for bad request: got %v want %v",
+		res.StatusCode, http.StatusForbidden)
+	}
+}
+
+func TestWSBadProtocol(t *testing.T) {
+	req := httptest.NewRequest("GET", "/ws/1", nil)
+	rr := httptest.NewRecorder()
+	// Need to create a router that we can pass the request through so that the vars will be added to the context
+	router := mux.NewRouter()
+    router.HandleFunc("/ws/{roomID:[0-9]+}", func(rw http.ResponseWriter, r *http.Request) {serveWs([]*room.Hub{} ,rw, r)})
+	router.ServeHTTP(rr, req)
+
+	res := rr.Result()
+	body, _ := io.ReadAll(res.Body)
+	t.Log(string(body))
+	if res.StatusCode != http.StatusBadRequest {
+		t.Errorf("handler returned wrong status code for bad request: got %v want %v",
+		res.StatusCode, http.StatusBadRequest)
 	}
 }

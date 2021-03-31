@@ -8,7 +8,7 @@ import (
 	"github.com/gorilla/mux"
 )
 
-// parse roomID from URL.
+// ParseRoomID parses RoomID from the request URL.
 // returns an error if no vaild roomID in URL or if string conversion failed.
 func ParseRoomID(r *http.Request) (int, error){
 	vars := mux.Vars(r)
