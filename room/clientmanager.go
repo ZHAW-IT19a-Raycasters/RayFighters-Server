@@ -20,14 +20,19 @@ const ClientShutdownTime = 1 * time.Second
 // to reconnect after a undesired connection loss.
 const ClientTimeoutTime = 5 * time.Second
 
+// ErrClientDoesntExist represents a client that does not actually
+// in the system exist.
 type ErrClientDoesntExist struct {
 	meta ClientMeta
 }
 
+// Error is the function used to fullfill the error interface.
 func (err ErrClientDoesntExist) Error() string {
 	return fmt.Sprintf("client doesn't exist [%d] - [%s]", err.meta.id, err.meta.name)
 }
 
+// clientManager is the struct responsible for managing
+// any and all client connections.
 type clientManager struct {
 	// an overview of all the clients in the room currently.
 	clients map[uint8]*Client
@@ -44,6 +49,7 @@ type clientManager struct {
 	lock sync.RWMutex
 }
 
+// newClientManager will initialize a new clientManager instance.
 func newClientManager() clientManager {
 	return clientManager{
 		clients:   make(map[uint8]*Client),
@@ -53,6 +59,9 @@ func newClientManager() clientManager {
 	}
 }
 
+// size will return the current client count.
+// Attention this is a non threadsafe count,
+// so the number might not be correct.
 func (manager *clientManager) size() int {
 	return len(manager.clients)
 }

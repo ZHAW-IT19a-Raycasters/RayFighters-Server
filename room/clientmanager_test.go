@@ -245,3 +245,71 @@ func TestClientManagerShutdown(t *testing.T) {
 		}
 	}
 }
+
+func TestIncorrectAddClient(t *testing.T) {
+	// test for panic on logging in after lost connection
+	// and incorrect removal of client data
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Error("there should have been a panic")
+		}
+	}()
+
+	getMeta := func(i int) ClientMeta {
+
+		// as uuids should be unique, it makes no difference,
+		// if a new one is called here.
+		uuid := uuid.New()
+		name := fmt.Sprintf("id: %d", i)
+		mock := newMockable()
+
+		return NewClientMeta(uuid, name, &mock)
+	}
+
+	cm := newClientManager()
+	meta := getMeta(0)
+	_ = cm.addClient(meta)
+
+	iId, _ := cm.mapId(meta)
+	// forcefully remove a client from the internal client map...
+
+	delete(cm.clients, iId)
+
+	_ = cm.addClient(meta)
+}
+
+func TestIncorrectRemoveClient(t *testing.T) {
+	// test for panic on logging in after lost connection
+	// and incorrect removal of client data
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Error("there should have been a panic")
+		}
+	}()
+
+	getMeta := func(i int) ClientMeta {
+
+		// as uuids should be unique, it makes no difference,
+		// if a new one is called here.
+		uuid := uuid.New()
+		name := fmt.Sprintf("id: %d", i)
+		mock := newMockable()
+
+		return NewClientMeta(uuid, name, &mock)
+	}
+
+	cm := newClientManager()
+	meta := getMeta(0)
+	_ = cm.addClient(meta)
+
+	// forcefully push a value back onto the queue
+	err := cm.idManager.Push(0)
+	if err != nil {
+		t.Errorf("There was an unexpected error on pushing onto the queue:\n%s", err.Error())
+		return
+	}
+
+	_ = cm.removeClient(meta)
+}
