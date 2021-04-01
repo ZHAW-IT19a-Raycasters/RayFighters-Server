@@ -244,8 +244,46 @@ func TestClientManagerShutdown(t *testing.T) {
 			t.Errorf("incorrect state has been used ")
 		}
 	}
+
+	// TODO: test logger output - this needs code that
+	// currently is not merged into this branch
 }
 
+func TestClientManagerForceShutdown(t *testing.T) {
+	getMeta := func(i int) ClientMeta {
+
+		// as uuids should be unique, it makes no difference,
+		// if a new one is called here.
+		uuid := uuid.New()
+		name := fmt.Sprintf("id: %d", i)
+		mock := newMockable()
+
+		return NewClientMeta(uuid, name, &mock)
+	}
+
+	cm := newClientManager()
+
+	// no errors here
+	for i := 0; i <= math.MaxUint8; i += 1 {
+		// assume this works
+		meta := getMeta(i)
+		_ = cm.addClient(meta)
+
+	}
+
+	// shutdown all the "workers"
+	cxt, cancel := context.WithCancel(context.Background())
+	cc := make(chan struct{})
+	go func() {
+		<-cc
+		cm.shutdown(cxt)
+	}()
+	// direct shutdown
+	cancel()
+	close(cc)
+	// TODO: test logger output - this needs code that
+	// currently is not merged into this branch
+}
 func TestIncorrectAddClient(t *testing.T) {
 	// test for panic on logging in after lost connection
 	// and incorrect removal of client data
