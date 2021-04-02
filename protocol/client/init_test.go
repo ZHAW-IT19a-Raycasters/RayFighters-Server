@@ -30,9 +30,11 @@ func TestOpcodeString(t *testing.T) {
 	exp := [...]string{
 		"Disconnect",
 		"Unknown",
+		"WhoAmI",
 		"Movement",
 		"Shooting",
 		"RequestOtherPlayers",
+		"RequestPlayerKD",
 	}
 	for i, val := range client.Overview {
 		if val.String() != exp[i] {

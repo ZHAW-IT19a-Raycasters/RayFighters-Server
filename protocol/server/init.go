@@ -20,10 +20,11 @@ const (
 	UnknownOpcode             ServerOpcode = 0x65
 	MovementPlayerOpcode      ServerOpcode = 0x6E
 	PlayerDeathOpcode      	  ServerOpcode = 0x78
-	NewPlayerJoinedOpcode 	  ServerOpcode = 0x7A
+	PlayerJoinedOpcode 	  	  ServerOpcode = 0x7A
 	PlayerLeftOpcode		  ServerOpcode = 0x7B
 	YouAreCalledOpcode		  ServerOpcode = 0x7C
 	SendAllPlayerInfoOpcode   ServerOpcode = 0x82
+	SendAllPlayerKDOpcode	  ServerOpcode = 0x83
 )
 
 var Overview = [...]ServerOpcode{
@@ -31,10 +32,11 @@ var Overview = [...]ServerOpcode{
 	UnknownOpcode,
 	MovementPlayerOpcode,
 	PlayerDeathOpcode,
-	NewPlayerJoinedOpcode,
+	PlayerJoinedOpcode,
 	PlayerLeftOpcode,
 	YouAreCalledOpcode,
 	SendAllPlayerInfoOpcode,
+	SendAllPlayerKDOpcode,
 }
 
 // Value returns the internal value representation as a uint8.
@@ -92,15 +94,23 @@ func (u Unknown) Bytes() []byte {
 
 // Disconnect represents a server shutdown.
 type PlayerDeath struct {
-	killerId uint8
 	killedId uint8
+	killerId uint8
+}
+
+func (pd PlayerDeath) KilledId() uint8 {
+	return pd.killedId
+}
+
+func (pd PlayerDeath) KillerId() uint8 {
+	return pd.killerId
 }
 
 // NewDisconnect creates a new disconnect instance.
-func NewPlayerDeath(killerId uint8, killedId uint8) PlayerDeath {
+func NewPlayerDeath(killedId uint8, killerId uint8) PlayerDeath {
 	return PlayerDeath{
-		killerId: killerId,
 		killedId: killedId,
+		killerId: killerId,
 	}
 }
 
@@ -114,8 +124,8 @@ func (pd PlayerDeath) Bytes() []byte {
 	buffer := make([]byte, size)
 
 	buffer[0] = PlayerDeathOpcode.Value()
-	buffer[1] = pd.killerId
-	buffer[2] = pd.killedId
+	buffer[1] = pd.killedId
+	buffer[2] = pd.killerId
 
 	return buffer
 }
@@ -170,52 +180,6 @@ func (mp MovementPlayer) Bytes() []byte {
 	utils.FloatToBinary(mp.coorY, buffer[10:18])
 
 	return buffer
-}
-
-// AnOtherPlayerKilled is the counter part to PlayerHimSelfKilledOpcode
-// it is send to any other active clients in the room.
-type AnOtherPlayerKilled struct {
-	userId uint8
-}
-
-// NewAnotherPlayerKilled will initialize the instantiation of
-// NewAnotherPlayerKilled.
-func NewAnotherPlayerKilled(other byte) AnOtherPlayerKilled {
-	return AnOtherPlayerKilled{
-		userId: other,
-	}
-}
-
-// UserId will return the userId of the player that gotten killed.
-func (pk AnOtherPlayerKilled) UserId() uint8 {
-	return pk.userId
-}
-
-// Bytes will turn the AnOtherPlayerKilled instance into a sendable
-// byte stream.
-func (pk AnOtherPlayerKilled) Bytes() []byte {
-	return []byte{
-		PlayerDeathOpcode.Value(),
-		pk.userId,
-	}
-}
-
-// PlayerHimSelfKilled is the counterpart to AnOtherPlayerKilled
-// as it deactivates the players abilities to move or shoot.
-type PlayerHimSelfKilled struct{}
-
-// NewPlayerHimSelfKilled will create the corresponding
-// instance.
-func NewPlayerHimSelfKilled() PlayerHimSelfKilled {
-	return PlayerHimSelfKilled{}
-}
-
-// Bytes will turn the AnOtherPlayerKilled instance into a sendable
-// byte stream.
-func (p PlayerHimSelfKilled) Bytes() []byte {
-	return []byte{
-		PlayerDeathOpcode.Value(),
-	}
 }
 
 // Player is an internally used representation of the
@@ -334,7 +298,7 @@ func (p PlayerJoined) Bytes() []byte {
 
 	data := make([]byte, size)
 
-	data[0] = NewPlayerJoinedOpcode.Value()
+	data[0] = PlayerJoinedOpcode.Value()
 	p.p.PutBytes(data[1:])
 
 	return data
@@ -372,6 +336,11 @@ type YouAreCalled struct  {
 	userId uint8
 }
 
+// UserId of the player leaving is returned.
+func (yac YouAreCalled) UserId() uint8 {
+	return yac.userId
+}
+
 func NewYouAreCalled(userId uint8) YouAreCalled {
 	return YouAreCalled{
 		userId: userId,
@@ -395,6 +364,18 @@ type PlayersKD struct {
 	playersKD []PlayerKD
 }
 
+func (pkd PlayerKD) UserId() uint8 {
+	return pkd.id
+}
+
+func (pkd PlayerKD) Kills() uint16 {
+	return pkd.kills
+}
+
+func (pkd PlayerKD) Deaths() uint16 {
+	return pkd.deaths
+}
+
 func NewPlayerKD(id uint8, kills, deaths uint16) PlayerKD {
 	return PlayerKD{
 		id: id,
@@ -404,10 +385,16 @@ func NewPlayerKD(id uint8, kills, deaths uint16) PlayerKD {
 }
 
 func (p PlayersKD) Bytes() []byte {
-	size := len(p.playersKD) * p.playersKD[0].ByteSize()
+	// 1 for Opcode
+	size := 1
+	// 1 for amount of Players
+	size += 1
+	size += len(p.playersKD) * p.playersKD[0].ByteSize()
 	b := make([]byte, size)
+	b[0] = SendAllPlayerKDOpcode.Value()
+	b[1] = byte(len(p.playersKD))
 	for index, playerKD := range p.playersKD {
-		playerKD.PutBytes(b[index*playerKD.ByteSize():])
+		playerKD.PutBytes(b[index*playerKD.ByteSize()+2:])
 	}
 	return b
 }
