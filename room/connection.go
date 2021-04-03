@@ -7,4 +7,5 @@ import "io"
 type ClientConnection interface {
 	NextReader() (int, io.Reader, error)
 	NextWriter(messageType int) (io.WriteCloser, error)
+	Close() error
 }

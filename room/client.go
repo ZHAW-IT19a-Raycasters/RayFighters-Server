@@ -3,23 +3,23 @@ package room
 import (
 	"context"
 	"errors"
+	"sync"
+
 	"github.zhaw.ch/raycasters/server/protocol"
 	"github.zhaw.ch/raycasters/server/protocol/client"
 	"github.zhaw.ch/raycasters/server/protocol/server"
-	"sync"
+	"github.zhaw.ch/raycasters/server/room/helpers"
 
 	"github.com/google/uuid"
+	"github.com/gorilla/websocket"
 	"github.zhaw.ch/raycasters/server/log"
 )
 
 var logger = log.Log()
 
-type ConnectionStatus uint
+var ErrClientReaderAlreadyActive = errors.New("the client worker is already active")
 
-type KD struct {
-	id uint8
-	ClientGame
-}
+type ConnectionStatus uint
 
 const (
 	Active ConnectionStatus = iota
@@ -38,73 +38,13 @@ func (c ConnectionStatus) String() string {
 type HubClientInteraction interface {
 	// Get All Players from Hub
 	GetAllPlayers() []server.Player
- 	// bool to check if player was hit
- 	// server.Player to know which player
+	// bool to check if player was hit
+	// server.Player to know which player
 	PlayerGotHit() (bool, server.Player)
 
 	PlayersKD() []server.PlayerKD
 
 	UnregisterClient(meta ClientMeta) error
-}
-
-type Client struct {
-	// is the one channel that controlls the
-	// input output connections
-	running chan struct{}
-	hub		HubClientInteraction
-	info    ClientGame
-	meta    ClientInternalMeta
-	status  ConnectionStatus
-	wg      *sync.WaitGroup
-}
-
-func NewClient(id uint8, meta ClientMeta) *Client {
-	c := Client{
-		running: make(chan struct{}),
-		info:    NewClientGame(NewCoordinate()),
-		meta:    NewClientInternalMeta(id, meta),
-		status:  Offline,
-		wg:      &sync.WaitGroup{},
-	}
-	return &c
-}
-
-func (c *Client) registerConn(conn ClientMeta) {
-	c.meta = NewClientInternalMeta(c.meta.id, conn)
-	c.status = Active
-	// TODO: start receiving and sending here
-}
-
-func (c *Client) Shutdown(ctx context.Context) {
-	// TODO: log message of shutdown
-
-	logger.Debugf("Shutting down client [%d]", c.meta.eId)
-
-	// set the state of the client to shutting down
-	c.status = ShuttingDown
-	// set the state of the client to offline
-	defer func() { c.status = Offline }()
-
-	// make a channel on which, we can wait on.
-	runs := make(chan struct{})
-
-	// Make a waiter that will (hopefully) shutdown soon.
-	go func() {
-		// close the running event handler
-		close(c.running)
-		// wait until the workgroup reaches zero
-		c.wg.Wait()
-		close(runs)
-	}()
-
-	select {
-	case <-runs:
-		// TODO: log the a clean shutdown was a success
-		logger.Debugf("Shutdown of client [%d] complete", c.meta.eId)
-	case <-ctx.Done():
-		// TODO: log the a forced shutdown was made
-		logger.Debugf("forced shutdown of client [%d], due to timeout", c.meta.eId)
-	}
 }
 
 type ClientGame struct {
@@ -155,21 +95,140 @@ func NewClientInternalMeta(id uint8, client ClientMeta) ClientInternalMeta {
 	}
 }
 
-func (c *Client) ReadClient() () {
+type Client struct {
+	// is the one channel that controlls the
+	// input output connections
+	running  chan struct{}
+	hub      HubClientInteraction
+	info     ClientGame
+	meta     ClientInternalMeta
+	status   ConnectionStatus
+	isActive helpers.AtomicBool
+	wg       *sync.WaitGroup
+}
+
+func NewClient(id uint8, meta ClientMeta) *Client {
+	c := Client{
+		running:  make(chan struct{}),
+		info:     NewClientGame(NewCoordinate()),
+		meta:     NewClientInternalMeta(id, meta),
+		status:   Offline,
+		isActive: helpers.NewAtomicBool(false),
+		wg:       &sync.WaitGroup{},
+	}
+	return &c
+}
+
+func (c *Client) registerConn(conn ClientMeta) {
+	c.meta = NewClientInternalMeta(c.meta.id, conn)
+	c.status = Active
+	// TODO: start receiving and sending here
+}
+
+func (c *Client) Shutdown(ctx context.Context) {
+	// TODO: log message of shutdown
+
+	logger.Debugf("Shutting down client [%d]", c.meta.eId)
+
+	// set the state of the client to shutting down
+	c.status = ShuttingDown
+	// set the state of the client to offline
+	defer func() { c.status = Offline }()
+
+	// make a channel on which, we can wait on.
+	runs := make(chan struct{})
+
+	// Make a waiter that will (hopefully) shutdown soon.
+	go func() {
+		// close the running event handler
+		close(c.running)
+		// wait until the workgroup reaches zero
+		c.wg.Wait()
+		close(runs)
+	}()
+
+	select {
+	case <-runs:
+		// TODO: log the a clean shutdown was a success
+		logger.Debugf("Shutdown of client [%d] complete", c.meta.eId)
+	case <-ctx.Done():
+		// TODO: log the a forced shutdown was made
+		logger.Debugf("forced shutdown of client [%d], due to timeout", c.meta.eId)
+	}
+}
+
+func (c *Client) registerTimeout() {
+	// TODO: Timer
+	c.status = Timeout
+}
+
+func (c *Client) connectionReader() {
+	defer func() {
+		// Error here is not important as the connections already died
+		// before reaching this position.
+		_ = c.meta.conn.Close()
+		// set the isActive variable to false
+		// result is not important as here the status
+		// of the connection has to be per definition
+		// false.
+		_ = c.isActive.SetFalse()
+	}()
+
+readLoop:
 	for {
 		_, message, err := c.meta.conn.NextReader()
+
 		if err != nil {
-			// Error is useless because we know the client exists
-			_ = c.hub.UnregisterClient(c.meta.getMeta())
+			// as per definition
+			// Applications must break out of the application's read loop when this method returns
+			// a non-nil error value. Errors returned from this method are permanent. Once this
+			// method returns a non-nil error, all subsequent calls to this method return the same
+			// error
+			if err != nil {
+				// if there was an unexpected close error
+				// then the client has to be set to timeout
+				if websocket.IsCloseError(err, websocket.CloseNormalClosure) {
+					c.registerTimeout()
+					logger.Debugf("Client [%d] lost connection, setting to timeout", c.meta.id)
+				} else if websocket.IsCloseError(err,
+					websocket.CloseProtocolError, websocket.CloseNoStatusReceived,
+					websocket.CloseInvalidFramePayloadData,
+				) {
+					c.registerTimeout()
+					logger.Warnf("unexpected websocket clusure error received for client [%d] "+
+						"- see https://rfc-editor.org/rfc/rfc6455.html#section-11.7 for more information\n[%s]", c.meta.id, err.Error())
+				} else {
+					// error is unknown so unregister the client
+					c.status = ShuttingDown
+
+					c.hub.UnregisterClient(c.meta.getMeta())
+
+					logger.Warnf("unexpected error happend\n%s", err.Error())
+				}
+
+				break readLoop
+			}
 		}
-		t := [17]byte{}
-		readBytes, err := message.Read(t[:])
+		readData := [17]byte{}
+		readBytes, err := message.Read(readData[:])
+
 		if err != nil {
-			// TODO: Timer
-			c.status = Timeout
+			logger.Warnf("unexpected read error received.\n[%s]", err.Error())
 		}
-		c.handleRead(t[:readBytes])
+
+		// handle the gotten data on an other go thread
+		// as to not block the next readers
+		go c.handleRead(readData[:readBytes])
 	}
+}
+
+func (c *Client) ReadClient() {
+	// check if there already is an active worker
+	if !c.isActive.SetTrue() {
+		return
+	}
+	// run the go reader
+	go c.connectionReader()
 }
 
 func (c *Client) SendData(message protocol.Bytefy) {
@@ -178,7 +237,7 @@ func (c *Client) SendData(message protocol.Bytefy) {
 		// return error
 		_ = errors.New("something went wrong with creating NextWriter")
 	} else {
-		_, err = cw.Write(message.Bytes())
+		_, _ = cw.Write(message.Bytes())
 	}
 }
 
@@ -211,7 +270,7 @@ func (c *Client) handleRead(t []byte) {
 	}
 }
 
-func (c* Client) handleUnknownReceived(t []byte) {
+func (c *Client) handleUnknownReceived(t []byte) {
 	_, err := client.NewUnknownByte(t)
 	if err != nil {
 		logger.Info(err)
@@ -272,7 +331,7 @@ func (c *Client) handleShooting(t []byte) {
 	} else {
 		hit, player := c.hub.PlayerGotHit()
 		if hit {
-			newAnotherPlayerKilled := server.NewAnotherPlayerKilled(player.UserId())
+			newAnotherPlayerKilled := server.NewPlayerDeath(player.UserId(), c.meta.id)
 			c.SendData(newAnotherPlayerKilled)
 		}
 	}
@@ -301,5 +360,3 @@ func (c *Client) handleRequestPlayerKD(t []byte) {
 		c.SendData(newPlayersKD)
 	}
 }
-
-

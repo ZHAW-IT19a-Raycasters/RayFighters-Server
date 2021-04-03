@@ -1,6 +1,8 @@
 package room
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -9,11 +11,13 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.zhaw.ch/raycasters/server/protocol/server"
 )
 
 type Mockable struct {
 	funcNextReader func() (int, io.Reader, error)
 	funcNextWriter func(messageType int) (io.WriteCloser, error)
+	funcCloser     func() error
 }
 
 func (m *Mockable) NextReader() (int, io.Reader, error) {
@@ -24,28 +28,81 @@ func (m *Mockable) NextWriter(messageType int) (io.WriteCloser, error) {
 	return m.funcNextWriter(messageType)
 }
 
+func (m *Mockable) Close() error {
+	return m.funcCloser()
+}
+
 func newMockable() Mockable {
 	return Mockable{
 		funcNextReader: func() (int, io.Reader, error) {
-
 			return 0, nil, nil
 		},
 		funcNextWriter: func(messageType int) (io.WriteCloser, error) {
-
 			return nil, nil
+		},
+		funcCloser: func() error {
+			return nil
 		},
 	}
 }
 
-func getClientMeta() ClientMeta {
-	uuid := uuid.New()
-	name := "Hans"
-	// Prepare the mocked data
-	mock := newMockable()
+func newMockableWithWC() (*Mockable, *MockedWriteCloser) {
+	mc := newMockedWriteCloser()
+	m := newMockable()
+	m.funcNextWriter = func(messageType int) (io.WriteCloser, error) {
+		return &mc, nil
+	}
+	return &m, &mc
+}
 
+type MockedWriteCloser struct {
+	buffer *bytes.Buffer
+	cl     func() error
+	*bufio.Writer
+}
+
+func newMockedWriteCloser() MockedWriteCloser {
+	bff := new(bytes.Buffer)
+	cl := func() error { return nil }
+	bw := bufio.NewWriter(bff)
+	return MockedWriteCloser{
+		bff,
+		cl,
+		bw,
+	}
+}
+
+func (mwc *MockedWriteCloser) Close() error {
+	return mwc.cl()
+}
+
+func getClientMeta(i int) ClientMeta {
+	// as uuids should be unique, it makes no difference,
+	// if a new one is called here.
+	uuid := uuid.New()
+	name := fmt.Sprintf("id: %d", i)
+	mock := newMockable()
 	return NewClientMeta(uuid, name, &mock)
 }
 
+func compareByteSlices(expeced, gotten []byte, t *testing.T) bool {
+	if len(expeced) != len(gotten) {
+		t.Errorf("incorrect byte slice lenght exp: [%d], got: [%d]", len(expeced), len(gotten))
+		return false
+	}
+
+	for i := range expeced {
+		exp := expeced[i]
+		got := gotten[i]
+
+		if exp != got {
+			t.Errorf("Byte at position [%d] are not equal exp: [0x%X] - got: [0x%X]", i, exp, got)
+			return false
+		}
+	}
+
+	return true
+}
 func TestClientManagerAddClientSigle(t *testing.T) {
 	cm := newClientManager()
 
@@ -55,7 +112,7 @@ func TestClientManagerAddClientSigle(t *testing.T) {
 		return
 	}
 
-	clientMeta := getClientMeta()
+	clientMeta := getClientMeta(0)
 	err := cm.addClient(clientMeta)
 	if err != nil {
 		t.Errorf("An unexpected error occuered, while adding a new client\n[%s]", err.Error())
@@ -96,7 +153,7 @@ func TestClientManagerAddClientSigle(t *testing.T) {
 func TestClientManagerAddClientTwice(t *testing.T) {
 	cm := newClientManager()
 
-	clientMeta := getClientMeta()
+	clientMeta := getClientMeta(0)
 	err := cm.addClient(clientMeta)
 	if err != nil {
 		t.Errorf("An unexpected error occuered, while adding a new client\n[%s]", err.Error())
@@ -125,22 +182,11 @@ func TestClientManagerAddClientTwice(t *testing.T) {
 }
 
 func TestClientManagerMaxClients(t *testing.T) {
-	getMeta := func(i int) ClientMeta {
-
-		// as uuids should be unique, it makes no difference,
-		// if a new one is called here.
-		uuid := uuid.New()
-		name := fmt.Sprintf("id: %d", i)
-		mock := newMockable()
-
-		return NewClientMeta(uuid, name, &mock)
-	}
-
 	cm := newClientManager()
 
 	// no errors here
 	for i := 0; i <= math.MaxUint8; i += 1 {
-		meta := getMeta(i)
+		meta := getClientMeta(i)
 		err := cm.addClient(meta)
 
 		if err != nil {
@@ -156,7 +202,7 @@ func TestClientManagerMaxClients(t *testing.T) {
 
 	}
 	// add an additional client
-	meta := getMeta(256)
+	meta := getClientMeta(256)
 	err := cm.addClient(meta)
 	if err == nil {
 		t.Error("A client was added illigaly here.")
@@ -166,7 +212,7 @@ func TestClientManagerMaxClients(t *testing.T) {
 func TestClientManagerRemoveClients(t *testing.T) {
 	cm := newClientManager()
 
-	meta := getClientMeta()
+	meta := getClientMeta(0)
 
 	err := cm.removeClient(meta)
 	if err == nil {
@@ -214,23 +260,12 @@ func TestClientManagerRemoveClients(t *testing.T) {
 }
 
 func TestClientManagerShutdown(t *testing.T) {
-	getMeta := func(i int) ClientMeta {
-
-		// as uuids should be unique, it makes no difference,
-		// if a new one is called here.
-		uuid := uuid.New()
-		name := fmt.Sprintf("id: %d", i)
-		mock := newMockable()
-
-		return NewClientMeta(uuid, name, &mock)
-	}
-
 	cm := newClientManager()
 
 	// no errors here
 	for i := 0; i <= math.MaxUint8; i += 1 {
 		// assume this works
-		meta := getMeta(i)
+		meta := getClientMeta(i)
 		_ = cm.addClient(meta)
 
 	}
@@ -244,29 +279,17 @@ func TestClientManagerShutdown(t *testing.T) {
 			t.Errorf("incorrect state has been used ")
 		}
 	}
-
 	// TODO: test logger output - this needs code that
 	// currently is not merged into this branch
 }
 
 func TestClientManagerForceShutdown(t *testing.T) {
-	getMeta := func(i int) ClientMeta {
-
-		// as uuids should be unique, it makes no difference,
-		// if a new one is called here.
-		uuid := uuid.New()
-		name := fmt.Sprintf("id: %d", i)
-		mock := newMockable()
-
-		return NewClientMeta(uuid, name, &mock)
-	}
-
 	cm := newClientManager()
 
 	// no errors here
 	for i := 0; i <= math.MaxUint8; i += 1 {
 		// assume this works
-		meta := getMeta(i)
+		meta := getClientMeta(i)
 		_ = cm.addClient(meta)
 
 	}
@@ -294,19 +317,8 @@ func TestIncorrectAddClient(t *testing.T) {
 		}
 	}()
 
-	getMeta := func(i int) ClientMeta {
-
-		// as uuids should be unique, it makes no difference,
-		// if a new one is called here.
-		uuid := uuid.New()
-		name := fmt.Sprintf("id: %d", i)
-		mock := newMockable()
-
-		return NewClientMeta(uuid, name, &mock)
-	}
-
 	cm := newClientManager()
-	meta := getMeta(0)
+	meta := getClientMeta(0)
 	_ = cm.addClient(meta)
 
 	iId, _ := cm.mapId(meta)
@@ -327,19 +339,8 @@ func TestIncorrectRemoveClient(t *testing.T) {
 		}
 	}()
 
-	getMeta := func(i int) ClientMeta {
-
-		// as uuids should be unique, it makes no difference,
-		// if a new one is called here.
-		uuid := uuid.New()
-		name := fmt.Sprintf("id: %d", i)
-		mock := newMockable()
-
-		return NewClientMeta(uuid, name, &mock)
-	}
-
 	cm := newClientManager()
-	meta := getMeta(0)
+	meta := getClientMeta(0)
 	_ = cm.addClient(meta)
 
 	// forcefully push a value back onto the queue
@@ -350,4 +351,37 @@ func TestIncorrectRemoveClient(t *testing.T) {
 	}
 
 	_ = cm.removeClient(meta)
+}
+
+func TestBroadCast(t *testing.T) {
+
+	// add test clients
+	const ClientCount = 10
+	clients := make([]ClientMeta, ClientCount)
+	mocks := make([]*MockedWriteCloser, ClientCount)
+
+	manager := newClientManager()
+
+	for i := 0; i < ClientCount; i += 1 {
+		clients[i] = getClientMeta(i)
+		clients[i].conn, mocks[i] = newMockableWithWC()
+		err := manager.addClient(clients[i])
+		if err != nil {
+			t.Errorf("error happend, while adding a new client.\n%s", err.Error())
+			return
+		}
+	}
+
+	// broadCast this to all clients
+	opcode := server.NewDisconnect()
+	exp := opcode.Bytes()
+	manager.broadCast(opcode, []byte{})
+
+	// test that the broadcast was "send"
+	for _, mock := range mocks {
+		buff := mock.buffer.Bytes()
+		if !compareByteSlices(exp, buff, t) {
+			return
+		}
+	}
 }
