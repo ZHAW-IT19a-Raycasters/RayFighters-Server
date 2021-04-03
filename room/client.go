@@ -23,6 +23,7 @@ type ConnectionStatus uint
 
 const (
 	Active ConnectionStatus = iota
+	Registered
 	Timeout
 	ShuttingDown
 	Offline
@@ -30,7 +31,7 @@ const (
 
 func (c ConnectionStatus) String() string {
 	vals := [...]string{
-		"Active", "Timeout", "ShuttingDown", "Offline",
+		"Active", "Registered", "Timeout", "ShuttingDown", "Offline",
 	}
 	return vals[c]
 }
@@ -115,12 +116,32 @@ func NewClient(id uint8, meta ClientMeta) *Client {
 		isActive: helpers.NewAtomicBool(false),
 		wg:       &sync.WaitGroup{},
 	}
+
+	// register connection
+	c.registerConn(meta)
+
 	return &c
 }
 
-func (c *Client) registerConn(conn ClientMeta) {
+func (c *Client) registerConn(conn ClientMeta) error {
+	if c.status == Active || c.status == Registered {
+		return ErrClientReaderAlreadyActive
+	}
 	c.meta = NewClientInternalMeta(c.meta.id, conn)
-	c.ReadClient()
+
+	return nil
+}
+
+func (c *Client) Run() error {
+	// check if there already is an active worker
+	if !c.isActive.SetTrue() {
+		return ErrClientReaderAlreadyActive
+	}
+	c.status = Active
+
+	go c.recvData()
+
+	return nil
 }
 
 func (c *Client) Shutdown(ctx context.Context) {
@@ -155,16 +176,17 @@ func (c *Client) Shutdown(ctx context.Context) {
 	}
 }
 
+// registerTimeout will register the timeout in the timeout queue
 func (c *Client) registerTimeout() {
 	// TODO: Timer
 	c.status = Timeout
 }
 
-// connectionReader is the actuall function used to run the client read loop
+// recvData is the actuall function used to run the client read loop
 // it will also handle all the incomming opcode commands.
 // Attention this function is a blocking call, so be carefull, while
 // reading form it.
-func (c *Client) connectionReader() {
+func (c *Client) recvData() {
 	defer func() {
 		// Error here is not important as the connections already died
 		// before reaching this position.
@@ -222,18 +244,6 @@ readLoop:
 		// as to not block the next readers
 		go c.handleRead(readData[:readBytes])
 	}
-}
-
-func (c *Client) ReadClient() error {
-	// check if there already is an active worker
-	if !c.isActive.SetTrue() {
-		return ErrClientReaderAlreadyActive
-	}
-	c.status = Active
-	// run the go reader
-	go c.connectionReader()
-
-	return nil
 }
 
 func (c *Client) SendData(message protocol.Bytefy) error {

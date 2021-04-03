@@ -52,13 +52,13 @@ type Hub struct {
 // the data structures.
 func NewHub(hubId int) *Hub {
 	return &Hub{
-		input:    		make(chan ClientMeta),
-		output:   		make(chan ClientMeta),
-		shutdown: 		make(chan struct{}),
-		clientManager: 	newClientManager(),
-		id:       		hubId,
-		counter:  		helpers.NewAtomicUint32(HubClientLimit),
-		isActive: 		helpers.NewAtomicBool(false),
+		input:         make(chan ClientMeta),
+		output:        make(chan ClientMeta),
+		shutdown:      make(chan struct{}),
+		clientManager: newClientManager(),
+		id:            hubId,
+		counter:       helpers.NewAtomicUint32(HubClientLimit),
+		isActive:      helpers.NewAtomicBool(false),
 	}
 }
 
@@ -154,8 +154,6 @@ func (h *Hub) UnregisterClient(meta ClientMeta) error {
 // BroadCast will as the name implies broadcast a given
 // byte interface to a given client.
 func (h *Hub) BroadCast(msg protocol.Bytefy) {
-	// TODO: Add broadcast function that can be called from the clients
-	// TODO: figure out if this is the right path to take
 	h.clientManager.broadCast(msg, []byte{})
 }
 
@@ -177,7 +175,7 @@ func (h *Hub) removeClient(meta ClientMeta) {
 		// is previously checked that the client
 		// is only removed once, so the counter
 		// is ever ony decremented once.
-		h.counter.Dec()
+		_ = h.counter.Dec()
 	}
 }
 

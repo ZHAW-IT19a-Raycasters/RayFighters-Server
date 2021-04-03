@@ -15,6 +15,8 @@ import (
 )
 
 type Mockable struct {
+	mr             *MockedReader
+	mwc            *MockedWriteCloser
 	funcNextReader func() (int, io.Reader, error)
 	funcNextWriter func(messageType int) (io.WriteCloser, error)
 	funcCloser     func() error
@@ -33,26 +35,23 @@ func (m *Mockable) Close() error {
 }
 
 func newMockable() Mockable {
+	mr := newMockedReader()
+	mwc := newMockedWriteCloser()
+	pmr := &mr
+	pmwc := &mwc
 	return Mockable{
+		mr:  pmr,
+		mwc: pmwc,
 		funcNextReader: func() (int, io.Reader, error) {
-			return 0, nil, nil
+			return 0, pmr, nil
 		},
 		funcNextWriter: func(messageType int) (io.WriteCloser, error) {
-			return nil, nil
+			return pmwc, nil
 		},
 		funcCloser: func() error {
 			return nil
 		},
 	}
-}
-
-func newMockableWithWC() (*Mockable, *MockedWriteCloser) {
-	mc := newMockedWriteCloser()
-	m := newMockable()
-	m.funcNextWriter = func(messageType int) (io.WriteCloser, error) {
-		return &mc, nil
-	}
-	return &m, &mc
 }
 
 type MockedWriteCloser struct {
@@ -74,6 +73,16 @@ func newMockedWriteCloser() MockedWriteCloser {
 
 func (mwc *MockedWriteCloser) Close() error {
 	return mwc.cl()
+}
+
+type MockedReader struct {
+	*bytes.Buffer
+}
+
+func newMockedReader() MockedReader {
+	return MockedReader{
+		new(bytes.Buffer),
+	}
 }
 
 func getClientMeta(i int) ClientMeta {
@@ -358,18 +367,20 @@ func TestBroadCast(t *testing.T) {
 	// add test clients
 	const ClientCount = 10
 	clients := make([]ClientMeta, ClientCount)
-	mocks := make([]*MockedWriteCloser, ClientCount)
+	mocks := make([]*Mockable, ClientCount)
 
 	manager := newClientManager()
 
 	for i := 0; i < ClientCount; i += 1 {
 		clients[i] = getClientMeta(i)
-		clients[i].conn, mocks[i] = newMockableWithWC()
+		mocks[i] = clients[i].conn.(*Mockable)
 		err := manager.addClient(clients[i])
 		if err != nil {
 			t.Errorf("error happend, while adding a new client.\n%s", err.Error())
 			return
 		}
+
+		// do not start the clients
 	}
 
 	// broadCast this to all clients
@@ -379,7 +390,7 @@ func TestBroadCast(t *testing.T) {
 
 	// test that the broadcast was "send"
 	for _, mock := range mocks {
-		buff := mock.buffer.Bytes()
+		buff := mock.mwc.buffer.Bytes()
 		if !compareByteSlices(exp, buff, t) {
 			return
 		}

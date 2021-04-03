@@ -76,30 +76,39 @@ func (manager *clientManager) mapId(meta ClientMeta) (uint8, bool) {
 
 // addClient will add a new client to the manager, if the client has
 // once before been added, then the previous connection will be
-// replaced.
-// This will return an error, if there is no more space left in the given
-// room. Attention this will not return an error if the given client
-// already has a profile in the room.
+// replaced, as per definition a client can only reconnect,
+// over a new connection. If the client uuid already has a working
+// connection, an error will be returned.
+//
+// If there is no more space left in the client manager
+// this function will panic.
 func (manager *clientManager) addClient(meta ClientMeta) error {
-	// TODO: Check atomic counter for limit
 
 	// lock the hub, so that writing is okay
 	manager.lock.Lock()
 	defer manager.lock.Unlock()
+
 	// check if client ID already exists.
 	if id, ok := manager.mapId(meta); ok {
 		// the person already exisited in the Hub
 		// add him back
-		if val, ok := manager.clients[id]; ok {
+		if client, ok := manager.clients[id]; ok {
 			// get client
-			val.registerConn(meta)
+			err := client.registerConn(meta)
+
+			if err != nil {
+				return err
+			}
+
+			// start the client
+			client.Run()
+
 		} else {
 			// There was a programming error, never is it allowed that the client
 			// is empty.
 			panic("On an existing UUID mapping did a client not exist.")
 		}
 	} else {
-
 		// a new client
 		// get the new ID for the client
 		id, err := manager.idManager.Pop()
@@ -118,6 +127,9 @@ func (manager *clientManager) addClient(meta ClientMeta) error {
 		// create the client with the correct information
 		client := NewClient(id, meta)
 		manager.clients[id] = client
+
+		// start the client
+		client.Run()
 	}
 	return nil
 }
