@@ -111,7 +111,6 @@ func NewClient(id uint8, meta ClientMeta) *Client {
 	c := Client{
 		running:  make(chan struct{}),
 		info:     NewClientGame(NewCoordinate()),
-		meta:     NewClientInternalMeta(id, meta),
 		status:   Offline,
 		isActive: helpers.NewAtomicBool(false),
 		wg:       &sync.WaitGroup{},
@@ -121,8 +120,7 @@ func NewClient(id uint8, meta ClientMeta) *Client {
 
 func (c *Client) registerConn(conn ClientMeta) {
 	c.meta = NewClientInternalMeta(c.meta.id, conn)
-	c.status = Active
-	// TODO: start receiving and sending here
+	c.ReadClient()
 }
 
 func (c *Client) Shutdown(ctx context.Context) {
@@ -162,6 +160,10 @@ func (c *Client) registerTimeout() {
 	c.status = Timeout
 }
 
+// connectionReader is the actuall function used to run the client read loop
+// it will also handle all the incomming opcode commands.
+// Attention this function is a blocking call, so be carefull, while
+// reading form it.
 func (c *Client) connectionReader() {
 	defer func() {
 		// Error here is not important as the connections already died
@@ -222,16 +224,22 @@ readLoop:
 	}
 }
 
-func (c *Client) ReadClient() {
+func (c *Client) ReadClient() error {
 	// check if there already is an active worker
 	if !c.isActive.SetTrue() {
-		return
+		return ErrClientReaderAlreadyActive
 	}
+	c.status = Active
 	// run the go reader
 	go c.connectionReader()
+
+	return nil
 }
 
-func (c *Client) SendData(message protocol.Bytefy) {
+func (c *Client) SendData(message protocol.Bytefy) error {
+	if !c.isActive.Get() {
+		return ErrClientReaderAlreadyActive
+	}
 	cw, err := c.meta.conn.NextWriter(1)
 	if err != nil {
 		// return error
@@ -239,6 +247,7 @@ func (c *Client) SendData(message protocol.Bytefy) {
 	} else {
 		_, _ = cw.Write(message.Bytes())
 	}
+	return nil
 }
 
 func (c *Client) handleRead(t []byte) {
