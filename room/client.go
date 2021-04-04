@@ -97,25 +97,21 @@ func NewClientInternalMeta(id uint8, client ClientMeta) ClientInternalMeta {
 }
 
 type Client struct {
-	// is the one channel that controlls the
-	// input output connections
-	running  chan struct{}
 	hub      HubClientInteraction
 	info     ClientGame
 	meta     ClientInternalMeta
 	status   ConnectionStatus
 	isActive helpers.AtomicBool
-	wg       *sync.WaitGroup
+	wg       sync.WaitGroup
 }
 
 func NewClient(id uint8, meta ClientMeta, hub HubClientInteraction) *Client {
 	c := Client{
-		running:  make(chan struct{}),
 		info:     NewClientGame(NewCoordinate()),
 		hub:      hub,
 		status:   Offline,
 		isActive: helpers.NewAtomicBool(false),
-		wg:       &sync.WaitGroup{},
+		wg:       sync.WaitGroup{},
 	}
 
 	// register connection
@@ -138,8 +134,6 @@ func (c *Client) Run() error {
 	if !c.isActive.SetTrue() {
 		return ErrClientReaderAlreadyActive
 	}
-	c.wg.Add(1)
-	c.status = Active
 
 	go c.recvData()
 
@@ -147,8 +141,6 @@ func (c *Client) Run() error {
 }
 
 func (c *Client) Shutdown(ctx context.Context) {
-	// TODO: log message of shutdown
-
 	logger.Debugf("Shutting down client [%d]", c.meta.eId)
 
 	// set the state of the client to shutting down
@@ -156,15 +148,21 @@ func (c *Client) Shutdown(ctx context.Context) {
 	// set the state of the client to offline
 	defer func() { c.status = Offline }()
 
+	// send the deconnect opcode
+	// ignore error as it is not important
+	_ = c.SendData(server.NewDisconnect())
+
 	// make a channel on which, we can wait on.
 	runs := make(chan struct{})
 
 	// Make a waiter that will (hopefully) shutdown soon.
 	go func() {
-		// close the running event handler
-		close(c.running)
+		// close the connection
+		c.meta.conn.Close()
+
 		// wait until the workgroup reaches zero
 		c.wg.Wait()
+		// toggle the completed shutdown cannel
 		close(runs)
 	}()
 
@@ -215,51 +213,55 @@ func (c *Client) recvData() {
 		// result is not important as here the status
 		// of the connection has to be per definition
 		// false.
-		_ = c.isActive.SetFalse()
+		c.isActive.SetFalse()
 		// remove the thread from the waitgroup
 		c.wg.Done()
 	}()
+	// setup the states
+	c.wg.Add(1)
+	c.status = Active
 
-readLoop:
+mainLoop:
 	for {
 		_, message, err := c.meta.conn.NextReader()
 
+		// as per definition
+		// Applications must break out of the application's read loop when this method returns
+		// a non-nil error value. Errors returned from this method are permanent. Once this
+		// method returns a non-nil error, all subsequent calls to this method return the same
+		// error
 		if err != nil {
-			// as per definition
-			// Applications must break out of the application's read loop when this method returns
-			// a non-nil error value. Errors returned from this method are permanent. Once this
-			// method returns a non-nil error, all subsequent calls to this method return the same
-			// error
-			if err != nil {
-				// if there was an unexpected close error
-				// then the client has to be set to timeout
-				if websocket.IsCloseError(err, websocket.CloseNormalClosure) {
-					c.registerTimeout()
-					logger.Debugf("Client [%d] lost connection, setting to timeout", c.meta.id)
-				} else if websocket.IsCloseError(err,
-					websocket.CloseProtocolError, websocket.CloseNoStatusReceived,
-					websocket.CloseInvalidFramePayloadData,
-				) {
-					c.registerTimeout()
-					logger.Warnf("unexpected websocket clusure error received for client [%d] "+
-						"- see https://rfc-editor.org/rfc/rfc6455.html#section-11.7 for more information\n[%s]", c.meta.id, err.Error())
-				} else {
-					// error is unknown so unregister the client
-					c.status = ShuttingDown
+			// if there was an unexpected close error
+			// then the client has to be set to timeout
+			/*if websocket.IsCloseError(err, websocket.CloseNormalClosure) {
+				c.registerTimeout()
+				logger.Debugf("Client [%d] lost connection, setting to timeout", c.meta.id)
+			} else */if websocket.IsCloseError(err,
+				websocket.CloseProtocolError, websocket.CloseNoStatusReceived,
+				websocket.CloseInvalidFramePayloadData,
+			) {
+				c.registerTimeout()
+				logger.Warnf("unexpected websocket clusure error received for client [%d] "+
+					"- see https://rfc-editor.org/rfc/rfc6455.html#section-11.7 for more information\n[%s]", c.meta.id, err.Error())
+			} else {
+				// error is unknown so unregister the client
+				c.status = ShuttingDown
 
-					c.hub.UnregisterClient(c.meta.getMeta())
+				c.hub.UnregisterClient(c.meta.getMeta())
 
-					logger.Warnf("unexpected error happend\n%s", err.Error())
-				}
-
-				break readLoop
+				logger.Warnf("unexpected error happend\n%s", err.Error())
 			}
+
+			// break out of the endless loop directly to a shutdown
+			break mainLoop
 		}
+
 		readData := [17]byte{}
 		readBytes, err := message.Read(readData[:])
 
 		if readBytes == 0 {
 			logger.Warn("empty package received")
+			return
 		}
 
 		if err != nil {
@@ -322,6 +324,8 @@ func (c *Client) handleDisconnect(t []byte) {
 	} else {
 		newDisconnect := server.NewDisconnect()
 		c.SendData(newDisconnect)
+
+		c.hub.UnregisterClient(c.meta.getMeta())
 	}
 }
 

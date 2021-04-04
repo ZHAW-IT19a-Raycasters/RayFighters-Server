@@ -142,9 +142,9 @@ func (manager *clientManager) addClient(meta ClientMeta) error {
 func (manager *clientManager) removeClient(meta ClientMeta) error {
 	id, ok := manager.mapId(meta)
 	if !ok {
-		// TODO: return a fitting error
 		return ErrClientDoesntExist{meta}
 	}
+
 	val := manager.clients[id]
 
 	// make sure it is shutdown, at most wait for the timout
@@ -161,6 +161,7 @@ func (manager *clientManager) removeClient(meta ClientMeta) error {
 
 	// this is run in an internal function, as to
 	// keep the lock for as short as possible
+	// due to the waiter possibly waiting for about 1s
 	remove := func() {
 		// lock the system and remove stuff,
 		// try to keep the lock for as short as possible
@@ -174,6 +175,7 @@ func (manager *clientManager) removeClient(meta ClientMeta) error {
 	remove()
 
 	<-waiter
+
 	cancel()
 
 	// remove client from manager
@@ -183,23 +185,27 @@ func (manager *clientManager) removeClient(meta ClientMeta) error {
 	// try to keep the lock for as short as possible
 	manager.lock.Lock()
 	defer manager.lock.Unlock()
-	// free the id as the last point, so that only at the end of the process
+	// free the id as the last point
+	// at the end of the process
+	// so to never have a double entry
+	// with the same internal id
 	//
 	// add it back to the queue
 	err := manager.idManager.Push(id)
 
 	if err != nil {
-		str := fmt.Sprintf(
-			"if there was a panic here, there was a programming error"+
-				"caused by incorrect id management.\n[%s]",
-			err.Error(),
-		)
+		// if there was a panic here, there was a programming error
+		// caused by incorrect id management
+		str := fmt.Sprintf("id has already been freed.\n[%s]", err.Error())
 		panic(str)
 	}
 
 	return nil
 }
 
+// shutdown is a completed shutdown of all the client manager
+// there is no way to restart a manager, as to speed up the shutdown
+// the clients will only partially be deregistered.
 func (manager *clientManager) shutdown(cxt context.Context) {
 	// Will tell all the clients to shutdown in the given shutdown time.
 	childCxt, chancelCxt := context.WithTimeout(cxt, ClientShutdownTime)

@@ -69,8 +69,8 @@ func (counter *AtomicBool) SetTrue() bool {
 	return atomic.CompareAndSwapUint32(&counter.value, False, True)
 }
 
-// SetTrue will set the value to true and if there was a change to the value
-// will return true, else false.
+// SetFalse will set the value to false and if there was a change to
+// the value will return true, else false.
 func (counter *AtomicBool) SetFalse() bool {
 	// if there was a swap => false to True
 	// this will return true, else false
