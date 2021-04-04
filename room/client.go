@@ -108,10 +108,11 @@ type Client struct {
 	wg       *sync.WaitGroup
 }
 
-func NewClient(id uint8, meta ClientMeta) *Client {
+func NewClient(id uint8, meta ClientMeta, hub HubClientInteraction) *Client {
 	c := Client{
 		running:  make(chan struct{}),
 		info:     NewClientGame(NewCoordinate()),
+		hub:      hub,
 		status:   Offline,
 		isActive: helpers.NewAtomicBool(false),
 		wg:       &sync.WaitGroup{},
@@ -137,6 +138,7 @@ func (c *Client) Run() error {
 	if !c.isActive.SetTrue() {
 		return ErrClientReaderAlreadyActive
 	}
+	c.wg.Add(1)
 	c.status = Active
 
 	go c.recvData()
@@ -176,10 +178,28 @@ func (c *Client) Shutdown(ctx context.Context) {
 	}
 }
 
+func (c *Client) SendData(message protocol.Bytefy) error {
+	if !c.isActive.Get() {
+		return ErrClientReaderAlreadyActive
+	}
+	cw, err := c.meta.conn.NextWriter(1)
+	if err != nil {
+		// return error
+		_ = errors.New("something went wrong with creating NextWriter")
+	} else {
+		_, _ = cw.Write(message.Bytes())
+	}
+	return nil
+}
+
 // registerTimeout will register the timeout in the timeout queue
 func (c *Client) registerTimeout() {
 	// TODO: Timer
 	c.status = Timeout
+	// close the connection
+	_ = c.meta.conn.Close()
+	// set the activity state to false
+	_ = c.isActive.SetFalse()
 }
 
 // recvData is the actuall function used to run the client read loop
@@ -196,6 +216,8 @@ func (c *Client) recvData() {
 		// of the connection has to be per definition
 		// false.
 		_ = c.isActive.SetFalse()
+		// remove the thread from the waitgroup
+		c.wg.Done()
 	}()
 
 readLoop:
@@ -236,6 +258,10 @@ readLoop:
 		readData := [17]byte{}
 		readBytes, err := message.Read(readData[:])
 
+		if readBytes == 0 {
+			logger.Warn("empty package received")
+		}
+
 		if err != nil {
 			logger.Warnf("unexpected read error received.\n[%s]", err.Error())
 		}
@@ -246,46 +272,32 @@ readLoop:
 	}
 }
 
-func (c *Client) SendData(message protocol.Bytefy) error {
-	if !c.isActive.Get() {
-		return ErrClientReaderAlreadyActive
-	}
-	cw, err := c.meta.conn.NextWriter(1)
-	if err != nil {
-		// return error
-		_ = errors.New("something went wrong with creating NextWriter")
-	} else {
-		_, _ = cw.Write(message.Bytes())
-	}
-	return nil
-}
-
-func (c *Client) handleRead(t []byte) {
-	switch client.Detect(t[0]) {
+func (c *Client) handleRead(data []byte) {
+	switch client.Detect(data[0]) {
 	case client.DisconnectOpcode:
 		// Received a Disconnect request from client
-		c.handleDisconnect(t)
+		c.handleDisconnect(data)
 	case client.UnknownOpcode:
 		// Client received Unknown request from Server
-		c.handleUnknownSent(t)
+		c.handleUnknownSent(data)
 	case client.WhoAmIOpcode:
 		// Received a WhoAmI request from client
-		c.handleWhoAmI(t)
+		c.handleWhoAmI(data)
 	case client.MovementOpcode:
 		// Received a Movement request from client
-		c.handleMovement(t)
+		c.handleMovement(data)
 	case client.ShootingOpcode:
 		// Received a Shooting request from client
-		c.handleShooting(t)
+		c.handleShooting(data)
 	case client.RequestOtherPlayersOpcode:
 		// Received a RequestOtherPlayers request from client
-		c.handleRequestOtherPlayer(t)
+		c.handleRequestOtherPlayer(data)
 	case client.RequestPlayerKDOpcode:
 		// Received a RequestOtherPlayers request from client
-		c.handleRequestOtherPlayer(t)
+		c.handleRequestOtherPlayer(data)
 	default:
 		// Received Unknown Code from client
-		c.handleUnknownReceived(t)
+		c.handleUnknownReceived(data)
 	}
 }
 

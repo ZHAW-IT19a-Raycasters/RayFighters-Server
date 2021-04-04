@@ -51,15 +51,32 @@ type Hub struct {
 // The hubId needs to be unique over all
 // the data structures.
 func NewHub(hubId int) *Hub {
-	return &Hub{
-		input:         make(chan ClientMeta),
-		output:        make(chan ClientMeta),
-		shutdown:      make(chan struct{}),
-		clientManager: newClientManager(),
-		id:            hubId,
-		counter:       helpers.NewAtomicUint32(HubClientLimit),
-		isActive:      helpers.NewAtomicBool(false),
+	h := &Hub{
+		input:    make(chan ClientMeta),
+		output:   make(chan ClientMeta),
+		shutdown: make(chan struct{}),
+		id:       hubId,
+		counter:  helpers.NewAtomicUint32(HubClientLimit),
+		isActive: helpers.NewAtomicBool(false),
 	}
+	h.clientManager = newClientManager(h)
+	return h
+}
+
+func (h *Hub) PlayerGotHit() (bool, server.Player) {
+	// TODO: implement the player got hit interface
+	// figure out if this is the correct path for
+	// comminication
+	return false, server.NewPlayer(0, "")
+}
+
+func (h *Hub) PlayersKD() []server.PlayerKD {
+	// TODO: implement this
+	// figure out if this is the correct path
+	// for communication between the client
+	// and the hub
+
+	return []server.PlayerKD{}
 }
 
 // IsAlive will check if the current hub is running or not.

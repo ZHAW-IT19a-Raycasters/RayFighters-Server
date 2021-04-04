@@ -11,8 +11,49 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/gorilla/websocket"
 	"github.zhaw.ch/raycasters/server/protocol/server"
 )
+
+type MockedHubClientInteraction struct {
+	funcAllPlayers       func() []server.Player
+	funcPlayerGotHit     func() (bool, server.Player)
+	funcPlayerKD         func() []server.PlayerKD
+	funcUnregisterClient func(meta ClientMeta) error
+}
+
+func (m *MockedHubClientInteraction) GetAllPlayers() []server.Player {
+	return m.funcAllPlayers()
+}
+
+func (m *MockedHubClientInteraction) PlayerGotHit() (bool, server.Player) {
+	return m.funcPlayerGotHit()
+}
+
+func (m *MockedHubClientInteraction) PlayersKD() []server.PlayerKD {
+	return m.funcPlayerKD()
+}
+
+func (m *MockedHubClientInteraction) UnregisterClient(meta ClientMeta) error {
+	return m.UnregisterClient(meta)
+}
+
+func newMockedHubClientInteraction() MockedHubClientInteraction {
+	return MockedHubClientInteraction{
+		funcAllPlayers: func() []server.Player {
+			return []server.Player{}
+		},
+		funcPlayerGotHit: func() (bool, server.Player) {
+			return false, server.NewPlayer(0, "")
+		},
+		funcPlayerKD: func() []server.PlayerKD {
+			return []server.PlayerKD{}
+		},
+		funcUnregisterClient: func(meta ClientMeta) error {
+			return nil
+		},
+	}
+}
 
 type Mockable struct {
 	mr             *MockedReader
@@ -31,6 +72,13 @@ func (m *Mockable) NextWriter(messageType int) (io.WriteCloser, error) {
 }
 
 func (m *Mockable) Close() error {
+	// replace the next func reader and next writer with error returning versions
+	m.funcNextReader = func() (int, io.Reader, error) {
+		return 0, nil, websocket.ErrCloseSent
+	}
+	m.funcNextWriter = func(messageType int) (io.WriteCloser, error) {
+		return nil, websocket.ErrCloseSent
+	}
 	return m.funcCloser()
 }
 
@@ -43,10 +91,10 @@ func newMockable() Mockable {
 		mr:  pmr,
 		mwc: pmwc,
 		funcNextReader: func() (int, io.Reader, error) {
-			return 0, pmr, nil
+			return 0, nil, websocket.ErrCloseSent
 		},
 		funcNextWriter: func(messageType int) (io.WriteCloser, error) {
-			return pmwc, nil
+			return nil, websocket.ErrCloseSent
 		},
 		funcCloser: func() error {
 			return nil
@@ -113,7 +161,8 @@ func compareByteSlices(expeced, gotten []byte, t *testing.T) bool {
 	return true
 }
 func TestClientManagerAddClientSigle(t *testing.T) {
-	cm := newClientManager()
+	hubMock := newMockedHubClientInteraction()
+	cm := newClientManager(&hubMock)
 
 	// make sure size starts at 0
 	if cm.size() != 0 {
@@ -157,10 +206,13 @@ func TestClientManagerAddClientSigle(t *testing.T) {
 	} else if client.meta.name != clientMeta.name {
 		t.Error("Wrong name has been used, while mapping.")
 	}
+
+	// wait un
 }
 
 func TestClientManagerAddClientTwice(t *testing.T) {
-	cm := newClientManager()
+	hubMock := newMockedHubClientInteraction()
+	cm := newClientManager(&hubMock)
 
 	clientMeta := getClientMeta(0)
 	err := cm.addClient(clientMeta)
@@ -169,8 +221,20 @@ func TestClientManagerAddClientTwice(t *testing.T) {
 		return
 	}
 
+	// adding a connection, while client conn is still active
 	mock := newMockable()
 	clientMeta.conn = &mock
+
+	err = cm.addClient(clientMeta)
+	if err == nil {
+		t.Errorf("An unexpected error occuered, while adding a new client\n[%s]", err.Error())
+		return
+	}
+
+	// force the client to be in a timeout state
+	id, _ := cm.mapId(clientMeta)
+	val := cm.clients[id]
+	val.registerTimeout()
 
 	err = cm.addClient(clientMeta)
 	if err != nil {
@@ -191,7 +255,8 @@ func TestClientManagerAddClientTwice(t *testing.T) {
 }
 
 func TestClientManagerMaxClients(t *testing.T) {
-	cm := newClientManager()
+	hubMock := newMockedHubClientInteraction()
+	cm := newClientManager(&hubMock)
 
 	// no errors here
 	for i := 0; i <= math.MaxUint8; i += 1 {
@@ -219,7 +284,8 @@ func TestClientManagerMaxClients(t *testing.T) {
 }
 
 func TestClientManagerRemoveClients(t *testing.T) {
-	cm := newClientManager()
+	hubMock := newMockedHubClientInteraction()
+	cm := newClientManager(&hubMock)
 
 	meta := getClientMeta(0)
 
@@ -269,7 +335,8 @@ func TestClientManagerRemoveClients(t *testing.T) {
 }
 
 func TestClientManagerShutdown(t *testing.T) {
-	cm := newClientManager()
+	hubMock := newMockedHubClientInteraction()
+	cm := newClientManager(&hubMock)
 
 	// no errors here
 	for i := 0; i <= math.MaxUint8; i += 1 {
@@ -293,7 +360,8 @@ func TestClientManagerShutdown(t *testing.T) {
 }
 
 func TestClientManagerForceShutdown(t *testing.T) {
-	cm := newClientManager()
+	hubMock := newMockedHubClientInteraction()
+	cm := newClientManager(&hubMock)
 
 	// no errors here
 	for i := 0; i <= math.MaxUint8; i += 1 {
@@ -326,7 +394,8 @@ func TestIncorrectAddClient(t *testing.T) {
 		}
 	}()
 
-	cm := newClientManager()
+	hubMock := newMockedHubClientInteraction()
+	cm := newClientManager(&hubMock)
 	meta := getClientMeta(0)
 	_ = cm.addClient(meta)
 
@@ -348,7 +417,8 @@ func TestIncorrectRemoveClient(t *testing.T) {
 		}
 	}()
 
-	cm := newClientManager()
+	hubMock := newMockedHubClientInteraction()
+	cm := newClientManager(&hubMock)
 	meta := getClientMeta(0)
 	_ = cm.addClient(meta)
 
@@ -369,7 +439,8 @@ func TestBroadCast(t *testing.T) {
 	clients := make([]ClientMeta, ClientCount)
 	mocks := make([]*Mockable, ClientCount)
 
-	manager := newClientManager()
+	hubMock := newMockedHubClientInteraction()
+	manager := newClientManager(&hubMock)
 
 	for i := 0; i < ClientCount; i += 1 {
 		clients[i] = getClientMeta(i)
