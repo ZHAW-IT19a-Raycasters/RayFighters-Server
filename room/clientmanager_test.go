@@ -365,10 +365,11 @@ func TestBroadCast(t *testing.T) {
 
 	for i := 0; i < ClientCount; i += 1 {
 		clients[i] = getClientMeta(i)
-		mocks[i] = clients[i].conn.(*MockedConnection)
+		tmp := clients[i].conn.(*MockedConnection)
+		mocks[i] = tmp
 		// change the func in the mock to write into the mocked reader
 		mocks[i].funcNextWriter = func(messageType int) (io.WriteCloser, error) {
-			return mocks[i].mwc, nil
+			return tmp.mwc, nil
 		}
 
 		err := manager.addClient(clients[i])
