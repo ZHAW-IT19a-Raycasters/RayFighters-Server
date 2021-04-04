@@ -1,8 +1,6 @@
 package room
 
 import (
-	"bufio"
-	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -11,138 +9,29 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/gorilla/websocket"
 	"github.zhaw.ch/raycasters/server/protocol/server"
 )
-
-type MockedHubClientInteraction struct {
-	funcAllPlayers       func() []server.Player
-	funcPlayerGotHit     func() (bool, server.Player)
-	funcPlayerKD         func() []server.PlayerKD
-	funcUnregisterClient func(meta ClientMeta) error
-}
-
-func (m *MockedHubClientInteraction) GetAllPlayers() []server.Player {
-	return m.funcAllPlayers()
-}
-
-func (m *MockedHubClientInteraction) PlayerGotHit() (bool, server.Player) {
-	return m.funcPlayerGotHit()
-}
-
-func (m *MockedHubClientInteraction) PlayersKD() []server.PlayerKD {
-	return m.funcPlayerKD()
-}
-
-func (m *MockedHubClientInteraction) UnregisterClient(meta ClientMeta) error {
-	return m.funcUnregisterClient(meta)
-}
-
-func newMockedHubClientInteraction() MockedHubClientInteraction {
-	return MockedHubClientInteraction{
-		funcAllPlayers: func() []server.Player {
-			return []server.Player{}
-		},
-		funcPlayerGotHit: func() (bool, server.Player) {
-			return false, server.NewPlayer(0, "")
-		},
-		funcPlayerKD: func() []server.PlayerKD {
-			return []server.PlayerKD{}
-		},
-		funcUnregisterClient: func(meta ClientMeta) error {
-			return nil
-		},
-	}
-}
-
-type Mockable struct {
-	mr             *MockedReader
-	mwc            *MockedWriteCloser
-	funcNextReader func() (int, io.Reader, error)
-	funcNextWriter func(messageType int) (io.WriteCloser, error)
-	funcCloser     func() error
-}
-
-func (m *Mockable) NextReader() (int, io.Reader, error) {
-	return m.funcNextReader()
-}
-
-func (m *Mockable) NextWriter(messageType int) (io.WriteCloser, error) {
-	return m.funcNextWriter(messageType)
-}
-
-func (m *Mockable) Close() error {
-	// replace the next func reader and next writer with error returning versions
-	m.funcNextReader = func() (int, io.Reader, error) {
-		return 0, nil, websocket.ErrCloseSent
-	}
-	m.funcNextWriter = func(messageType int) (io.WriteCloser, error) {
-		return nil, websocket.ErrCloseSent
-	}
-	return m.funcCloser()
-}
-
-func newMockable() Mockable {
-	mr := newMockedReader()
-	mwc := newMockedWriteCloser()
-	pmr := &mr
-	pmwc := &mwc
-	return Mockable{
-		mr:  pmr,
-		mwc: pmwc,
-		funcNextReader: func() (int, io.Reader, error) {
-			return 0, nil, websocket.ErrCloseSent
-		},
-		funcNextWriter: func(messageType int) (io.WriteCloser, error) {
-			return nil, websocket.ErrCloseSent
-		},
-		funcCloser: func() error {
-			return nil
-		},
-	}
-}
-
-type MockedWriteCloser struct {
-	buffer *bytes.Buffer
-	cl     func() error
-	*bufio.Writer
-}
-
-func newMockedWriteCloser() MockedWriteCloser {
-	bff := new(bytes.Buffer)
-	cl := func() error { return nil }
-	bw := bufio.NewWriter(bff)
-	return MockedWriteCloser{
-		bff,
-		cl,
-		bw,
-	}
-}
-
-func (mwc *MockedWriteCloser) Close() error {
-	return mwc.cl()
-}
-
-type MockedReader struct {
-	*bytes.Buffer
-}
-
-func newMockedReader() MockedReader {
-	return MockedReader{
-		new(bytes.Buffer),
-	}
-}
 
 func getClientMeta(i int) ClientMeta {
 	// as uuids should be unique, it makes no difference,
 	// if a new one is called here.
 	uuid := uuid.New()
 	name := fmt.Sprintf("id: %d", i)
-	mock := newMockable()
+	mock := newMockedConnection()
 	return NewClientMeta(uuid, name, &mock)
 }
 
 func compareByteSlices(expeced, gotten []byte, t *testing.T) bool {
+	if gotten == nil {
+		t.Error("gotten bytes are nil")
+		return false
+	}
+
+	if expeced == nil {
+		t.Error("exptected bytes are nil")
+		return false
+	}
+
 	if len(expeced) != len(gotten) {
 		t.Errorf("incorrect byte slice lenght exp: [%d], got: [%d]", len(expeced), len(gotten))
 		return false
@@ -224,7 +113,7 @@ func TestClientManagerAddClientTwice(t *testing.T) {
 	}
 
 	// adding a connection, while client conn is still active
-	mock := newMockable()
+	mock := newMockedConnection()
 	clientMeta.conn = &mock
 
 	err = cm.addClient(clientMeta)
@@ -468,7 +357,7 @@ func TestBroadCast(t *testing.T) {
 	// add test clients
 	const ClientCount = 10
 	clients := make([]ClientMeta, ClientCount)
-	mocks := make([]*Mockable, ClientCount)
+	mocks := make([]*MockedConnection, ClientCount)
 
 	hubMock := newMockedHubClientInteraction()
 	manager := newClientManager(&hubMock)
@@ -476,24 +365,44 @@ func TestBroadCast(t *testing.T) {
 
 	for i := 0; i < ClientCount; i += 1 {
 		clients[i] = getClientMeta(i)
-		mocks[i] = clients[i].conn.(*Mockable)
+		mocks[i] = clients[i].conn.(*MockedConnection)
+		// change the func in the mock to write into the mocked reader
+		mocks[i].funcNextWriter = func(messageType int) (io.WriteCloser, error) {
+			return mocks[i].mwc, nil
+		}
+
 		err := manager.addClient(clients[i])
 		if err != nil {
 			t.Errorf("error happend, while adding a new client.\n%s", err.Error())
 			return
 		}
-
-		// do not start the clients
 	}
 
 	// broadCast this to all clients
+	// this is the case where all the clients are offline
 	opcode := server.NewDisconnect()
 	exp := opcode.Bytes()
-	manager.broadCast(opcode, []byte{})
+	manager.broadCast(opcode, []uint8{})
 
 	// test that the broadcast was "send"
 	for _, mock := range mocks {
-		buff := mock.mwc.buffer.Bytes()
+		buff := mock.mwc.Bytes()
+		if len(buff) != 0 {
+			t.Error("should be empty")
+			return
+		}
+	}
+
+	// reactivate the clients for the test
+	for _, client := range manager.clients {
+		client.status = Active
+	}
+
+	manager.broadCast(opcode, []uint8{})
+
+	// test that the broadcast was "send"
+	for _, mock := range mocks {
+		buff := mock.mwc.Bytes()
 		if !compareByteSlices(exp, buff, t) {
 			return
 		}

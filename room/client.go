@@ -182,11 +182,11 @@ func (c *Client) SendData(message protocol.Bytefy) error {
 	}
 	cw, err := c.meta.conn.NextWriter(1)
 	if err != nil {
+		// TODO: create a fixed error
 		// return error
-		_ = errors.New("something went wrong with creating NextWriter")
-	} else {
-		_, _ = cw.Write(message.Bytes())
+		return errors.New("something went wrong with creating NextWriter")
 	}
+	_, _ = cw.Write(message.Bytes())
 	return nil
 }
 
