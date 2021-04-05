@@ -361,7 +361,6 @@ func TestBroadCast(t *testing.T) {
 
 	hubMock := newMockedHubClientInteraction()
 	manager := newClientManager(&hubMock)
-	defer manager.shutdown(context.Background())
 
 	for i := 0; i < ClientCount; i += 1 {
 		clients[i] = getClientMeta(i)
@@ -379,24 +378,52 @@ func TestBroadCast(t *testing.T) {
 		}
 	}
 
+	manager.shutdown(context.Background())
+
+	for _, mock := range mocks {
+		mock.mwc.Reset()
+	}
+
 	// broadCast this to all clients
 	// this is the case where all the clients are offline
 	opcode := server.NewDisconnect()
 	exp := opcode.Bytes()
 	manager.broadCast(opcode, []uint8{})
 
-	// test that the broadcast was "send"
+	// test that the broadcast was not "send"
+	// as all the clients are fully deactivated
 	for _, mock := range mocks {
 		buff := mock.mwc.Bytes()
 		if len(buff) != 0 {
 			t.Error("should be empty")
 			return
 		}
+		mock.mwc.Reset()
 	}
 
 	// reactivate the clients for the test
 	for _, client := range manager.clients {
 		client.status = Active
+	}
+
+	manager.broadCast(opcode, []uint8{})
+
+	// test that the broadcast was not "send"
+	// as all the clients are not "isActive"
+	for _, mock := range mocks {
+		buff := mock.mwc.Bytes()
+		if len(buff) != 0 {
+			t.Error("should be empty")
+			return
+		}
+		mock.mwc.Reset()
+	}
+
+	for _, client := range manager.clients {
+		if !client.isActive.SetTrue() {
+			t.Errorf("could not change the state of the isActive bool in [%d]", client.meta.id)
+			return
+		}
 	}
 
 	manager.broadCast(opcode, []uint8{})

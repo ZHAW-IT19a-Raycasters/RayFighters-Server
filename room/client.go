@@ -103,6 +103,7 @@ type Client struct {
 	status   ConnectionStatus
 	isActive helpers.AtomicBool
 	wg       sync.WaitGroup
+	lock     sync.Mutex
 }
 
 func NewClient(id uint8, meta ClientMeta, hub HubClientInteraction) *Client {
@@ -112,6 +113,7 @@ func NewClient(id uint8, meta ClientMeta, hub HubClientInteraction) *Client {
 		status:   Offline,
 		isActive: helpers.NewAtomicBool(false),
 		wg:       sync.WaitGroup{},
+		lock:     sync.Mutex{},
 	}
 
 	// register connection
@@ -121,6 +123,8 @@ func NewClient(id uint8, meta ClientMeta, hub HubClientInteraction) *Client {
 }
 
 func (c *Client) registerConn(conn ClientMeta) error {
+	c.lock.Lock()
+	defer c.lock.Unlock()
 	if c.status == Active || c.status == Registered {
 		return ErrClientReaderAlreadyActive
 	}
@@ -141,12 +145,22 @@ func (c *Client) Run() error {
 }
 
 func (c *Client) Shutdown(ctx context.Context) {
+	// don't bother with running the function more then
+	// once
+	if c.status == ShuttingDown || c.status == Offline {
+		return
+	}
+	c.lock.Lock()
+	defer func() {
+		c.status = Offline
+		c.lock.Unlock()
+	}()
+
 	logger.Debugf("Shutting down client [%d]", c.meta.eId)
 
 	// set the state of the client to shutting down
 	c.status = ShuttingDown
 	// set the state of the client to offline
-	defer func() { c.status = Offline }()
 
 	// send the deconnect opcode
 	// ignore error as it is not important
@@ -192,6 +206,8 @@ func (c *Client) SendData(message protocol.Bytefy) error {
 
 // registerTimeout will register the timeout in the timeout queue
 func (c *Client) registerTimeout() {
+	c.lock.Lock()
+	defer c.lock.Unlock()
 	// TODO: Timer
 	c.status = Timeout
 	// close the connection
@@ -205,6 +221,11 @@ func (c *Client) registerTimeout() {
 // Attention this function is a blocking call, so be carefull, while
 // reading form it.
 func (c *Client) recvData() {
+	// This function needs no locking
+	// as per the condition of the atomic
+	// condition this function will only
+	// ever be called a single time per
+	// run
 	defer func() {
 		// Error here is not important as the connections already died
 		// before reaching this position.
@@ -233,10 +254,12 @@ mainLoop:
 		if err != nil {
 			// if there was an unexpected close error
 			// then the client has to be set to timeout
-			/*if websocket.IsCloseError(err, websocket.CloseNormalClosure) {
+
+			// TODO: figure out how to handle the timeout
+			if websocket.IsCloseError(err, websocket.CloseAbnormalClosure) {
 				c.registerTimeout()
 				logger.Debugf("Client [%d] lost connection, setting to timeout", c.meta.id)
-			} else */if websocket.IsCloseError(err,
+			} else if websocket.IsCloseError(err,
 				websocket.CloseProtocolError, websocket.CloseNoStatusReceived,
 				websocket.CloseInvalidFramePayloadData,
 			) {
