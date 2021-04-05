@@ -26,7 +26,7 @@ func NewAtomicUint32(limit uint32) AtomicUint32 {
 
 // Value will return the current state of the variable.
 func (counter *AtomicUint32) Value() uint32 {
-	return counter.value
+	return atomic.LoadUint32(&counter.value)
 }
 
 // Limit will return the set limit.

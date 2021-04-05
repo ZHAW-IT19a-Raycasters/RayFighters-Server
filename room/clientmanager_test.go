@@ -260,7 +260,7 @@ func TestClientManagerShutdown(t *testing.T) {
 	// currently is not merged into this branch
 }
 
-func TestIncorrectAddClient(t *testing.T) {
+func TestClientManagerIncorrectAddClient(t *testing.T) {
 	// TODO: fix this tests it hangs for ever
 
 	// test for panic on logging in after lost connection
@@ -295,7 +295,7 @@ func TestIncorrectAddClient(t *testing.T) {
 	_ = cm.addClient(meta)
 }
 
-func TestIncorrectRemoveClient(t *testing.T) {
+func TestClientManagerIncorrectRemoveClient(t *testing.T) {
 	// test for panic on logging in after lost connection
 	// and incorrect removal of client data
 	hubMock := newMockedHubClientInteraction()
@@ -326,7 +326,7 @@ func TestIncorrectRemoveClient(t *testing.T) {
 	_ = cm.removeClient(meta)
 }
 
-func TestBroadCast(t *testing.T) {
+func TestClientManagerBroadCast(t *testing.T) {
 
 	// add test clients
 	const ClientCount = 10

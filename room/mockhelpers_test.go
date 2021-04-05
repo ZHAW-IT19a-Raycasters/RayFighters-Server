@@ -3,6 +3,7 @@ package room
 import (
 	"bytes"
 	"io"
+	"sync"
 
 	"github.com/gorilla/websocket"
 	"github.zhaw.ch/raycasters/server/protocol/server"
@@ -49,6 +50,7 @@ func newMockedHubClientInteraction() MockedHubClientInteraction {
 }
 
 type MockedConnection struct {
+	lock           sync.Mutex
 	mr             *MockedReader
 	mwc            *MockedWriteCloser
 	funcNextReader func() (int, io.Reader, error)
@@ -57,14 +59,20 @@ type MockedConnection struct {
 }
 
 func (m *MockedConnection) NextReader() (int, io.Reader, error) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
 	return m.funcNextReader()
 }
 
 func (m *MockedConnection) NextWriter(messageType int) (io.WriteCloser, error) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
 	return m.funcNextWriter(messageType)
 }
 
 func (m *MockedConnection) Close() error {
+	m.lock.Lock()
+	defer m.lock.Unlock()
 	// replace the next func reader and next writer with error returning versions
 	m.funcNextReader = func() (int, io.Reader, error) {
 		return 0, nil, websocket.ErrCloseSent
@@ -81,8 +89,9 @@ func newMockedConnection() MockedConnection {
 	pmr := &mr
 	pmwc := &mwc
 	return MockedConnection{
-		mr:  pmr,
-		mwc: pmwc,
+		lock: sync.Mutex{},
+		mr:   pmr,
+		mwc:  pmwc,
 		funcNextReader: func() (int, io.Reader, error) {
 			return 0, nil, websocket.ErrCloseSent
 		},
