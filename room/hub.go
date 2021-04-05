@@ -32,7 +32,7 @@ type Hub struct {
 	// from behind a lock. And so creates an unneeded overhead
 	// while asynchronously adding a new client. So to avoid the given
 	// overhead an atomic implementation is here used.
-	counter helpers.AtomicUint32
+	counter helpers.Semaphore
 	// The channel over which a new connection
 	// is added. This connections input can be accessed
 	// via the `RegisterClient` function associated
@@ -56,7 +56,7 @@ func NewHub(hubId int) *Hub {
 		output:   make(chan ClientMeta),
 		shutdown: make(chan struct{}),
 		id:       hubId,
-		counter:  helpers.NewAtomicUint32(HubClientLimit),
+		counter:  helpers.NewSemaphore(HubClientLimit),
 		isActive: helpers.NewAtomicBool(false),
 	}
 	h.clientManager = newClientManager(h)
@@ -105,14 +105,14 @@ func (h *Hub) GetAllPlayers() []server.Player {
 }
 
 // Size will return the current player count
-func (h *Hub) Size() uint32 {
+func (h *Hub) Size() int {
 	return h.counter.Value()
 }
 
 // Full will check if the hub is at it's set
 // limitation.
 func (h *Hub) Full() bool {
-	return h.counter.AtLimit()
+	return h.counter.Full()
 }
 
 // ClientExists will check if a specific client
@@ -139,7 +139,7 @@ func (h *Hub) RegisterClient(meta ClientMeta) error {
 		// increment the counter
 		// if the counter already is maxed out
 		// this will return an error
-		err := h.counter.Inc()
+		err := h.counter.Acquire()
 		if err != nil {
 			return ErrHubIsFull
 		}
@@ -192,7 +192,7 @@ func (h *Hub) removeClient(meta ClientMeta) {
 		// is previously checked that the client
 		// is only removed once, so the counter
 		// is ever ony decremented once.
-		_ = h.counter.Dec()
+		_ = h.counter.Release()
 	}
 }
 
