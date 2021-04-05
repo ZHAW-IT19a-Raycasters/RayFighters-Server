@@ -123,11 +123,19 @@ func NewClient(id uint8, meta ClientMeta, hub HubClientInteraction) *Client {
 }
 
 func (c *Client) registerConn(conn ClientMeta) error {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-	if c.status == Active || c.status == Registered {
+	// check if the recv is running
+	if c.isActive.Get() {
 		return ErrClientReaderAlreadyActive
 	}
+
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	// make sure that there is no chance of this conn
+	// already beeing registered
+	if c.status == Registered {
+		return ErrClientReaderAlreadyActive
+	}
+	c.status = Registered
 	c.meta = NewClientInternalMeta(c.meta.id, conn)
 
 	return nil
@@ -138,6 +146,19 @@ func (c *Client) Run() error {
 	if !c.isActive.SetTrue() {
 		return ErrClientReaderAlreadyActive
 	}
+	// setup the states needed to run the client
+	// this has to run in this thread here or else
+	// the counter might be wrong
+	// using a function to ensure that the lock is dropped as fast
+	// as possible
+	setupStates := func() {
+		c.lock.Lock()
+		defer c.lock.Unlock()
+		// setup the states
+		c.status = Active
+	}
+	c.wg.Add(1)
+	setupStates()
 
 	go c.recvData()
 
@@ -147,9 +168,10 @@ func (c *Client) Run() error {
 func (c *Client) Shutdown(ctx context.Context) {
 	// don't bother with running the function more then
 	// once
-	if c.status == ShuttingDown || c.status == Offline {
+	if c.status == Offline {
 		return
 	}
+
 	c.lock.Lock()
 	defer func() {
 		c.status = Offline
@@ -160,6 +182,7 @@ func (c *Client) Shutdown(ctx context.Context) {
 
 	// set the state of the client to shutting down
 	c.status = ShuttingDown
+
 	// set the state of the client to offline
 
 	// send the deconnect opcode
@@ -172,10 +195,13 @@ func (c *Client) Shutdown(ctx context.Context) {
 	// Make a waiter that will (hopefully) shutdown soon.
 	go func() {
 		// close the connection
-		c.meta.conn.Close()
+		// error is irrelevant as we already send the
+		// disconnect message
+		_ = c.meta.conn.Close()
 
 		// wait until the workgroup reaches zero
 		c.wg.Wait()
+
 		// toggle the completed shutdown cannel
 		close(runs)
 	}()
@@ -194,6 +220,7 @@ func (c *Client) SendData(message protocol.Bytefy) error {
 	if !c.isActive.Get() {
 		return ErrClientReaderAlreadyActive
 	}
+
 	cw, err := c.meta.conn.NextWriter(1)
 	if err != nil {
 		// TODO: create a fixed error
@@ -234,15 +261,11 @@ func (c *Client) recvData() {
 		// result is not important as here the status
 		// of the connection has to be per definition
 		// false.
-		c.isActive.SetFalse()
+		_ = c.isActive.SetFalse()
 		// remove the thread from the waitgroup
 		c.wg.Done()
 	}()
-	// setup the states
-	c.wg.Add(1)
-	c.status = Active
 
-mainLoop:
 	for {
 		_, message, err := c.meta.conn.NextReader()
 
@@ -252,31 +275,26 @@ mainLoop:
 		// method returns a non-nil error, all subsequent calls to this method return the same
 		// error
 		if err != nil {
-			// if there was an unexpected close error
-			// then the client has to be set to timeout
 
 			// TODO: figure out how to handle the timeout
 			if websocket.IsCloseError(err, websocket.CloseAbnormalClosure) {
-				c.registerTimeout()
 				logger.Debugf("Client [%d] lost connection, setting to timeout", c.meta.id)
 			} else if websocket.IsCloseError(err,
 				websocket.CloseProtocolError, websocket.CloseNoStatusReceived,
 				websocket.CloseInvalidFramePayloadData,
 			) {
-				c.registerTimeout()
 				logger.Warnf("unexpected websocket clusure error received for client [%d] "+
 					"- see https://rfc-editor.org/rfc/rfc6455.html#section-11.7 for more information\n[%s]", c.meta.id, err.Error())
 			} else {
-				// error is unknown so unregister the client
-				c.status = ShuttingDown
-
-				c.hub.UnregisterClient(c.meta.getMeta())
-
 				logger.Warnf("unexpected error happend\n%s", err.Error())
 			}
 
+			// if there was an unexpected close error
+			// then the client has to be set to timeout
+			c.registerTimeout()
+
 			// break out of the endless loop directly to a shutdown
-			break mainLoop
+			return
 		}
 
 		readData := [17]byte{}

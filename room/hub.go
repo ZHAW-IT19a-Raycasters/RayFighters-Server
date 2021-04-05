@@ -171,7 +171,7 @@ func (h *Hub) UnregisterClient(meta ClientMeta) error {
 // BroadCast will as the name implies broadcast a given
 // byte interface to a given client.
 func (h *Hub) BroadCast(msg protocol.Bytefy) {
-	h.clientManager.broadCast(msg, []byte{})
+	h.clientManager.broadCast(msg)
 }
 
 // removeClient is the actuall functionality, that is

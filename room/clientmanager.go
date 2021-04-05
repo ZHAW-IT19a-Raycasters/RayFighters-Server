@@ -1,7 +1,6 @@
 package room
 
 import (
-	"container/list"
 	"context"
 	"fmt"
 	"sync"
@@ -223,18 +222,20 @@ func (manager *clientManager) shutdown(cxt context.Context) {
 		close(waiter)
 	}()
 
+	closeClient := func(val *Client) {
+		val.Shutdown(childCxt)
+		// Decrement the wait group here
+		// as there is no degregisteation.
+		manager.wg.Done()
+	}
+
 	// run shutdown on all clients
 	for _, value := range manager.clients {
 		// run shutdown in it's own threads
 		// do not remove all the clients
 		// as that would use up too much time
 		// for not used data.
-		go func(val *Client) {
-			val.Shutdown(childCxt)
-			// Decrement the wait group here
-			// as there is no degregisteation.
-			manager.wg.Done()
-		}(value)
+		go closeClient(value)
 	}
 
 	select {
@@ -248,18 +249,9 @@ func (manager *clientManager) shutdown(cxt context.Context) {
 // broadCast will send the given message to all the connected clients.
 // This function allows for a blacklist, so that the server does not send
 // the broadcast to those clients.
-func (manager *clientManager) broadCast(msg protocol.Bytefy, except []uint8) {
+func (manager *clientManager) broadCast(msg protocol.Bytefy) {
 	// TODO: implement broadCast
 	// This waits on final client implementation.
-
-	// TODO: write benchmark for this
-	// Attention this might be faster via a different implementation.
-
-	// write except onto linked list, so that removing an element is in O(1)
-	blackList := list.New()
-	for blacklisted := range except {
-		blackList.PushBack(blacklisted)
-	}
 
 	// use a reader lock for this, as any kind of write would be problematic.
 	manager.lock.RLock()
@@ -272,18 +264,9 @@ func (manager *clientManager) broadCast(msg protocol.Bytefy, except []uint8) {
 			continue
 		}
 
-		for elem := blackList.Front(); elem != nil; elem = elem.Next() {
-			if elem.Value.(uint8) != id {
-				// TODO: maybe use a channel here, so to
-				// not block the broadCast too much.
-				meta := manager.clients[id]
-				meta.SendData(msg)
-			} else {
-				// Remove element from black list to speed up internal loop
-				tmp := elem
-				elem = elem.Next()
-				blackList.Remove(tmp)
-			}
-		}
+		// TODO: maybe use a channel here, so to
+		// not block the broadCast too much.
+		meta := manager.clients[id]
+		meta.SendData(msg)
 	}
 }

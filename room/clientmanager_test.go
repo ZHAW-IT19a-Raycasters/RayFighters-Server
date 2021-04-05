@@ -260,32 +260,6 @@ func TestClientManagerShutdown(t *testing.T) {
 	// currently is not merged into this branch
 }
 
-func TestClientManagerForceShutdown(t *testing.T) {
-	hubMock := newMockedHubClientInteraction()
-	cm := newClientManager(&hubMock)
-
-	// no errors here
-	for i := 0; i <= math.MaxUint8; i += 1 {
-		// assume this works
-		meta := getClientMeta(i)
-		_ = cm.addClient(meta)
-
-	}
-
-	// shutdown all the "workers"
-	cxt, cancel := context.WithCancel(context.Background())
-	cc := make(chan struct{})
-	go func() {
-		<-cc
-		cm.shutdown(cxt)
-	}()
-	// direct shutdown
-	cancel()
-	close(cc)
-	// TODO: test logger output - this needs code that
-	// currently is not merged into this branch
-}
-
 func TestIncorrectAddClient(t *testing.T) {
 	// TODO: fix this tests it hangs for ever
 
@@ -388,7 +362,7 @@ func TestBroadCast(t *testing.T) {
 	// this is the case where all the clients are offline
 	opcode := server.NewDisconnect()
 	exp := opcode.Bytes()
-	manager.broadCast(opcode, []uint8{})
+	manager.broadCast(opcode)
 
 	// test that the broadcast was not "send"
 	// as all the clients are fully deactivated
@@ -406,7 +380,7 @@ func TestBroadCast(t *testing.T) {
 		client.status = Active
 	}
 
-	manager.broadCast(opcode, []uint8{})
+	manager.broadCast(opcode)
 
 	// test that the broadcast was not "send"
 	// as all the clients are not "isActive"
@@ -421,12 +395,12 @@ func TestBroadCast(t *testing.T) {
 
 	for _, client := range manager.clients {
 		if !client.isActive.SetTrue() {
-			t.Errorf("could not change the state of the isActive bool in [%d]", client.meta.id)
+			t.Errorf("could not change the state of the isActive bool for [%d]", client.meta.id)
 			return
 		}
 	}
 
-	manager.broadCast(opcode, []uint8{})
+	manager.broadCast(opcode)
 
 	// test that the broadcast was "send"
 	for _, mock := range mocks {
