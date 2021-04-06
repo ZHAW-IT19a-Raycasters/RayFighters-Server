@@ -7,7 +7,7 @@ import (
 
 	"github.zhaw.ch/raycasters/server/protocol"
 	"github.zhaw.ch/raycasters/server/protocol/server"
-	"github.zhaw.ch/raycasters/server/room/helpers"
+	"github.zhaw.ch/raycasters/server/utils"
 )
 
 // HubClientLimit is the absolute upper limit supported
@@ -32,7 +32,7 @@ type Hub struct {
 	// from behind a lock. And so creates an unneeded overhead
 	// while asynchronously adding a new client. So to avoid the given
 	// overhead an atomic implementation is here used.
-	counter helpers.Semaphore
+	counter utils.Semaphore
 	// The channel over which a new connection
 	// is added. This connections input can be accessed
 	// via the `RegisterClient` function associated
@@ -44,7 +44,7 @@ type Hub struct {
 	// The channel that signals the main loop to shutdown.
 	shutdown chan struct{}
 	// If the current hub is running or not.
-	isActive helpers.AtomicBool
+	isActive utils.AtomicBool
 }
 
 // NewHub will initiate a new hub struct.
@@ -56,8 +56,8 @@ func NewHub(hubId int) *Hub {
 		output:   make(chan ClientMeta),
 		shutdown: make(chan struct{}),
 		id:       hubId,
-		counter:  helpers.NewSemaphore(HubClientLimit),
-		isActive: helpers.NewAtomicBool(false),
+		counter:  utils.NewSemaphore(HubClientLimit),
+		isActive: utils.NewAtomicBool(false),
 	}
 	h.clientManager = newClientManager(h)
 	return h

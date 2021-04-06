@@ -8,7 +8,7 @@ import (
 	"github.zhaw.ch/raycasters/server/protocol"
 	"github.zhaw.ch/raycasters/server/protocol/client"
 	"github.zhaw.ch/raycasters/server/protocol/server"
-	"github.zhaw.ch/raycasters/server/room/helpers"
+	"github.zhaw.ch/raycasters/server/utils"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
@@ -101,7 +101,7 @@ type Client struct {
 	info     ClientGame
 	meta     ClientInternalMeta
 	status   ConnectionStatus
-	isActive helpers.AtomicBool
+	isActive utils.AtomicBool
 	wg       sync.WaitGroup
 	lock     sync.Mutex
 }
@@ -111,7 +111,7 @@ func NewClient(id uint8, meta ClientMeta, hub HubClientInteraction) *Client {
 		info:     NewClientGame(NewCoordinate()),
 		hub:      hub,
 		status:   Offline,
-		isActive: helpers.NewAtomicBool(false),
+		isActive: utils.NewAtomicBool(false),
 		wg:       sync.WaitGroup{},
 		lock:     sync.Mutex{},
 	}
