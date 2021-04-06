@@ -1,8 +1,8 @@
 package helpers
 
 import (
+	"errors"
 	"math"
-	"strings"
 	"testing"
 )
 
@@ -29,11 +29,12 @@ func TestIdManagerPop(t *testing.T) {
 	if !manager.IsEmpty() {
 		t.Error("Manager should be empty")
 	}
+
 	_, err := manager.Pop()
 	if err == nil {
 		t.Error("on the incorrect pop request, there should be an error")
-	} else if !strings.HasPrefix(err.Error(), "Incorrect handling of the idManager") {
-		t.Error("Prefix missing")
+	} else if !errors.Is(err, ErrIdManagerEmpty) {
+		t.Error("incorrect error was send")
 	}
 }
 
@@ -59,6 +60,8 @@ func TestIdManagerPush(t *testing.T) {
 	err := manager.Push(42)
 	if err == nil {
 		t.Errorf("The manager should not be fillable anymore.")
+	} else if !errors.Is(err, ErrIdManagerFull) {
+		t.Error("incorrect error was send")
 	}
 }
 
