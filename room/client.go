@@ -103,7 +103,7 @@ type Client struct {
 	status   ConnectionStatus
 	isActive utils.AtomicBool
 	wg       sync.WaitGroup
-	lock     sync.Mutex
+	lock     sync.RWMutex
 }
 
 func NewClient(id uint8, meta ClientMeta, hub HubClientInteraction) *Client {
@@ -113,7 +113,7 @@ func NewClient(id uint8, meta ClientMeta, hub HubClientInteraction) *Client {
 		status:   Offline,
 		isActive: utils.NewAtomicBool(false),
 		wg:       sync.WaitGroup{},
-		lock:     sync.Mutex{},
+		lock:     sync.RWMutex{},
 	}
 
 	// register connection
@@ -167,16 +167,19 @@ func (c *Client) Run() error {
 }
 
 func (c *Client) Shutdown(ctx context.Context) {
+	// this write lock is needed in the later parts
+	// of the processes
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
 	// don't bother with running the function more then
 	// once
 	if c.status == Offline {
 		return
 	}
 
-	c.lock.Lock()
 	defer func() {
 		c.status = Offline
-		c.lock.Unlock()
 	}()
 
 	logger.Debugf("Shutting down client [%d]", c.meta.eId)
