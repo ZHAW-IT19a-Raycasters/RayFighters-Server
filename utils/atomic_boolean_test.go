@@ -1,13 +1,13 @@
-package helpers_test
+package utils_test
 
 import (
 	"testing"
 
-	"github.zhaw.ch/raycasters/server/room/helpers"
+	"github.zhaw.ch/raycasters/server/utils"
 )
 
 func TestAtomicBoolValue(t *testing.T) {
-	ab := helpers.NewAtomicBool(false)
+	ab := utils.NewAtomicBool(false)
 	if ab.Get() != false {
 		t.Error("Incorrect value has been set while initializing.")
 		return
@@ -27,7 +27,7 @@ func TestAtomicBoolValue(t *testing.T) {
 }
 
 func TestAtomicBoolSetTrue(t *testing.T) {
-	ab := helpers.NewAtomicBool(false)
+	ab := utils.NewAtomicBool(false)
 
 	if !ab.SetTrue() {
 		t.Error("Should return true on the first set")
@@ -51,7 +51,7 @@ func TestAtomicBoolSetTrue(t *testing.T) {
 }
 
 func TestAtomicBoolSetFalse(t *testing.T) {
-	ab := helpers.NewAtomicBool(false)
+	ab := utils.NewAtomicBool(false)
 
 	if ab.SetFalse() {
 		t.Error("Should return false as the intial condition is so")
@@ -85,26 +85,26 @@ func TestAtomicBoolSetFalse(t *testing.T) {
 	}
 }
 func TestAtomicBoolMapBoolToInt(t *testing.T) {
-	got := helpers.MapBoolToInt(false)
-	if got != helpers.False {
+	got := utils.MapBoolToInt(false)
+	if got != utils.False {
 		t.Error("False mapping from bool to int in the case false")
 		return
 	}
 
-	got = helpers.MapBoolToInt(true)
-	if got != helpers.True {
+	got = utils.MapBoolToInt(true)
+	if got != utils.True {
 		t.Error("False mapping from bool to int in the case false")
 	}
 }
 
 func TestMapIntToBool(t *testing.T) {
-	got := helpers.MapIntToBool(helpers.True)
+	got := utils.MapIntToBool(utils.True)
 	if got != true {
 		t.Error("False mapping from int to bool in the case of true")
 		return
 	}
 
-	got = helpers.MapIntToBool(helpers.False)
+	got = utils.MapIntToBool(utils.False)
 	if got != false {
 		t.Error("False mapping from int to bool in the case of false")
 		return
@@ -119,5 +119,5 @@ func TestMapIntToBoolPanic(t *testing.T) {
 		}
 	}()
 
-	_ = helpers.MapIntToBool(42)
+	_ = utils.MapIntToBool(42)
 }
