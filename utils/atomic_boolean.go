@@ -16,12 +16,14 @@ const (
 // Attention this function will panic, if the value
 // is anything else then 1 or 0.
 func MapIntToBool(value uint32) bool {
-	if value == True {
+	switch value {
+	case True:
 		return true
-	} else if value == False {
+	case False:
 		return false
+	default:
+		panic("There is no mapping for anything else then a 0 or 1")
 	}
-	panic("There is no mapping for anything else then a 0 or 1")
 }
 
 // MapBoolToInt will convert the bool into the respective
@@ -51,14 +53,13 @@ func NewAtomicBool(value bool) AtomicBool {
 
 // Get will return the current value of the atomic value.
 func (counter *AtomicBool) Get() bool {
-	return MapIntToBool(atomic.LoadUint32(&counter.value))
+	return atomic.LoadUint32(&counter.value) == True
 }
 
 // Set will replace the current value and return
 // the replaced one.
 func (counter *AtomicBool) Set(value bool) bool {
-	old := atomic.SwapUint32(&counter.value, MapBoolToInt(value))
-	return MapIntToBool(old)
+	return atomic.SwapUint32(&counter.value, MapBoolToInt(value)) == True
 }
 
 // SetTrue will set the value to true and if there was a change to the value

@@ -112,20 +112,14 @@ func TestClientManagerAddClientTwice(t *testing.T) {
 		return
 	}
 
-	// adding a connection, while client conn is still active
-	mock := newMockedConnection()
-	clientMeta.conn = &mock
-
-	err = cm.addClient(clientMeta)
-	if err != nil {
-		t.Error("no error expected here, as the client is timedout here")
-		return
-	}
-
 	// force the client to be in a timeout state
 	id, _ := cm.mapId(clientMeta)
 	val := cm.clients[id]
-	val.registerTimeout()
+	val.Shutdown(context.Background())
+
+	// adding a connection, while client conn is still active
+	mock := newMockedConnection()
+	clientMeta.conn = &mock
 
 	err = cm.addClient(clientMeta)
 	if err != nil {

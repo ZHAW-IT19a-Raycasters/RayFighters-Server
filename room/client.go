@@ -166,28 +166,34 @@ func (c *Client) Run() error {
 	return nil
 }
 
-func (c *Client) Shutdown(ctx context.Context) {
+func (c *Client) checkOffline() bool {
 	// this write lock is needed in the later parts
 	// of the processes
-	c.lock.Lock()
-	defer c.lock.Unlock()
-
+	c.lock.RLock()
+	c.lock.RUnlock()
 	// don't bother with running the function more then
 	// once
-	if c.status == Offline {
+	// unlock again here
+	return c.status == Offline
+}
+
+func (c *Client) Shutdown(ctx context.Context) {
+	if c.checkOffline() {
 		return
 	}
 
 	defer func() {
+		c.lock.Lock()
 		c.status = Offline
+		c.lock.Unlock()
 	}()
 
 	logger.Debugf("Shutting down client [%d]", c.meta.eId)
 
+	c.lock.Lock()
 	// set the state of the client to shutting down
 	c.status = ShuttingDown
-
-	// set the state of the client to offline
+	c.lock.Unlock()
 
 	// send the deconnect opcode
 	// ignore error as it is not important
@@ -201,7 +207,7 @@ func (c *Client) Shutdown(ctx context.Context) {
 		// close the connection
 		// error is irrelevant as we already send the
 		// disconnect message
-		_ = c.meta.conn.Close()
+		c.meta.conn.Close()
 
 		// wait until the workgroup reaches zero
 		c.wg.Wait()
