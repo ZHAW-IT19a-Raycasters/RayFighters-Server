@@ -12,13 +12,14 @@ import (
 	"github.zhaw.ch/raycasters/server/protocol/server"
 )
 
-func getClientMeta(i int) ClientMeta {
+func getClientMeta(i int) (ClientMeta, *MockedConnection) {
 	// as uuids should be unique, it makes no difference,
 	// if a new one is called here.
 	uuid := uuid.New()
 	name := fmt.Sprintf("id: %d", i)
 	mock := newMockedConnection()
-	return NewClientMeta(uuid, name, &mock)
+	pmock := &mock
+	return NewClientMeta(uuid, name, pmock), pmock
 }
 
 func compareByteSlices(expeced, gotten []byte, t *testing.T) bool {
@@ -61,7 +62,7 @@ func TestClientManagerAddClientSigle(t *testing.T) {
 		return
 	}
 
-	clientMeta := getClientMeta(0)
+	clientMeta, _ := getClientMeta(0)
 	err := cm.addClient(clientMeta)
 	if err != nil {
 		t.Errorf("An unexpected error occuered, while adding a new client\n[%s]", err.Error())
@@ -104,7 +105,7 @@ func TestClientManagerAddClientTwice(t *testing.T) {
 	cm := newClientManager(&hubMock)
 	defer cm.shutdown(context.Background())
 
-	clientMeta := getClientMeta(0)
+	clientMeta, _ := getClientMeta(0)
 
 	err := cm.addClient(clientMeta)
 	if err != nil {
@@ -146,7 +147,7 @@ func TestClientManagerMaxClients(t *testing.T) {
 
 	// no errors here
 	for i := 0; i <= math.MaxUint8; i += 1 {
-		meta := getClientMeta(i)
+		meta, _ := getClientMeta(i)
 		err := cm.addClient(meta)
 
 		if err != nil {
@@ -162,7 +163,7 @@ func TestClientManagerMaxClients(t *testing.T) {
 
 	}
 	// add an additional client
-	meta := getClientMeta(256)
+	meta, _ := getClientMeta(256)
 	err := cm.addClient(meta)
 	if err == nil {
 		t.Error("A client was added illigaly here.")
@@ -174,7 +175,7 @@ func TestClientManagerRemoveClients(t *testing.T) {
 	cm := newClientManager(&hubMock)
 	defer cm.shutdown(context.Background())
 
-	meta := getClientMeta(0)
+	meta, _ := getClientMeta(0)
 
 	err := cm.removeClient(meta)
 	if err == nil {
@@ -228,7 +229,7 @@ func TestClientManagerShutdown(t *testing.T) {
 	// no errors here
 	for i := 0; i <= math.MaxUint8; i += 1 {
 		// assume this works
-		meta := getClientMeta(i)
+		meta, _ := getClientMeta(i)
 		err := cm.addClient(meta)
 		if err != nil {
 			t.Error("There was an error while adding the clients")
@@ -270,7 +271,7 @@ func TestClientManagerIncorrectAddClient(t *testing.T) {
 		cm.shutdown(context.Background())
 	}()
 
-	meta := getClientMeta(0)
+	meta, _ := getClientMeta(0)
 	_ = cm.addClient(meta)
 
 	id, _ := cm.mapId(meta)
@@ -302,7 +303,7 @@ func TestClientManagerIncorrectRemoveClient(t *testing.T) {
 		cm.shutdown(context.Background())
 	}()
 
-	meta := getClientMeta(0)
+	meta, _ := getClientMeta(0)
 	_ = cm.addClient(meta)
 
 	id, _ := cm.mapId(meta)
@@ -331,14 +332,9 @@ func TestClientManagerBroadCast(t *testing.T) {
 	manager := newClientManager(&hubMock)
 
 	for i := 0; i < ClientCount; i += 1 {
-		clients[i] = getClientMeta(i)
-		tmp := clients[i].conn.(*MockedConnection)
+		var tmp *MockedConnection
+		clients[i], tmp = getClientMeta(i)
 		mocks[i] = tmp
-		// change the func in the mock to write into the mocked reader
-		mocks[i].funcNextWriter = func(messageType int) (io.WriteCloser, error) {
-			return tmp.mwc, nil
-		}
-
 		err := manager.addClient(clients[i])
 		if err != nil {
 			t.Errorf("error happend, while adding a new client.\n%s", err.Error())
@@ -350,6 +346,12 @@ func TestClientManagerBroadCast(t *testing.T) {
 
 	for _, mock := range mocks {
 		mock.mwc.Reset()
+
+		// change the func in the mock to write into the mocked reader
+		tmp := mock
+		mock.funcNextWriter = func(messageType int) (io.WriteCloser, error) {
+			return tmp.mwc, nil
+		}
 	}
 
 	// broadCast this to all clients
