@@ -2,7 +2,6 @@ package helpers
 
 import (
 	"errors"
-	"sync/atomic"
 )
 
 type empty struct{}
@@ -38,14 +37,18 @@ func (sem *Semaphore) Limit() uint32 {
 
 // Empty will return true, if the counter is at it's
 // lower limit a zero.
+// Attention this might not represents the actuall value
+// due to non atomic operations.
 func (sem *Semaphore) Empty() bool {
-	return atomic.CompareAndSwapUint32(&sem.counter, 0, sem.counter)
+	return len(sem.sem) == 0
 }
 
 // Full will return true, if the counter reached the
 // given limit.
+// Attention this might not represents the actuall value
+// due to non atomic operations.
 func (sem *Semaphore) Full() bool {
-	return atomic.CompareAndSwapUint32(&sem.counter, sem.limit, sem.limit)
+	return len(sem.sem) == int(sem.limit)
 }
 
 // Acquire will increment the counter by 1.
@@ -54,7 +57,6 @@ func (sem *Semaphore) Full() bool {
 func (sem *Semaphore) Acquire() error {
 	select {
 	case sem.sem <- empty{}:
-		atomic.AddUint32(&sem.counter, 1)
 		return nil
 	default:
 		return ErrSemaphoreAtLimit
@@ -67,9 +69,6 @@ func (sem *Semaphore) Acquire() error {
 func (sem *Semaphore) Release() error {
 	select {
 	case <-sem.sem:
-		// To subtract a signed positive constant value c from x, do
-		// AddUint32(&x, ^uint32(c-1)).
-		atomic.AddUint32(&sem.counter, ^uint32(0))
 		return nil
 	default:
 		return ErrSemaphoreAtLimit
