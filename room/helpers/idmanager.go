@@ -1,77 +1,74 @@
 package helpers
 
 import (
-	"container/list"
-	"fmt"
+	"errors"
 	"math"
 )
 
 // IdManagerError is the error produced, if during a function call a possibly invalid state
 // would have been reached.
-type IdManagerError struct {
-	msg string
-}
+var (
+	ErrIdManagerFull  = errors.New("incorrect handling of the idManager, it is filled up")
+	ErrIdManagerEmpty = errors.New("incorrect handling of the idManager, is is empty")
+)
 
-func NewIdManagerError(msg string) IdManagerError {
-	return IdManagerError{
-		msg: msg,
-	}
-}
-
-// The error interface
-func (m IdManagerError) Error() string {
-	return fmt.Sprintf("Incorrect handling of the idManager id is %s", m.msg)
-}
+const IdCountLimit = uint32(math.MaxUint8 + 1)
 
 // IdManager is an abstraction over the standard library
 // linkedlist implementation for uint8 values.
 type IdManager struct {
-	// The list of currently available user ids
+	// The list of currently ids user ids
 	// if this is empty all ids have been used.
-	available *list.List
+	ids chan uint8
 }
 
 // Will create a new idManager and fills it up with all values for uint8.
 func NewIdManager() IdManager {
-	ids := list.New()
-	for i := 0; i <= math.MaxUint8; i += 1 {
+	ids := make(chan uint8, IdCountLimit)
+	for i := uint32(0); i <= IdCountLimit-1; i += 1 {
 		// make sure that only uint8 values are pushed into the
 		// queue
-		ids.PushBack(uint8(i))
+		ids <- uint8(i)
 	}
 	return IdManager{
-		available: ids,
+		ids: ids,
 	}
 }
 
 // Will append the value to the back of the list.
 // Can return an error, if the list is full.
 func (m IdManager) Push(val uint8) error {
-	if m.IsFull() {
-		return NewIdManagerError("full")
+	select {
+	case m.ids <- val:
+		return nil
+	default:
+		return ErrIdManagerFull
 	}
-	m.available.PushBack(val)
-	return nil
 }
 
 // Will return the currently first value of the queue.
 // Attention: Will return an error if the queue is empty
 // as well as a 0
 func (m IdManager) Pop() (uint8, error) {
-	if m.IsEmpty() {
-		return 0, NewIdManagerError("empty")
+	select {
+	case id := <-m.ids:
+		return id, nil
+	default:
+		return 0, ErrIdManagerEmpty
 	}
-	val := m.available.Front()
-	// this is fast as the value will be in fist position anyway
-	m.available.Remove(val)
-	return val.Value.(uint8), nil
 }
 
+// Count will return the current amount of ids left.
+func (m IdManager) Count() int {
+	return len(m.ids)
+}
+
+// IsEmpty will check if there are still some ids left
 func (m IdManager) IsEmpty() bool {
-	return m.available.Len() == 0
+	return len(m.ids) == 0
 }
 
+// IsFull will check if there is still space for more ids.
 func (m IdManager) IsFull() bool {
-	const max = math.MaxUint8 + 1
-	return m.available.Len() == max
+	return len(m.ids) == int(IdCountLimit)
 }

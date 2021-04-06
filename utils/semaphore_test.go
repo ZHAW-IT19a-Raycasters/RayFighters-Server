@@ -1,36 +1,36 @@
-package helpers_test
+package utils_test
 
 import (
 	"sync"
 	"testing"
 
-	"github.zhaw.ch/raycasters/server/room/helpers"
+	"github.zhaw.ch/raycasters/server/utils"
 )
 
 const limit uint32 = 42
 
-func TestAtomicCounterBase(t *testing.T) {
-	ac := helpers.NewAtomicUint32(limit)
+func TestSemaphoreBase(t *testing.T) {
+	ac := utils.NewSemaphore(limit)
 
 	if ac.Value() != 0 {
 		t.Error("Base value is incorrect.")
 		return
 	}
 
-	if !ac.AtZero() {
+	if !ac.Empty() {
 		t.Error("is zero should be false")
 		return
 	}
 
-	if ac.AtLimit() {
+	if ac.Full() {
 		t.Error("is filled should be false")
 	}
 }
 
-func TestAtomicCounterInc(t *testing.T) {
-	ac := helpers.NewAtomicUint32(limit)
+func TestSemaphoreInc(t *testing.T) {
+	ac := utils.NewSemaphore(limit)
 
-	err := ac.Inc()
+	err := ac.Acquire()
 
 	if err != nil {
 		t.Errorf("there was an error:\n%s", err.Error())
@@ -44,49 +44,49 @@ func TestAtomicCounterInc(t *testing.T) {
 		return
 	}
 
-	if ac.AtZero() {
-		t.Error("should not be zero")
-	}
+	// if ac.AtZero() {
+	// 	t.Error("should not be zero")
+	// }
 
-	if ac.AtLimit() {
-		t.Error("should not be filled up")
-	}
+	// if ac.AtLimit() {
+	// 	t.Error("should not be filled up")
+	// }
 
 	for i := 0; i < int(limit)-1; i += 1 {
-		err := ac.Inc()
+		err := ac.Acquire()
 		if err != nil {
 			t.Errorf("There was an error at position [%d]", i-1)
 			return
 		}
 	}
 
-	if ac.AtZero() {
-		t.Error("should not be zero")
-	}
+	// if ac.AtZero() {
+	// 	t.Error("should not be zero")
+	// }
 
-	if !ac.AtLimit() {
-		t.Error("should be filled up")
-	}
+	// if !ac.AtLimit() {
+	// 	t.Error("should be filled up")
+	// }
 
 	val = ac.Value()
 
-	if val != limit {
+	if val != int(limit) {
 		t.Error("value should be at the given limit")
 		return
 	}
 
 	// false increment
-	err = ac.Inc()
+	err = ac.Acquire()
 
 	if err == nil {
 		t.Error("At the max inc there should have been an error.")
 	}
 }
 
-func TestAtomicCounterDec(t *testing.T) {
-	ac := helpers.NewAtomicUint32(limit)
+func TestSemaphoreDec(t *testing.T) {
+	ac := utils.NewSemaphore(limit)
 
-	ac.Inc()
+	ac.Acquire()
 
 	val := ac.Value()
 
@@ -95,7 +95,7 @@ func TestAtomicCounterDec(t *testing.T) {
 		return
 	}
 
-	err := ac.Dec()
+	err := ac.Release()
 
 	if err != nil {
 		t.Errorf("there was an error:\n%s", err.Error())
@@ -108,44 +108,44 @@ func TestAtomicCounterDec(t *testing.T) {
 		t.Error("value should be at one")
 		return
 	}
-	if !ac.AtZero() {
+	if !ac.Empty() {
 		t.Error("should not be zero")
 	}
 
-	if ac.AtLimit() {
+	if ac.Full() {
 		t.Error("should not be filled up")
 	}
 
 	// below zero
 
-	err = ac.Dec()
+	err = ac.Release()
 
 	if err == nil {
 		t.Error("As the value could have gone below zero, there should be an error here.")
 	}
 }
 
-func TestAtomicCounterFilledAndEmpty(t *testing.T) {
-	ac := helpers.NewAtomicUint32(limit)
+func TestSemaphoreFilledAndEmpty(t *testing.T) {
+	ac := utils.NewSemaphore(limit)
 
 	for i := 0; i < int(limit); i += 1 {
-		err := ac.Inc()
+		err := ac.Acquire()
 		if err != nil {
 			t.Errorf("There was an error at position [%d]", i)
 			return
 		}
 	}
 
-	if ac.AtZero() {
+	if ac.Empty() {
 		t.Error("should not be zero")
 	}
 
-	if !ac.AtLimit() {
+	if !ac.Full() {
 		t.Error("should be filled up")
 	}
 
 	// over filled so returns an error
-	err := ac.Inc()
+	err := ac.Acquire()
 
 	if err == nil {
 		t.Error("There should be an error here telling us, that the counter is at it's limit")
@@ -154,7 +154,7 @@ func TestAtomicCounterFilledAndEmpty(t *testing.T) {
 
 	// decrement back to zero
 	for i := int(limit - 1); i >= 0; i -= 1 {
-		err := ac.Dec()
+		err := ac.Release()
 
 		if err != nil {
 			t.Errorf("There was an error at position [%d]", i)
@@ -162,25 +162,25 @@ func TestAtomicCounterFilledAndEmpty(t *testing.T) {
 		}
 	}
 
-	if !ac.AtZero() {
+	if !ac.Empty() {
 		t.Error("should be zero")
 	}
 
-	if ac.AtLimit() {
+	if ac.Full() {
 		t.Error("should not be filled up")
 	}
 }
 
-func TestAtomicCounterFilledAndEmptyConcurrent(t *testing.T) {
+func TestSemaphoreFilledAndEmptyConcurrent(t *testing.T) {
 	var wg sync.WaitGroup
 
-	ac := helpers.NewAtomicUint32(limit)
+	ac := utils.NewSemaphore(limit)
 	waiForDec := make(chan struct{})
 	waitForAtLimit := make(chan struct{})
 
 	go func() {
 		// busy wait until filled up
-		for !ac.AtLimit() {
+		for !ac.Full() {
 		}
 		close(waitForAtLimit)
 	}()
@@ -188,7 +188,7 @@ func TestAtomicCounterFilledAndEmptyConcurrent(t *testing.T) {
 	for i := 0; i < int(ac.Limit()); i += 1 {
 		wg.Add(1)
 		go func(count int) {
-			err := ac.Inc()
+			err := ac.Acquire()
 			if err != nil {
 				t.Errorf("There was an error at position [%d]", count)
 				return
@@ -196,7 +196,7 @@ func TestAtomicCounterFilledAndEmptyConcurrent(t *testing.T) {
 
 			<-waiForDec
 
-			err = ac.Dec()
+			err = ac.Release()
 			if err != nil {
 				t.Errorf("There was an error at position [%d]", count)
 				return
@@ -208,7 +208,7 @@ func TestAtomicCounterFilledAndEmptyConcurrent(t *testing.T) {
 	<-waitForAtLimit
 
 	val := ac.Value()
-	if val != ac.Limit() {
+	if val != int(ac.Limit()) {
 		t.Error("Value should be at it's limit here")
 		return
 	}
@@ -222,11 +222,11 @@ func TestAtomicCounterFilledAndEmptyConcurrent(t *testing.T) {
 		t.Error("Value should be at it's lower limit 0")
 		return
 	}
-	if !ac.AtZero() {
+	if !ac.Empty() {
 		t.Error("should be zero")
 	}
 
-	if ac.AtLimit() {
+	if ac.Full() {
 		t.Error("should be not filled up")
 	}
 }
