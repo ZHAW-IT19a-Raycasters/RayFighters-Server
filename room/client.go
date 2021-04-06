@@ -151,13 +151,14 @@ func (c *Client) Run() error {
 	// the counter might be wrong
 	// using a function to ensure that the lock is dropped as fast
 	// as possible
+	c.wg.Add(1)
+
 	setupStates := func() {
 		c.lock.Lock()
 		defer c.lock.Unlock()
 		// setup the states
 		c.status = Active
 	}
-	c.wg.Add(1)
 	setupStates()
 
 	go c.recvData()

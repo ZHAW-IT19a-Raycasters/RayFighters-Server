@@ -51,7 +51,7 @@ func NewAtomicBool(value bool) AtomicBool {
 
 // Get will return the current value of the atomic value.
 func (counter *AtomicBool) Get() bool {
-	return MapIntToBool(counter.value)
+	return MapIntToBool(atomic.LoadUint32(&counter.value))
 }
 
 // Set will replace the current value and return
