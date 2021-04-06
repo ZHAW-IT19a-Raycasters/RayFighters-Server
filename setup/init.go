@@ -5,7 +5,25 @@ import (
 	"fmt"
 )
 
-// Will write back the parsed commandline parameters to the configuration data.
+// Setup is the struct that handles all the setup required
+// by the system.
+type Setup struct {
+	args     func() (argParser, error)
+	conf     func(filename string) configParser
+	confFile string
+}
+
+// NewSetup will as the name implies create a new setup
+// procedure.
+func NewSetup() Setup {
+	return Setup{
+		args:     argParse,
+		conf:     newConfigParser,
+		confFile: Config,
+	}
+}
+
+// writeArgsToConfig will write back the parsed commandline parameters to the configuration data.
 func writeArgsToConfig(conf *Configuration, args *commandlineArguments) {
 
 	if *args.Ip != "" {
@@ -17,18 +35,20 @@ func writeArgsToConfig(conf *Configuration, args *commandlineArguments) {
 	}
 }
 
-// Will parse the arguments from both the configuration file as well as the commandline arguments
-// If there was an error of any kind will print the given help message and return nil.
-func Setup() *Configuration {
-	// shutting of annoying error
-	argParser, err := argParse()
+// Configuration will parse the arguments from both the configuration file as well as
+// the commandline arguments. If there was an error of any kind will print the given
+// help message and return nil.
+func (s Setup) Configuration() *Configuration {
+	argParser, err := s.args()
 
 	if err != nil {
 		argParser.Usage(err)
 		return nil
 	}
 
-	conf, err := configParse()
+	confParser := s.conf(s.confFile)
+
+	conf, err := confParser.Parse()
 
 	if err != nil {
 		err = fmt.Errorf("%s -> %w", err.Error(), errors.Unwrap(err))
@@ -37,13 +57,6 @@ func Setup() *Configuration {
 	}
 
 	writeArgsToConfig(conf, argParser.Args())
-
-	err = checkIfConfigIsLegal(conf)
-
-	if err != nil {
-		argParser.Usage(err)
-		return nil
-	}
 
 	return conf
 }
