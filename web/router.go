@@ -44,17 +44,21 @@ func NewServer(conf *webconfig.WebConfig) *Server {
 		fmt.Printf("failed to generate private key: %s\n", err)
 	}
 
-	// #TODO: either register as uuid or use uuid.MarshalText and register as byte[]/string
-	// jwt.RegisterCustomField(`uuid`, uuid.UUID)
+	amw := authenticationMiddleware{privKey}
 
 	router := mux.NewRouter()
-	router.HandleFunc("/", serveRoot)
-	router.HandleFunc("/auth", ServeAuthWithKey(privKey)).Methods("POST")
-	router.HandleFunc("/ws/{roomID:[0-9]+}", func(w http.ResponseWriter, r *http.Request) {
+	// serve /auth without authentication middleware
+	router.Path("/auth").Handler(http.HandlerFunc(ServeAuthWithKey(privKey))).Methods("POST")
+	api := router.PathPrefix("/").Subrouter()
+	api.HandleFunc("/", serveRoot)
+	api.HandleFunc("/ws/{roomID:[0-9]+}", func(w http.ResponseWriter, r *http.Request) {
 		// TODO: get a hub reference from handler function via HubManager
 		// handle with a wrapper lambda for now
 		serveWs(hubs[:], w, r)
 	})
+
+	
+	api.Use(amw.Middleware)
 
 	httpServer := &http.Server{Handler: router, Addr: conf.String(), WriteTimeout: 15 * time.Second, ReadTimeout: 15 * time.Second}
 	
