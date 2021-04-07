@@ -5,6 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/lestrrat-go/jwx/jwa"
+	"github.com/lestrrat-go/jwx/jwt"
 )
 
 // Create a struct to read the username and password from the request body
@@ -29,16 +34,37 @@ func ServeAuthWithKey(privKey *rsa.PrivateKey) (HandleFunc func(w http.ResponseW
 
 		// #TODO: check if username is already taken?
 		fmt.Printf("%s has requested a JWT",creds.Username)
-		
+
+		// create new client
+		uuidStr,_ := uuid.New().MarshalText()
+	
 		// create JWT
+		t := jwt.New()
+		t.Set(jwt.IssuedAtKey, time.Now())
+		t.Set(`name`, creds.Username)
+		t.Set(`uuid`, uuidStr)
 
-		// sign JWT
+		// Signing the token (using raw rsa.PrivateKey)
+		// also marshalls to json
+		signed, err := jwt.Sign(t, jwa.RS512, privKey)
+		if err != nil {
+			// also wraps a json marshalling error
+			fmt.Printf("failed to sign token: %s", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
 
-		// create cookie
-
-		// set cookie
+		// Finally, we set the client cookie for "token" as the JWT we just generated
+		// we also set an expiry time which is the same as the token itself
+		http.SetCookie(w, &http.Cookie{
+			Name:    "token",
+			Value:   string(signed[:]),
+		})
+		
 
 		// enable HttpOnly
+		// #TODO: frontend team will not be able to access it via clientside scripts! (security measure)
+		// wait with enabling until we can make sure it works without clientside interaction
 
 	}
 }
