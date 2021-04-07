@@ -19,8 +19,8 @@ type Credentials struct {
 
 // ServeAuthWithKey creates a closure with the given key and
 // returns a route handler that
-// creates a JWT, signs it and adds it to the Response Header
-// via Set-Cookie. Also enables HttpOnly for security
+// creates a JWT, signs it with the provided key
+// and adds it to the Response Header
 func ServeAuthWithKey(privKey *rsa.PrivateKey) (HandleFunc func(w http.ResponseWriter, r *http.Request)) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// parse client's desired username from json body
@@ -29,6 +29,7 @@ func ServeAuthWithKey(privKey *rsa.PrivateKey) (HandleFunc func(w http.ResponseW
 		if err != nil {
 			// If the structure of the body is wrong, return an HTTP error
 			w.WriteHeader(http.StatusBadRequest)
+			fmt.Printf("failed to decode json: %s", err)
 			return
 		}
 
@@ -41,7 +42,7 @@ func ServeAuthWithKey(privKey *rsa.PrivateKey) (HandleFunc func(w http.ResponseW
 		// create JWT
 		t := jwt.New()
 		t.Set(jwt.IssuedAtKey, time.Now())
-		t.Set(`name`, creds.Username)
+		t.Set(`username`, creds.Username)
 		t.Set(`uuid`, uuidStr)
 
 		// Signing the token (using raw rsa.PrivateKey)
@@ -71,4 +72,26 @@ func ServeAuthWithKey(privKey *rsa.PrivateKey) (HandleFunc func(w http.ResponseW
 
 // Middleware
 		// parse and verify
-		// token, err := jwt.ParseHeader(r.Header,"Authorization",jwt.WithVerify(jwa.RS512, &privKey.PublicKey))
+		// 
+
+type authenticationMiddleware struct {
+	privateKey *rsa.PrivateKey
+	// #TODO: later hold client manager to check if already logged in via uuid
+}
+// Middleware function, which will be called for each request
+// checks if user is authenticated via valid token
+// not authorized users requests get redirected to /auth
+func (amw *authenticationMiddleware) Middleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+		token, err := jwt.ParseHeader(r.Header,"Authorization",jwt.WithVerify(jwa.RS512, amw.privateKey.PublicKey))
+		if err != nil {
+			http.Error(w, "Forbidden", http.StatusForbidden)
+		} else {
+			if user, ok := token.Get(`username`); ok {
+				fmt.Printf("Authenticated user %s\n", user)
+			}
+			next.ServeHTTP(w, r)
+		}
+	})
+}

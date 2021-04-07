@@ -59,7 +59,7 @@ func TestAuthTokenIssueing(t *testing.T) {
 	// 
 }
 
-func TestAuthTokenRequestWithValidJson(t *testing.T) {
+func TestAuthRequestWithValidJson(t *testing.T) {
 	postBody, _ := json.Marshal(map[string]string{
 		"username":  "Phil",
 	})
@@ -69,6 +69,31 @@ func TestAuthTokenRequestWithValidJson(t *testing.T) {
 	router := mux.NewRouter()
 	// #TODO: generate key
     router.HandleFunc("/auth", ServeAuthWithKey(nil))
+	router.ServeHTTP(rr, req)
+	res := rr.Result()
+	if res.StatusCode != http.StatusOK {
+		t.Errorf("handler returned wrong status code: got %v want %v",
+		res.StatusCode, http.StatusOK)
+	}
+}
+
+
+func TestAuthTokenResponseVaild(t *testing.T) {
+	postBody, _ := json.Marshal(map[string]string{
+		"username":  "Phil",
+	})
+	req := httptest.NewRequest("POST", "/auth", bytes.NewBuffer(postBody))
+	rr := httptest.NewRecorder()
+
+	// generate private key
+	privKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		fmt.Printf("failed to generate private key: %s\n", err)
+	}
+
+	router := mux.NewRouter()
+	// #TODO: generate key
+    router.HandleFunc("/auth", ServeAuthWithKey(privKey))
 	router.ServeHTTP(rr, req)
 	res := rr.Result()
 	if res.StatusCode != http.StatusOK {
