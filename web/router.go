@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
@@ -12,8 +11,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
-	"github.com/lestrrat-go/jwx/jwa"
-	"github.com/lestrrat-go/jwx/jwt"
 	"github.zhaw.ch/raycasters/server/log"
 	"github.zhaw.ch/raycasters/server/room"
 	"github.zhaw.ch/raycasters/server/web/helpers"
@@ -127,57 +124,4 @@ func serveWs(hubs []*room.Hub, w http.ResponseWriter, r *http.Request) {
 	cm := room.NewClientMeta(uuid, "john dude", conn)
 
 	hubs[roomID].RegisterClient(cm)
-}
-
-
-func serveAuth(privKey *rsa.PrivateKey, w http.ResponseWriter, r *http.Request) {
-	
-	payload := r.Header.Get("Authorization")
-	if len(payload)!=0 {
-		// client has a token
-		token, err := jwt.Parse(
-			[]byte(payload),
-			jwt.WithValidate(true),
-			jwt.WithVerify(jwa.RS512, &privKey.PublicKey),
-		)
-		if err != nil {
-			fmt.Printf("failed to parse JWT token: %s\n", err)
-			return
-		}
-		buf, err := json.MarshalIndent(token, "", "  ")
-		if err != nil {
-			fmt.Printf("failed to generate JSON: %s\n", err)
-			return
-		}
-		fmt.Printf("%s\n", buf)
-		fmt.Printf("welcome back %s\n", token)
-		w.Write(buf)
-	}else{
-		// new client
-		name := r.PostFormValue("name")
-		fmt.Printf("%s would like a token",name)
-
-		t := jwt.New()
-		t.Set(jwt.AudienceKey, `Players`)
-		t.Set(jwt.IssuedAtKey, time.Now())
-		t.Set(`name`, name)
-		t.Set(`uuid`, uuid.New())
-		
-		buf, err := json.MarshalIndent(t, "", "  ")
-		if err != nil {
-			fmt.Printf("failed to generate JSON: %s\n", err)
-			return
-		}
-
-		
-		// Signing the token (using raw rsa.PrivateKey)
-		signed, err := jwt.Sign(t, jwa.RS512, privKey)
-		if err != nil {
-			fmt.Printf("failed to sign token: %s", err)
-			return
-		}	
-		
-		fmt.Printf("%s\n", buf)
-		w.Write(signed)
-		}
 }
