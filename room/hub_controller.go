@@ -5,13 +5,14 @@ import (
 	"sync"
 
 	"github.zhaw.ch/raycasters/server/protocol"
-	"github.zhaw.ch/raycasters/server/protocol/client"
+	pclient "github.zhaw.ch/raycasters/server/protocol/client"
+	"github.zhaw.ch/raycasters/server/room/client"
 	"github.zhaw.ch/raycasters/server/room/helpers"
 )
 
 type hubController struct {
 	// The manager of the different client with the different connections.
-	clientManager clientManager
+	clientManager client.ClientManager
 	connections   map[uint8]helpers.HubQueue
 	wg            sync.WaitGroup
 	lock          sync.RWMutex
@@ -20,24 +21,24 @@ type hubController struct {
 func newHubController() *hubController {
 	// TODO: add map implementation
 	return &hubController{
-		clientManager: newClientManager(),
+		clientManager: client.NewClientManager(),
 		connections:   make(map[uint8]helpers.HubQueue),
 		wg:            sync.WaitGroup{},
 		lock:          sync.RWMutex{},
 	}
 }
 
-func (hc *hubController) clientExists(meta ClientMeta) bool {
+func (hc *hubController) clientExists(meta client.ClientMeta) bool {
 	// check the meta information, so that
 	// there never can be a double increment
 	// per added client.
 	hc.lock.RLock()
 	defer hc.lock.RUnlock()
-	_, ok := hc.clientManager.mapId(meta)
+	_, ok := hc.clientManager.MapId(meta)
 	return ok
 }
 
-func (hc *hubController) registerClient(meta ClientMeta) error {
+func (hc *hubController) registerClient(meta client.ClientMeta) error {
 	// TODO: implement
 
 	// prepare the queues
@@ -45,7 +46,7 @@ func (hc *hubController) registerClient(meta ClientMeta) error {
 
 	// directly add the client to the manager and
 	// let it figure out, what to do here
-	err := hc.clientManager.addClient(meta, cqueue)
+	err := hc.clientManager.AddClient(meta, cqueue)
 
 	// something went wrong while adding the client
 	if err != nil {
@@ -54,7 +55,7 @@ func (hc *hubController) registerClient(meta ClientMeta) error {
 
 	// get id
 	// this will return a value due to adding above without any errors
-	id, _ := hc.clientManager.mapId(meta)
+	id, _ := hc.clientManager.MapId(meta)
 
 	// add the queue to the controller
 	hc.lock.Lock()
@@ -83,7 +84,7 @@ func (hc *hubController) registerClient(meta ClientMeta) error {
 	return nil
 }
 
-func (hc *hubController) removeClient(meta ClientMeta) error {
+func (hc *hubController) removeClient(meta client.ClientMeta) error {
 	// TODO: add implementation
 
 	return nil
@@ -92,7 +93,7 @@ func (hc *hubController) removeClient(meta ClientMeta) error {
 // BroadCast will as the name implies broadcast a given
 // byte interface to a given client.
 func (h *hubController) broadCast(msg protocol.Bytefy) {
-	h.clientManager.broadCast(msg)
+	// TODO: implement
 }
 
 func (h *hubController) shutdown(cxt context.Context) {
@@ -136,26 +137,26 @@ func (h *hubController) shutdown(cxt context.Context) {
 // }
 
 func (c *hubController) handleRead(data []byte) protocol.Bytefy {
-	switch client.Detect(data[0]) {
-	case client.DisconnectOpcode:
+	switch pclient.Detect(data[0]) {
+	case pclient.DisconnectOpcode:
 		// Received a Disconnect request from client
 		c.handleDisconnect(data)
-	case client.UnknownOpcode:
+	case pclient.UnknownOpcode:
 		// hubController received Unknown request from Server
 		c.handleUnknownSent(data)
-	case client.WhoAmIOpcode:
+	case pclient.WhoAmIOpcode:
 		// Received a WhoAmI request from client
 		c.handleWhoAmI(data)
-	case client.MovementOpcode:
+	case pclient.MovementOpcode:
 		// Received a Movement request from client
 		c.handleMovement(data)
-	case client.ShootingOpcode:
+	case pclient.ShootingOpcode:
 		// Received a Shooting request from client
 		c.handleShooting(data)
-	case client.RequestOtherPlayersOpcode:
+	case pclient.RequestOtherPlayersOpcode:
 		// Received a RequestOtherPlayers request from client
 		c.handleRequestOtherPlayer(data)
-	case client.RequestPlayerKDOpcode:
+	case pclient.RequestPlayerKDOpcode:
 		// Received a RequestOtherPlayers request from client
 		c.handleRequestOtherPlayer(data)
 	default:
@@ -167,7 +168,7 @@ func (c *hubController) handleRead(data []byte) protocol.Bytefy {
 }
 
 func (c *hubController) handleUnknownReceived(t []byte) {
-	_, err := client.NewUnknownByte(t)
+	_, err := pclient.NewUnknownByte(t)
 	if err != nil {
 		logger.Info(err)
 		//newUnknown := server.NewUnknown()
@@ -179,7 +180,7 @@ func (c *hubController) handleUnknownReceived(t []byte) {
 }
 
 func (c *hubController) handleDisconnect(t []byte) {
-	_, err := client.NewDisconnectByte(t)
+	_, err := pclient.NewDisconnectByte(t)
 	if err != nil {
 		logger.Info(err)
 		//newUnknown := server.NewUnknown()
@@ -197,7 +198,7 @@ func (c *hubController) handleUnknownSent(t []byte) {
 }
 
 func (c *hubController) handleWhoAmI(t []byte) {
-	_, err := client.NewWhoAmIByte(t)
+	_, err := pclient.NewWhoAmIByte(t)
 	if err != nil {
 		logger.Info(err)
 		//newUnknown := server.NewUnknown()
@@ -209,7 +210,7 @@ func (c *hubController) handleWhoAmI(t []byte) {
 }
 
 func (c *hubController) handleMovement(t []byte) {
-	_, err := client.NewMovementByte(t)
+	_, err := pclient.NewMovementByte(t)
 	if err != nil {
 		logger.Info(err)
 		//newUnknown := server.NewUnknown()
@@ -221,7 +222,7 @@ func (c *hubController) handleMovement(t []byte) {
 }
 
 func (c *hubController) handleShooting(t []byte) {
-	_, err := client.NewShootingBytes(t)
+	_, err := pclient.NewShootingBytes(t)
 	if err != nil {
 		logger.Info(err)
 		///newUnknown := server.NewUnknown()
@@ -236,7 +237,7 @@ func (c *hubController) handleShooting(t []byte) {
 }
 
 func (c *hubController) handleRequestOtherPlayer(t []byte) {
-	_, err := client.NewRequestOtherPlayersBytes(t)
+	_, err := pclient.NewRequestOtherPlayersBytes(t)
 	if err != nil {
 		logger.Info(err)
 		//newUnknown := server.NewUnknown()
@@ -248,7 +249,7 @@ func (c *hubController) handleRequestOtherPlayer(t []byte) {
 }
 
 func (c *hubController) handleRequestPlayerKD(t []byte) {
-	_, err := client.NewRequestPlayerKDByte(t)
+	_, err := pclient.NewRequestPlayerKDByte(t)
 	if err != nil {
 		logger.Info(err)
 		//newUnknown := server.NewUnknown()

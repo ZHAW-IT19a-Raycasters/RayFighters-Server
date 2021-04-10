@@ -1,4 +1,4 @@
-package room
+package client
 
 import "io"
 

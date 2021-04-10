@@ -1,10 +1,12 @@
-package room
+package client
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
 	"github.com/google/uuid"
+	"github.zhaw.ch/raycasters/server/room/helpers"
 )
 
 func getClientMeta(i int) (ClientMeta, *MockedConnection) {
@@ -46,20 +48,22 @@ func compareByteSlices(expeced, gotten []byte, t *testing.T) bool {
 	return true
 }
 
-/*
 func TestClientManagerAddClientSigle(t *testing.T) {
-	hubMock := newMockedHubClientInteraction()
-	cm := newClientManager(&hubMock)
-	defer cm.shutdown(context.Background())
+
+	cm := NewClientManager()
+	defer cm.Shutdown(context.Background())
 
 	// make sure size starts at 0
-	if cm.size() != 0 {
+	if cm.Size() != 0 {
 		t.Error("client manager does not start at zero")
 		return
 	}
 
 	clientMeta, _ := getClientMeta(0)
-	err := cm.addClient(clientMeta)
+	clientQueue, _ := helpers.NewWorkQueue()
+
+	err := cm.AddClient(clientMeta, clientQueue)
+
 	if err != nil {
 		t.Errorf("An unexpected error occuered, while adding a new client\n[%s]", err.Error())
 		return
@@ -96,14 +100,16 @@ func TestClientManagerAddClientSigle(t *testing.T) {
 	}
 }
 
+/*
 func TestClientManagerAddClientTwice(t *testing.T) {
-	hubMock := newMockedHubClientInteraction()
 	cm := newClientManager(&hubMock)
 	defer cm.shutdown(context.Background())
 
 	clientMeta, _ := getClientMeta(0)
 
-	err := cm.addClient(clientMeta)
+	clientQueue, _ := helpers.NewWorkQueue()
+
+	err := cm.addClient(clientMeta, clientQueue)
 	if err != nil {
 		t.Errorf("An unexpected error occuered, while adding a new client\n[%s]", err.Error())
 		return

@@ -1,4 +1,4 @@
-package room
+package client
 
 import (
 	"context"
@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.zhaw.ch/raycasters/server/protocol"
 	"github.zhaw.ch/raycasters/server/room/helpers"
 )
 
@@ -25,14 +24,27 @@ type ErrClientDoesntExist struct {
 	meta ClientMeta
 }
 
+func NewErrClientDoesntExist(meta ClientMeta) ErrClientDoesntExist {
+	return ErrClientDoesntExist{
+		meta,
+	}
+}
+
 // Error is the function used to fullfill the error interface.
 func (err ErrClientDoesntExist) Error() string {
 	return fmt.Sprintf("client doesn't exist [%d] - [%s]", err.meta.id, err.meta.name)
 }
 
-// clientManager is the struct responsible for managing
+// Is satisfies the error.Is requirements, so that
+// the error above can be recogised correctly.
+func (err ErrClientDoesntExist) Is(target error) bool {
+	_, ok := target.(ErrClientDoesntExist)
+	return ok
+}
+
+// ClientManager is the struct responsible for managing
 // any and all client connections.
-type clientManager struct {
+type ClientManager struct {
 	// an overview of all the clients in the room currently.
 	clients map[uint8]*Client
 	// mapps from the external uuid to the internally used
@@ -48,32 +60,42 @@ type clientManager struct {
 	lock sync.RWMutex
 }
 
-// newClientManager will initialize a new clientManager instance.
-func newClientManager() clientManager {
-	return clientManager{
+// NewClientManager will initialize a new clientManager instance.
+func NewClientManager() ClientManager {
+	return ClientManager{
 		clients:   make(map[uint8]*Client),
 		mapping:   make(map[uuid.UUID]uint8),
 		idManager: helpers.NewIdManager(),
+		lock:      sync.RWMutex{},
 		wg:        &sync.WaitGroup{},
 	}
 }
 
-// size will return the current client count.
-// Attention this is a non threadsafe count,
-// so the number might not be correct.
-func (manager *clientManager) size() int {
+// Size will return the current client count.
+// Attention although this is a threadsafe
+// locking functions it is not recommended
+// to be used, as it forces the usege of
+// a reader lock and that will slow down
+// other write processes.
+func (manager *ClientManager) Size() int {
+	manager.lock.RLock()
+	defer manager.lock.RUnlock()
 	return len(manager.clients)
 }
 
-// mapId will map the client meta information with the internal value.
+// MapId will map the client meta information with the internal value.
 // If there is no such person this function will return false and
 // a zero value.
-func (manager *clientManager) mapId(meta ClientMeta) (uint8, bool) {
+// Attention this is threadsafe
+func (manager *ClientManager) MapId(meta ClientMeta) (uint8, bool) {
+	manager.lock.RLock()
+	defer manager.lock.RUnlock()
+
 	id, ok := manager.mapping[meta.id]
 	return id, ok
 }
 
-// addClient will add a new client to the manager, if the client has
+// AddClient will add a new client to the manager, if the client has
 // once before been added, then the previous connection will be
 // replaced, as per definition a client can only reconnect,
 // over a new connection. If the client uuid already has a working
@@ -81,14 +103,14 @@ func (manager *clientManager) mapId(meta ClientMeta) (uint8, bool) {
 //
 // If there is no more space left in the client manager
 // this function will panic.
-func (manager *clientManager) addClient(meta ClientMeta, queue helpers.ClientQueue) error {
+func (manager *ClientManager) AddClient(meta ClientMeta, queue helpers.ClientQueue) error {
 
 	// lock the hub, so that writing is okay
 	manager.lock.Lock()
 	defer manager.lock.Unlock()
 
 	// check if client ID already exists.
-	if id, ok := manager.mapId(meta); ok {
+	if id, ok := manager.MapId(meta); ok {
 		// the person already exisited in the Hub
 		// add him back
 		if client, ok := manager.clients[id]; ok {
@@ -133,10 +155,10 @@ func (manager *clientManager) addClient(meta ClientMeta, queue helpers.ClientQue
 	return nil
 }
 
-// removeClient will remove the given client from the manager, this will return an error
+// RemoveClient will remove the given client from the manager, this will return an error
 // if the given client does not exist.
-func (manager *clientManager) removeClient(meta ClientMeta) error {
-	id, ok := manager.mapId(meta)
+func (manager *ClientManager) RemoveClient(meta ClientMeta) error {
+	id, ok := manager.MapId(meta)
 	if !ok {
 		return ErrClientDoesntExist{meta}
 	}
@@ -199,10 +221,10 @@ func (manager *clientManager) removeClient(meta ClientMeta) error {
 	return nil
 }
 
-// shutdown is a completed shutdown of all the client manager
-// there is no way to restart a manager, as to speed up the shutdown
+// Shutdown is a completed Shutdown of all the client manager
+// there is no way to restart a manager, as to speed up the Shutdown
 // the clients will only partially be deregistered.
-func (manager *clientManager) shutdown(cxt context.Context) {
+func (manager *ClientManager) Shutdown(cxt context.Context) {
 	// Will tell all the clients to shutdown in the given shutdown time.
 	childCxt, chancelCxt := context.WithTimeout(cxt, ClientShutdownTime)
 
@@ -240,30 +262,5 @@ func (manager *clientManager) shutdown(cxt context.Context) {
 		logger.Debug("client manager shutdown complete")
 	case <-cxt.Done():
 		logger.Info("client manager was forcefully shutdown")
-	}
-}
-
-// broadCast will send the given message to all the connected clients.
-// This function allows for a blacklist, so that the server does not send
-// the broadcast to those clients.
-func (manager *clientManager) broadCast(msg protocol.Bytefy) {
-	// TODO: implement broadCast
-	// This waits on final client implementation.
-
-	// use a reader lock for this, as any kind of write would be problematic.
-	manager.lock.RLock()
-	defer manager.lock.RUnlock()
-
-	// loop over all the connected clients and internaly over the except
-	for id, client := range manager.clients {
-		// check if client is still active, if not ignore that client
-		if client.status != Active {
-			continue
-		}
-
-		// TODO: maybe use a channel here, so to
-		// not block the broadCast too much.
-		meta := manager.clients[id]
-		meta.SendData(msg)
 	}
 }
