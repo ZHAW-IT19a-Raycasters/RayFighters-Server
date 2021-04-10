@@ -1,12 +1,11 @@
-package room
+package client
 
 import (
 	"context"
 	"errors"
 	"sync"
 
-	"github.zhaw.ch/raycasters/server/protocol"
-	"github.zhaw.ch/raycasters/server/protocol/server"
+	"github.zhaw.ch/raycasters/server/gamemap"
 	"github.zhaw.ch/raycasters/server/room/helpers"
 	"github.zhaw.ch/raycasters/server/utils"
 
@@ -36,25 +35,13 @@ func (c ConnectionStatus) String() string {
 	return vals[c]
 }
 
-type HubClientInteraction interface {
-	// Get All Players from Hub
-	GetAllPlayers() []server.Player
-	// bool to check if player was hit
-	// server.Player to know which player
-	PlayerGotHit() (bool, server.Player)
-
-	PlayersKD() []server.PlayerKD
-
-	UnregisterClient(meta ClientMeta) error
-}
-
 type ClientGame struct {
-	pos    Coordinate
+	pos    gamemap.Coordinate
 	kills  uint
 	deaths uint
 }
 
-func NewClientGame(pos Coordinate) ClientGame {
+func NewClientGame(pos gamemap.Coordinate) ClientGame {
 	return ClientGame{
 		pos:    pos,
 		kills:  0,
@@ -108,7 +95,7 @@ type Client struct {
 
 func NewClient(id uint8, meta ClientMeta, queue helpers.ClientQueue) *Client {
 	c := Client{
-		info:     NewClientGame(NewCoordinate()),
+		info:     NewClientGame(gamemap.NewCoordinate()),
 		queue:    queue,
 		status:   Offline,
 		isActive: utils.NewAtomicBool(false),
@@ -122,14 +109,15 @@ func NewClient(id uint8, meta ClientMeta, queue helpers.ClientQueue) *Client {
 	return &c
 }
 
+// registerConn will register the new client with it's exclusive hub connection.
+// Attention this function assumes that there already is a lock on the client
+// object.
 func (c *Client) registerConn(conn ClientMeta, queue helpers.ClientQueue) error {
 	// check if the recv is running
 	if c.isActive.Get() {
 		return ErrClientReaderAlreadyActive
 	}
 
-	c.lock.Lock()
-	defer c.lock.Unlock()
 	// make sure that there is no chance of this conn
 	// already beeing registered
 	if c.status == Registered {
@@ -152,7 +140,7 @@ func (c *Client) Run() error {
 	// the counter might be wrong
 	// using a function to ensure that the lock is dropped as fast
 	// as possible
-	c.wg.Add(1)
+	c.wg.Add(2)
 
 	setupStates := func() {
 		c.lock.Lock()
@@ -162,7 +150,14 @@ func (c *Client) Run() error {
 	}
 	setupStates()
 
-	go c.recvData()
+	go func() {
+		c.recvData()
+		c.wg.Done()
+	}()
+	go func() {
+		c.sendData()
+		c.wg.Done()
+	}()
 
 	return nil
 }
@@ -198,7 +193,7 @@ func (c *Client) Shutdown(ctx context.Context) {
 
 	// send the deconnect opcode
 	// ignore error as it is not important
-	_ = c.SendData(server.NewDisconnect())
+	//_ = c.SendData(server.NewDisconnect())
 
 	// make a channel on which, we can wait on.
 	runs := make(chan struct{})
@@ -227,19 +222,28 @@ func (c *Client) Shutdown(ctx context.Context) {
 	}
 }
 
-func (c *Client) SendData(message protocol.Bytefy) error {
+func (c *Client) sendData() error {
+
 	if !c.isActive.Get() {
 		return ErrClientReaderAlreadyActive
 	}
 
-	cw, err := c.meta.conn.NextWriter(1)
-	if err != nil {
-		// TODO: create a fixed error
-		// return error
-		return errors.New("something went wrong with creating NextWriter")
+	for {
+		message, err := c.queue.Dequeue()
+
+		if err != nil {
+			// this means that we have to shutdown the system
+			return nil
+		}
+		cw, err := c.meta.conn.NextWriter(websocket.BinaryMessage)
+
+		if err != nil {
+			// TODO: create a fixed error
+			// return error
+			return errors.New("something went wrong with creating NextWriter")
+		}
+		_, _ = cw.Write(message)
 	}
-	_, _ = cw.Write(message.Bytes())
-	return nil
 }
 
 // registerTimeout will register the timeout in the timeout queue
@@ -275,8 +279,6 @@ func (c *Client) recvData() {
 		// of the connection has to be per definition
 		// false.
 		_ = c.isActive.SetFalse()
-		// remove the thread from the waitgroup
-		c.wg.Done()
 	}()
 
 	for {

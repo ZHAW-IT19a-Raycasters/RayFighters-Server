@@ -5,8 +5,12 @@ import (
 	"errors"
 	"math"
 
+	"github.zhaw.ch/raycasters/server/log"
+	"github.zhaw.ch/raycasters/server/room/client"
 	"github.zhaw.ch/raycasters/server/utils"
 )
+
+var logger = log.Log()
 
 // HubClientLimit is the absolute upper limit supported
 // by a single hub. This limitation comes from the
@@ -36,10 +40,10 @@ type Hub struct {
 	// is added. This connections input can be accessed
 	// via the `RegisterClient` function associated
 	// with this type.
-	input chan ClientMeta
+	input chan client.ClientMeta
 	// The channel over which a connections
 	// are removed over. This
-	output chan ClientMeta
+	output chan client.ClientMeta
 	// The channel that signals the main loop to shutdown.
 	shutdown chan struct{}
 	// If the current hub is running or not.
@@ -51,8 +55,8 @@ type Hub struct {
 // the data structures.
 func NewHub(hubId int) *Hub {
 	h := &Hub{
-		input:      make(chan ClientMeta),
-		output:     make(chan ClientMeta),
+		input:      make(chan client.ClientMeta),
+		output:     make(chan client.ClientMeta),
 		controller: newHubController(),
 		shutdown:   make(chan struct{}),
 		id:         hubId,
@@ -80,7 +84,7 @@ func (h *Hub) Full() bool {
 
 // RegisterClient will use the meta information given
 // by the parameter to check if the player
-func (h *Hub) RegisterClient(meta ClientMeta) error {
+func (h *Hub) RegisterClient(meta client.ClientMeta) error {
 
 	// if the client does not have an entry in the
 	// manager, then the player count has to be
@@ -104,7 +108,7 @@ func (h *Hub) RegisterClient(meta ClientMeta) error {
 
 // UnregisterClient will give the hub the command to remove
 // a given client from the system.
-func (h *Hub) UnregisterClient(meta ClientMeta) error {
+func (h *Hub) UnregisterClient(meta client.ClientMeta) error {
 	// Attention, this function does not actually decrement
 	// the client counter. That has to happen at the very
 	// last moment, after the client has been completely removed
@@ -112,7 +116,7 @@ func (h *Hub) UnregisterClient(meta ClientMeta) error {
 
 	// check if the client exists.
 	if !h.controller.clientExists(meta) {
-		return ErrClientDoesntExist{meta}
+		return client.NewErrClientDoesntExist(meta)
 	}
 
 	// client exists so give the removal command
@@ -125,7 +129,7 @@ func (h *Hub) UnregisterClient(meta ClientMeta) error {
 // client manager and decrementing a client.
 // Attention decrementing the client may only happen
 // in a case, that there actually was a client removed.
-func (h *Hub) removeClient(meta ClientMeta) {
+func (h *Hub) removeClient(meta client.ClientMeta) {
 	// TODO: Remove client from Map
 	err := h.controller.removeClient(meta)
 	// if there was an error here there was a

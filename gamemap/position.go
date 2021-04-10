@@ -1,4 +1,4 @@
-package room
+package gamemap
 
 type Coordinate struct {
 	x    float64
