@@ -9,7 +9,6 @@ import (
 	"github.zhaw.ch/raycasters/server/room/helpers"
 	"github.zhaw.ch/raycasters/server/utils"
 
-	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.zhaw.ch/raycasters/server/log"
 )
@@ -17,71 +16,6 @@ import (
 var logger = log.Log()
 
 var ErrClientReaderAlreadyActive = errors.New("the client worker is already active")
-
-type ConnectionStatus uint
-
-const (
-	Active ConnectionStatus = iota
-	Registered
-	Timeout
-	ShuttingDown
-	Offline
-)
-
-func (c ConnectionStatus) String() string {
-	vals := [...]string{
-		"Active", "Registered", "Timeout", "ShuttingDown", "Offline",
-	}
-	return vals[c]
-}
-
-type ClientGame struct {
-	pos    gamemap.Coordinate
-	kills  uint
-	deaths uint
-}
-
-func NewClientGame(pos gamemap.Coordinate) ClientGame {
-	return ClientGame{
-		pos:    pos,
-		kills:  0,
-		deaths: 0,
-	}
-}
-
-type ClientMeta struct {
-	id   uuid.UUID
-	name string
-	conn ClientConnection
-}
-
-func NewClientMeta(id uuid.UUID, name string, conn ClientConnection) ClientMeta {
-	return ClientMeta{
-		id:   id,
-		name: name,
-		conn: conn,
-	}
-}
-
-type ClientInternalMeta struct {
-	id   uint8
-	eId  uuid.UUID
-	name string
-	conn ClientConnection
-}
-
-func (c ClientInternalMeta) getMeta() ClientMeta {
-	return NewClientMeta(c.eId, c.name, c.conn)
-}
-
-func NewClientInternalMeta(id uint8, client ClientMeta) ClientInternalMeta {
-	return ClientInternalMeta{
-		id:   id,
-		eId:  client.id,
-		name: client.name,
-		conn: client.conn,
-	}
-}
 
 type Client struct {
 	info     ClientGame
@@ -117,6 +51,9 @@ func (c *Client) registerConn(conn ClientMeta, queue helpers.ClientQueue) error 
 	if c.isActive.Get() {
 		return ErrClientReaderAlreadyActive
 	}
+
+	c.lock.Lock()
+	defer c.lock.Unlock()
 
 	// make sure that there is no chance of this conn
 	// already beeing registered
