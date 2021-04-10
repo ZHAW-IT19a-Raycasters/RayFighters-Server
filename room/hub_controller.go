@@ -18,6 +18,7 @@ type hubController struct {
 }
 
 func newHubController() *hubController {
+	// TODO: add map implementation
 	return &hubController{
 		clientManager: newClientManager(),
 		connections:   make(map[uint8]helpers.HubQueue),
@@ -71,8 +72,11 @@ func (hc *hubController) registerClient(meta ClientMeta) error {
 			if err != nil {
 				break
 			}
-			// TODO: get instructions from functions on what to send back here
-			hc.handleRead(data)
+
+			go func() {
+				gotten := hc.handleRead(data)
+				hqueue.Enqueue(gotten.Bytes())
+			}()
 		}
 	}()
 
@@ -131,7 +135,7 @@ func (h *hubController) shutdown(cxt context.Context) {
 // 	return players
 // }
 
-func (c *hubController) handleRead(data []byte) {
+func (c *hubController) handleRead(data []byte) protocol.Bytefy {
 	switch client.Detect(data[0]) {
 	case client.DisconnectOpcode:
 		// Received a Disconnect request from client
@@ -158,6 +162,8 @@ func (c *hubController) handleRead(data []byte) {
 		// Received Unknown Code from client
 		c.handleUnknownReceived(data)
 	}
+	// TODO: change to actuall return
+	return nil
 }
 
 func (c *hubController) handleUnknownReceived(t []byte) {
