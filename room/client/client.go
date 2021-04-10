@@ -236,7 +236,6 @@ func (c *Client) sendData() error {
 		}
 		_, _ = cw.Write(message)
 	}
-	return nil
 }
 
 // registerTimeout will register the timeout in the timeout queue

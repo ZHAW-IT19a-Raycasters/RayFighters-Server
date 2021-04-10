@@ -11,6 +11,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.zhaw.ch/raycasters/server/log"
 	"github.zhaw.ch/raycasters/server/room"
+	"github.zhaw.ch/raycasters/server/room/client"
 	"github.zhaw.ch/raycasters/server/web/helpers"
 
 	webconfig "github.zhaw.ch/raycasters/server/web/config"
@@ -110,7 +111,7 @@ func serveWs(hubs []*room.Hub, w http.ResponseWriter, r *http.Request) {
 
 	// create and register client
 	uuid := uuid.New()
-	cm := room.NewClientMeta(uuid, "john dude", conn)
+	cm := client.NewClientMeta(uuid, "john dude", conn)
 
 	hubs[roomID].RegisterClient(cm)
 }
