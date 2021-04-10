@@ -1,10 +1,14 @@
 package client
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"io"
 	"testing"
 
+	"github.com/gorilla/websocket"
+	pclient "github.zhaw.ch/raycasters/server/protocol/client"
 	"github.zhaw.ch/raycasters/server/room/helpers"
 )
 
@@ -50,4 +54,31 @@ func TestClientregisterConn(t *testing.T) {
 	}
 
 	client.Shutdown(context.TODO())
+}
+
+func TestClientResv(t *testing.T) {
+	cq, hq := helpers.NewWorkQueue()
+	cmeta, mock := getClientMeta(1)
+
+	funcTransfer := make(chan func() (int, io.Reader, error))
+
+	mock.funcNextReader = func() (int, io.Reader, error) {
+		return (<-funcTransfer)()
+	}
+
+	client := NewClient(1, cmeta, cq)
+	defer client.Shutdown(context.TODO())
+	client.Run()
+
+	// fill up the channel
+	buffer := []byte{pclient.DisconnectOpcode.Value()}
+	funcTransfer <- func() (int, io.Reader, error) {
+		return 0, bytes.NewReader(buffer), nil
+	}
+	funcTransfer <- func() (int, io.Reader, error) {
+		return 0, nil, websocket.ErrCloseSent
+	}
+
+	data, _ := hq.Dequeue()
+	compareByteSlices(buffer, data, t)
 }
