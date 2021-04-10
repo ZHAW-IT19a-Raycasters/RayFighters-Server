@@ -51,12 +51,13 @@ type Hub struct {
 // the data structures.
 func NewHub(hubId int) *Hub {
 	h := &Hub{
-		input:    make(chan ClientMeta),
-		output:   make(chan ClientMeta),
-		shutdown: make(chan struct{}),
-		id:       hubId,
-		counter:  utils.NewSemaphore(HubClientLimit),
-		isActive: utils.NewAtomicBool(false),
+		input:      make(chan ClientMeta),
+		output:     make(chan ClientMeta),
+		controller: newHubController(),
+		shutdown:   make(chan struct{}),
+		id:         hubId,
+		counter:    utils.NewSemaphore(HubClientLimit),
+		isActive:   utils.NewAtomicBool(false),
 	}
 	return h
 }
@@ -82,7 +83,8 @@ func (h *Hub) Full() bool {
 func (h *Hub) RegisterClient(meta ClientMeta) error {
 
 	// if the client does not have an entry in the
-	// manager, then the counter may be incremented.
+	// manager, then the player count has to be
+	// incremented.
 	if !h.controller.clientExists(meta) {
 		// increment the counter
 		// if the counter already is maxed out
