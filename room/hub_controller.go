@@ -1,19 +1,89 @@
 package room
 
-import "github.zhaw.ch/raycasters/server/utils"
+import (
+	"context"
+	"sync"
+
+	"github.zhaw.ch/raycasters/server/protocol"
+)
 
 type hubController struct {
 	// The manager of the different client with the different connections.
 	clientManager clientManager
-	// Is the player counter, this variable counts the active
-	// player connections, although that number is already available
-	// via the client map length, is would have to be accessed
-	// from behind a lock. And so creates an unneeded overhead
-	// while asynchronously adding a new client. So to avoid the given
-	// overhead an atomic implementation is here used.
-	counter utils.Semaphore
+	lock          sync.RWMutex
 }
 
 func newHubController() *hubController {
-	return &hubController{}
+	return &hubController{
+		clientManager: newClientManager(),
+		lock:          sync.RWMutex{},
+	}
 }
+
+func (hc *hubController) clientExists(meta ClientMeta) bool {
+	// check the meta information, so that
+	// there never can be a double increment
+	// per added client.
+	hc.lock.RLock()
+	defer hc.lock.RUnlock()
+	_, ok := hc.clientManager.mapId(meta)
+	return ok
+}
+
+func (hc *hubController) registerClient(meta ClientMeta) error {
+	// TODO: implement
+
+	return nil
+}
+
+func (hc *hubController) removeClient(meta ClientMeta) error {
+	// TODO: add implementation
+
+	return nil
+}
+
+// BroadCast will as the name implies broadcast a given
+// byte interface to a given client.
+func (h *hubController) broadCast(msg protocol.Bytefy) {
+	h.clientManager.broadCast(msg)
+}
+
+func (h *hubController) shutdown(cxt context.Context) {
+	// TODO:
+}
+
+// func (h *hubController) PlayerGotHit() (bool, server.Player) {
+// 	// TODO: implement the player got hit interface
+// 	// figure out if this is the correct path for
+// 	// comminication
+// 	return false, server.NewPlayer(0, "")
+// }
+
+// func (h *hubController) PlayersKD() []server.PlayerKD {
+// 	// TODO: implement this
+// 	// figure out if this is the correct path
+// 	// for communication between the client
+// 	// and the hub
+
+// 	return []server.PlayerKD{}
+// }
+
+// // GetAllPlayers will generate a slice
+// // of send able player data.
+// func (h *hubController) GetAllPlayers() []server.Player {
+// 	// lock the client manager, so that there is no
+// 	// changes during this process.
+// 	h.clientManager.lock.RLock()
+// 	defer h.clientManager.lock.RUnlock()
+
+// 	// pre-allocate all the players
+// 	players := make([]server.Player, h.clientManager.size())
+
+// 	i := 0 // add counter
+// 	for userID, client := range h.clientManager.clients {
+// 		players[i] = server.NewPlayer(userID, client.meta.name)
+// 		i += 1
+// 	}
+
+// 	return players
+// }

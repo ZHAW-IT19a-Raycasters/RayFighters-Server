@@ -5,8 +5,6 @@ import (
 	"errors"
 	"math"
 
-	"github.zhaw.ch/raycasters/server/protocol"
-	"github.zhaw.ch/raycasters/server/protocol/server"
 	"github.zhaw.ch/raycasters/server/utils"
 )
 
@@ -24,8 +22,9 @@ var ErrHubIsFull = errors.New("the hub is currently filled to capacity")
 type Hub struct {
 	// id is the designated hub identifier
 	id int
-	// The manager of the different client with the different connections.
-	clientManager clientManager
+	// controller is the struct responsible for running all the client opcodes
+	// and handling all the io.
+	controller *hubController
 	// Is the player counter, this variable counts the active
 	// player connections, although that number is already available
 	// via the client map length, is would have to be accessed
@@ -59,49 +58,12 @@ func NewHub(hubId int) *Hub {
 		counter:  utils.NewSemaphore(HubClientLimit),
 		isActive: utils.NewAtomicBool(false),
 	}
-	h.clientManager = newClientManager()
 	return h
-}
-
-func (h *Hub) PlayerGotHit() (bool, server.Player) {
-	// TODO: implement the player got hit interface
-	// figure out if this is the correct path for
-	// comminication
-	return false, server.NewPlayer(0, "")
-}
-
-func (h *Hub) PlayersKD() []server.PlayerKD {
-	// TODO: implement this
-	// figure out if this is the correct path
-	// for communication between the client
-	// and the hub
-
-	return []server.PlayerKD{}
 }
 
 // IsAlive will check if the current hub is running or not.
 func (h *Hub) IsAlive() bool {
 	return h.isActive.Get()
-}
-
-// GetAllPlayers will generate a slice
-// of send able player data.
-func (h *Hub) GetAllPlayers() []server.Player {
-	// lock the client manager, so that there is no
-	// changes during this process.
-	h.clientManager.lock.RLock()
-	defer h.clientManager.lock.RUnlock()
-
-	// pre-allocate all the players
-	players := make([]server.Player, h.clientManager.size())
-
-	i := 0 // add counter
-	for userID, client := range h.clientManager.clients {
-		players[i] = server.NewPlayer(userID, client.meta.name)
-		i += 1
-	}
-
-	return players
 }
 
 // Size will return the current player count
@@ -115,36 +77,24 @@ func (h *Hub) Full() bool {
 	return h.counter.Full()
 }
 
-// ClientExists will check if a specific client
-// has an entry in the hub or not.
-func (h *Hub) ClientExists(meta ClientMeta) bool {
-	h.clientManager.lock.RLock()
-	defer h.clientManager.lock.RUnlock()
-	_, ok := h.clientManager.mapId(meta)
-	return ok
-}
-
 // RegisterClient will use the meta information given
 // by the parameter to check if the player
 func (h *Hub) RegisterClient(meta ClientMeta) error {
-	// check the meta information, so that
-	// there never can be a double increment
-	// per added client.
-	h.clientManager.lock.RLock()
-	defer h.clientManager.lock.RUnlock()
 
 	// if the client does not have an entry in the
 	// manager, then the counter may be incremented.
-	if !h.ClientExists(meta) {
+	if !h.controller.clientExists(meta) {
 		// increment the counter
 		// if the counter already is maxed out
 		// this will return an error
 		err := h.counter.Acquire()
+
 		if err != nil {
 			return ErrHubIsFull
 		}
 	}
 
+	// add the client to the queue to be added into the system
 	h.input <- meta
 
 	return nil
@@ -159,19 +109,13 @@ func (h *Hub) UnregisterClient(meta ClientMeta) error {
 	// from the hub.
 
 	// check if the client exists.
-	if !h.ClientExists(meta) {
+	if !h.controller.clientExists(meta) {
 		return ErrClientDoesntExist{meta}
 	}
 
 	// client exists so give the removal command
 	h.output <- meta
 	return nil
-}
-
-// BroadCast will as the name implies broadcast a given
-// byte interface to a given client.
-func (h *Hub) BroadCast(msg protocol.Bytefy) {
-	h.clientManager.broadCast(msg)
 }
 
 // removeClient is the actuall functionality, that is
@@ -181,7 +125,7 @@ func (h *Hub) BroadCast(msg protocol.Bytefy) {
 // in a case, that there actually was a client removed.
 func (h *Hub) removeClient(meta ClientMeta) {
 	// TODO: Remove client from Map
-	err := h.clientManager.removeClient(meta)
+	err := h.controller.removeClient(meta)
 	// if there was an error here there was a
 	// double remove called, in the time it took to
 	// remove the specific client. This can only be
@@ -237,10 +181,11 @@ func (h *Hub) Shutdown(cxt context.Context) {
 	waitCompletion := make(chan struct{})
 
 	go func() {
-		h.clientManager.shutdown(cxt)
-		close(waitCompletion)
+		h.controller.shutdown(cxt)
 		// make sure that the main thread is closed
 		close(h.shutdown)
+		// close blocker
+		close(waitCompletion)
 	}()
 
 	select {
