@@ -6,8 +6,8 @@ import (
 	"sync"
 
 	"github.zhaw.ch/raycasters/server/protocol"
-	"github.zhaw.ch/raycasters/server/protocol/client"
 	"github.zhaw.ch/raycasters/server/protocol/server"
+	"github.zhaw.ch/raycasters/server/room/helpers"
 	"github.zhaw.ch/raycasters/server/utils"
 
 	"github.com/google/uuid"
@@ -97,19 +97,19 @@ func NewClientInternalMeta(id uint8, client ClientMeta) ClientInternalMeta {
 }
 
 type Client struct {
-	hub      HubClientInteraction
 	info     ClientGame
 	meta     ClientInternalMeta
+	queue    helpers.ClientQueue
 	status   ConnectionStatus
 	isActive utils.AtomicBool
 	wg       sync.WaitGroup
 	lock     sync.RWMutex
 }
 
-func NewClient(id uint8, meta ClientMeta, hub HubClientInteraction) *Client {
+func NewClient(id uint8, meta ClientMeta, queue helpers.ClientQueue) *Client {
 	c := Client{
 		info:     NewClientGame(NewCoordinate()),
-		hub:      hub,
+		queue:    queue,
 		status:   Offline,
 		isActive: utils.NewAtomicBool(false),
 		wg:       sync.WaitGroup{},
@@ -117,12 +117,12 @@ func NewClient(id uint8, meta ClientMeta, hub HubClientInteraction) *Client {
 	}
 
 	// register connection
-	c.registerConn(meta)
+	c.registerConn(meta, queue)
 
 	return &c
 }
 
-func (c *Client) registerConn(conn ClientMeta) error {
+func (c *Client) registerConn(conn ClientMeta, queue helpers.ClientQueue) error {
 	// check if the recv is running
 	if c.isActive.Get() {
 		return ErrClientReaderAlreadyActive
@@ -137,6 +137,7 @@ func (c *Client) registerConn(conn ClientMeta) error {
 	}
 	c.status = Registered
 	c.meta = NewClientInternalMeta(c.meta.id, conn)
+	c.queue = queue
 
 	return nil
 }
@@ -170,7 +171,7 @@ func (c *Client) checkOffline() bool {
 	// this write lock is needed in the later parts
 	// of the processes
 	c.lock.RLock()
-	c.lock.RUnlock()
+	defer c.lock.RUnlock()
 	// don't bother with running the function more then
 	// once
 	// unlock again here
@@ -247,6 +248,8 @@ func (c *Client) registerTimeout() {
 	defer c.lock.Unlock()
 	// TODO: Timer
 	c.status = Timeout
+
+	c.queue.Shutdown()
 	// close the connection
 	_ = c.meta.conn.Close()
 	// set the activity state to false
@@ -321,10 +324,11 @@ func (c *Client) recvData() {
 
 		// handle the gotten data on an other go thread
 		// as to not block the next readers
-		go c.handleRead(readData[:readBytes])
+		c.queue.Enqueue(readData[:])
 	}
 }
 
+/*
 func (c *Client) handleRead(data []byte) {
 	switch client.Detect(data[0]) {
 	case client.DisconnectOpcode:
@@ -446,3 +450,4 @@ func (c *Client) handleRequestPlayerKD(t []byte) {
 		c.SendData(newPlayersKD)
 	}
 }
+*/

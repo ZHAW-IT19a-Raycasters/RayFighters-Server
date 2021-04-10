@@ -22,7 +22,7 @@ var ErrHubIsFull = errors.New("the hub is currently filled to capacity")
 // The hub controls the the individual connections between the
 // different modules like the map or the client manager.
 type Hub struct {
-	// The room id is used to uniquely identify the hub.
+	// id is the designated hub identifier
 	id int
 	// The manager of the different client with the different connections.
 	clientManager clientManager
@@ -59,7 +59,7 @@ func NewHub(hubId int) *Hub {
 		counter:  utils.NewSemaphore(HubClientLimit),
 		isActive: utils.NewAtomicBool(false),
 	}
-	h.clientManager = newClientManager(h)
+	h.clientManager = newClientManager()
 	return h
 }
 
@@ -213,14 +213,16 @@ func (h *Hub) Run() {
 	// crash
 	defer h.isActive.SetFalse()
 
+	// TODO: move into hub controller
 	for {
 		select {
 		case <-h.shutdown:
 			logger.Infof("Shutting down hub [%d]", h.id)
 			return
-		case meta := <-h.input:
+		case <-h.input:
 			logger.Debugf("Adding a new player to hub [%d]", h.id)
-			h.clientManager.addClient(meta)
+
+			//h.clientManager.addClient(meta)
 		case meta := <-h.output:
 			logger.Debugf("Removing an old player from the hub [%d]", h.id)
 			h.removeClient(meta)

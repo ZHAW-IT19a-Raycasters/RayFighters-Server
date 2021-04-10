@@ -17,6 +17,7 @@ import (
 )
 
 const hubsCount int = 3
+
 var logger = log.Log()
 
 // Server holds all endpoints for a server
@@ -79,15 +80,15 @@ func serveRoot(writer http.ResponseWriter, request *http.Request) {
 // parses desired roomID from the request URL
 // and registers the client to the hub
 func serveWs(hubs []*room.Hub, w http.ResponseWriter, r *http.Request) {
-	
+
 	roomID, err := helpers.ParseRoomID(r)
 	if err != nil {
 		logger.Error(err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	if (roomID < 0 || roomID >= hubsCount) {
-		err := fmt.Errorf("no room with id %d available",roomID)
+	if roomID < 0 || roomID >= hubsCount {
+		err := fmt.Errorf("no room with id %d available", roomID)
 		logger.Error(err)
 		http.Error(w, err.Error(), http.StatusForbidden)
 		return
@@ -113,7 +114,6 @@ func serveWs(hubs []*room.Hub, w http.ResponseWriter, r *http.Request) {
 
 	hubs[roomID].RegisterClient(cm)
 }
-
 
 // func serveAuth(w http.ResponseWriter, r *http.Request) {}
 

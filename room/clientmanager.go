@@ -39,8 +39,6 @@ type clientManager struct {
 	mapping map[uuid.UUID]uint8
 	// manages all the available ids
 	idManager helpers.IdManager
-	// The pointer to the hub, so that the client can comminicate with the hub
-	hub HubClientInteraction
 	// Counts the ammount of connections are currently open and
 	// running.
 	wg *sync.WaitGroup
@@ -51,11 +49,10 @@ type clientManager struct {
 }
 
 // newClientManager will initialize a new clientManager instance.
-func newClientManager(hub HubClientInteraction) clientManager {
+func newClientManager() clientManager {
 	return clientManager{
 		clients:   make(map[uint8]*Client),
 		mapping:   make(map[uuid.UUID]uint8),
-		hub:       hub,
 		idManager: helpers.NewIdManager(),
 		wg:        &sync.WaitGroup{},
 	}
@@ -84,7 +81,7 @@ func (manager *clientManager) mapId(meta ClientMeta) (uint8, bool) {
 //
 // If there is no more space left in the client manager
 // this function will panic.
-func (manager *clientManager) addClient(meta ClientMeta) error {
+func (manager *clientManager) addClient(meta ClientMeta, queue helpers.ClientQueue) error {
 
 	// lock the hub, so that writing is okay
 	manager.lock.Lock()
@@ -96,7 +93,7 @@ func (manager *clientManager) addClient(meta ClientMeta) error {
 		// add him back
 		if client, ok := manager.clients[id]; ok {
 			// get client
-			err := client.registerConn(meta)
+			err := client.registerConn(meta, queue)
 
 			if err != nil {
 				return err
@@ -127,7 +124,7 @@ func (manager *clientManager) addClient(meta ClientMeta) error {
 		manager.mapping[meta.id] = id
 
 		// create the client with the correct information
-		client := NewClient(id, meta, manager.hub)
+		client := NewClient(id, meta, queue)
 		manager.clients[id] = client
 
 		// start the client
