@@ -1,12 +1,13 @@
-package helpers_test
+package helpers
 
 import (
+	"errors"
 	"sync"
 	"testing"
 
+	"github.zhaw.ch/raycasters/server/protocol"
 	"github.zhaw.ch/raycasters/server/protocol/client"
 	"github.zhaw.ch/raycasters/server/protocol/server"
-	"github.zhaw.ch/raycasters/server/room/helpers"
 )
 
 func compareByte(expected, gotten []byte, t *testing.T) bool {
@@ -31,8 +32,8 @@ func compareByte(expected, gotten []byte, t *testing.T) bool {
 func TestQueueShutdown(t *testing.T) {
 	var wg sync.WaitGroup
 
-	_, h := helpers.NewWorkQueue()
-
+	_, h := NewWorkQueue()
+	blocker := make(chan struct{})
 	wg.Add(1)
 	go func() {
 		defer func() {
@@ -40,21 +41,45 @@ func TestQueueShutdown(t *testing.T) {
 			h.Shutdown()
 			wg.Done()
 		}()
+		close(blocker)
 		_, err := h.Dequeue()
 		if err == nil {
 			t.Error("shutdown expected")
+		} else if !errors.Is(err, ErrQueueClosed) {
+			t.Error("Wrong error used here")
 		}
 	}()
-
+	<-blocker
 	h.Shutdown()
 
 	wg.Wait()
+
+	// check that functions return correct error
+	// these should not block, so they are run
+	// here
+	err := h.Enqueue([]byte{42})
+	if err == nil {
+		t.Error("There should be an error here")
+		return
+	} else if !errors.Is(err, ErrQueueClosed) {
+		t.Error("The error should indicate that the queue is closed")
+		return
+	}
+
+	_, err = h.Dequeue()
+	if err == nil {
+		t.Error("There should be an error here")
+		return
+	} else if !errors.Is(err, ErrQueueClosed) {
+		t.Error("The error should indicate that the queue is closed")
+		return
+	}
 }
 
-func TestCommunications(t *testing.T) {
+func TestQueueCommunications(t *testing.T) {
 	var wg sync.WaitGroup
 
-	c, h := helpers.NewWorkQueue()
+	c, h := NewWorkQueue()
 
 	request := []byte{client.DisconnectOpcode.Value()}
 	response := []byte{server.DisconnectOpcode.Value()}
@@ -109,4 +134,61 @@ func TestCommunications(t *testing.T) {
 	}()
 
 	wg.Wait()
+}
+
+func TestQueueDrain(t *testing.T) {
+
+	c, h := NewWorkQueue()
+	exp := make([]protocol.Package, 0, QueueSize)
+	for i := 0; i < QueueSize; i += 1 {
+		t := []byte{byte(i)}
+		exp = append(exp, t)
+		h.Enqueue(t)
+	}
+
+	got, err := c.DequeueDrain()
+
+	if err != nil {
+		t.Error("The queue should be active")
+		return
+	}
+
+	lgot := len(got)
+	lexp := len(exp)
+
+	if lexp != lgot {
+		t.Errorf("Incorrect data lenght exp: [%d] got:[%d]", lexp, lgot)
+		return
+	}
+
+	for i := range got {
+		if compareByte(exp[i], got[i], t) {
+			return
+		}
+	}
+}
+
+func TestQueueDrainForce(t *testing.T) {
+	// this test does not show anything speciall
+	// it merely servers to get 100% coverage
+	c, h := NewWorkQueue()
+
+	// force the queue into draining mode
+	c.isDraining.SetTrue()
+	err := h.Enqueue([]byte{0})
+	if err == nil {
+		t.Error("Should be an error showing the draining error")
+		return
+	}
+
+	_, err = c.Dequeue()
+	if err == nil {
+		t.Error("Should be an error showing the draining")
+		return
+	}
+
+	_, err = c.DequeueDrain()
+	if err == nil {
+		t.Error("Should be an error showing the draining")
+	}
 }

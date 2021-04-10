@@ -56,6 +56,11 @@ func TestIdManagerPush(t *testing.T) {
 	// check if the manager is full
 	if !manager.IsFull() {
 		t.Error("Manager should be full")
+		return
+	}
+	if manager.Count() != math.MaxUint8+1 {
+		t.Errorf("Count should be at [%d] is at [%d]", math.MaxUint8+1, manager.Count())
+		return
 	}
 	err := manager.Push(42)
 	if err == nil {
