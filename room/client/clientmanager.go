@@ -86,11 +86,18 @@ func (manager *ClientManager) Size() int {
 // MapId will map the client meta information with the internal value.
 // If there is no such person this function will return false and
 // a zero value.
-// Attention this is threadsafe
+// Attention this is threadsafe, but fairly slow due to the lock.
 func (manager *ClientManager) MapId(meta ClientMeta) (uint8, bool) {
 	manager.lock.RLock()
 	defer manager.lock.RUnlock()
+	return manager.mapToInternalId(meta)
+}
 
+// mapToInternalId is the lock free version to the MapId function,
+// it is intendet to be used, with external locking inplace as
+// it itself does not lock, but assumes the caller allready
+// has one.
+func (manager *ClientManager) mapToInternalId(meta ClientMeta) (uint8, bool) {
 	id, ok := manager.mapping[meta.id]
 	return id, ok
 }
@@ -110,7 +117,7 @@ func (manager *ClientManager) AddClient(meta ClientMeta, queue helpers.ClientQue
 	defer manager.lock.Unlock()
 
 	// check if client ID already exists.
-	if id, ok := manager.MapId(meta); ok {
+	if id, ok := manager.mapToInternalId(meta); ok {
 		// the person already exisited in the Hub
 		// add him back
 		if client, ok := manager.clients[id]; ok {

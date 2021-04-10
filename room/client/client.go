@@ -109,14 +109,15 @@ func NewClient(id uint8, meta ClientMeta, queue helpers.ClientQueue) *Client {
 	return &c
 }
 
+// registerConn will register the new client with it's exclusive hub connection.
+// Attention this function assumes that there already is a lock on the client
+// object.
 func (c *Client) registerConn(conn ClientMeta, queue helpers.ClientQueue) error {
 	// check if the recv is running
 	if c.isActive.Get() {
 		return ErrClientReaderAlreadyActive
 	}
 
-	c.lock.Lock()
-	defer c.lock.Unlock()
 	// make sure that there is no chance of this conn
 	// already beeing registered
 	if c.status == Registered {
@@ -149,8 +150,14 @@ func (c *Client) Run() error {
 	}
 	setupStates()
 
-	go c.recvData()
-	go c.sendData()
+	go func() {
+		c.recvData()
+		c.wg.Done()
+	}()
+	go func() {
+		c.sendData()
+		c.wg.Done()
+	}()
 
 	return nil
 }
@@ -223,6 +230,7 @@ func (c *Client) sendData() error {
 
 	for {
 		message, err := c.queue.Dequeue()
+
 		if err != nil {
 			// this means that we have to shutdown the system
 			return nil
@@ -271,8 +279,6 @@ func (c *Client) recvData() {
 		// of the connection has to be per definition
 		// false.
 		_ = c.isActive.SetFalse()
-		// remove the thread from the waitgroup
-		c.wg.Done()
 	}()
 
 	for {
