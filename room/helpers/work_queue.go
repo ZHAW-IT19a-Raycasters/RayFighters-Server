@@ -125,7 +125,9 @@ func NewWorkQueue() (ClientQueue, HubQueue) {
 	pactive := &active
 	drain := utils.NewAtomicBool(false)
 	pdrain := &drain
+
 	running := make(chan struct{})
+
 	aChan := make(chan protocol.Package, QueueSize)
 	bChan := make(chan protocol.Package, QueueSize)
 

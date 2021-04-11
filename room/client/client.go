@@ -134,6 +134,7 @@ func (c *Client) Shutdown(ctx context.Context) {
 
 	// send the deconnect opcode
 	// ignore error as it is not important
+	// TODO: figure out what to do here...
 	//_ = c.SendData(server.NewDisconnect())
 
 	// make a channel on which, we can wait on.
@@ -163,41 +164,53 @@ func (c *Client) Shutdown(ctx context.Context) {
 	}
 }
 
-func (c *Client) sendData() error {
+// sendData is the actuall function used to run the client send loop
+// it will also handle all the outgoing data packages.
+// Attention this function is a blocking call, so be carefull, while
+// reading form it.
+// This function uses no locking as per the condition of the atomic
+// condition this function will only ever be called a single time
+// per run.
+func (c *Client) sendData() {
+	defer c.shutdownHandler()
 
-	if !c.isActive.Get() {
-		return ErrClientReaderAlreadyActive
+	checkErr := func(err error) bool {
+		if err != nil {
+			// try to register a timeout
+			c.registerTimeout()
+
+			// break out of the endless loop to a shutdown
+			return false
+		}
+		return true
 	}
-
+	// No checks for activation are needed
+	// due to that this function will only
+	// be called from the run function
 	for {
 		message, err := c.queue.Dequeue()
 
 		if err != nil {
 			// this means that we have to shutdown the system
-			return nil
+			return
 		}
 
 		cw, err := c.meta.conn.NextWriter(websocket.BinaryMessage)
 
-		if err != nil {
-			// try to register a timeout
-			c.registerTimeout()
-
-			// break out of the endless loop to a shutdown
-			return nil
+		if checkErr(err) {
+			return
 		}
+		_, err = cw.Write(message)
 
-		_, _ = cw.Write(message)
+		if checkErr(err) {
+			return
+		}
 
 		// flush the message to the network
 		err = cw.Close()
 
-		if err != nil {
-			// try to register a timeout
-			c.registerTimeout()
-
-			// break out of the endless loop to a shutdown
-			return nil
+		if checkErr(err) {
+			return
 		}
 	}
 }
@@ -220,6 +233,8 @@ func (c *Client) registerTimeout() {
 	_ = c.meta.conn.Close()
 	// set the activity state to false
 	_ = c.isActive.SetFalse()
+	// close queue
+	c.queue.Shutdown()
 }
 
 // recvData is the actuall function used to run the client read loop
@@ -227,21 +242,9 @@ func (c *Client) registerTimeout() {
 // Attention this function is a blocking call, so be carefull, while
 // reading form it.
 func (c *Client) recvData() {
-	// This function needs no locking
-	// as per the condition of the atomic
-	// condition this function will only
-	// ever be called a single time per
-	// run
-	defer func() {
-		// Error here is not important as the connections already died
-		// before reaching this position.
-		_ = c.meta.conn.Close()
-		// set the isActive variable to false
-		// result is not important as here the status
-		// of the connection has to be per definition
-		// false.
-		_ = c.isActive.SetFalse()
-	}()
+	// TODO: refactor out of this function
+
+	defer c.shutdownHandler()
 
 	for {
 		_, message, err := c.meta.conn.NextReader()
@@ -288,6 +291,23 @@ func (c *Client) recvData() {
 
 		// handle the gotten data on an other go thread
 		// as to not block the next readers
-		c.queue.Enqueue(readData[:readBytes])
+		err = c.queue.Enqueue(readData[:readBytes])
+		if err != nil {
+			return
+		}
 	}
+}
+func (c *Client) shutdownHandler() {
+
+	// Error here is not important as the connections already died
+	// before reaching this position.
+	_ = c.meta.conn.Close()
+
+	// set the isActive variable to false
+	// result is not important as here the status
+	// of the connection has to be per definition
+	// false.
+	_ = c.isActive.SetFalse()
+
+	c.queue.Shutdown()
 }
