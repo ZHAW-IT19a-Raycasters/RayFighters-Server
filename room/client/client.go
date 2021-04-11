@@ -27,6 +27,7 @@ type Client struct {
 	queue    helpers.ClientQueue
 	status   ConnectionStatus
 	isActive utils.AtomicBool
+	run      chan struct{}
 	wg       sync.WaitGroup
 	lock     sync.RWMutex
 }
@@ -114,59 +115,6 @@ func (c *Client) checkOffline() bool {
 	return c.status == Offline
 }
 
-func (c *Client) Shutdown(ctx context.Context) {
-	if c.checkOffline() {
-		return
-	}
-
-	defer func() {
-		c.lock.Lock()
-		c.status = Offline
-		c.lock.Unlock()
-	}()
-
-	logger.Debugf("Shutting down client [%d]", c.meta.eId)
-
-	c.registerTimeout()
-
-	c.lock.Lock()
-	c.shutdownHandler()
-	// set the state of the client to shutting down
-	c.status = ShuttingDown
-	c.lock.Unlock()
-
-	// send the deconnect opcode
-	// ignore error as it is not important
-	// TODO: figure out what to do here...
-	//_ = c.SendData(server.NewDisconnect())
-
-	// make a channel on which, we can wait on.
-	runs := make(chan struct{})
-
-	// Make a waiter that will (hopefully) shutdown soon.
-	go func() {
-		// close the connection
-		// error is irrelevant as we already send the
-		// disconnect message
-		c.meta.conn.Close()
-
-		// wait until the workgroup reaches zero
-		c.wg.Wait()
-
-		// toggle the completed shutdown cannel
-		close(runs)
-	}()
-
-	select {
-	case <-runs:
-		// TODO: log the a clean shutdown was a success
-		logger.Debugf("Shutdown of client [%d] complete", c.meta.eId)
-	case <-ctx.Done():
-		// TODO: log the a forced shutdown was made
-		logger.Debugf("forced shutdown of client [%d], due to timeout", c.meta.eId)
-	}
-}
-
 // sendData is the actuall function used to run the client send loop
 // it will also handle all the outgoing data packages.
 // Attention this function is a blocking call, so be carefull, while
@@ -187,6 +135,26 @@ func (c *Client) sendData() {
 		}
 		return true
 	}
+
+	process := func(message []byte) bool {
+
+		cw, err := c.meta.conn.NextWriter(websocket.BinaryMessage)
+
+		if checkErr(err) {
+			return false
+		}
+
+		_, err = cw.Write(message)
+
+		if checkErr(err) {
+			return false
+		}
+
+		// flush the message to the network
+		err = cw.Close()
+
+		return !checkErr(err)
+	}
 	// No checks for activation are needed
 	// due to that this function will only
 	// be called from the run function
@@ -195,49 +163,24 @@ func (c *Client) sendData() {
 
 		if err != nil {
 			// this means that we have to shutdown the system
+
+			// due to how the client works this error can
+			// be ignored as it would implie an other
+			// drainer
+			messages, _ := c.queue.DequeueDrain()
+			for _, message = range messages {
+				if !process(message) {
+					return
+				}
+			}
+
 			return
 		}
 
-		cw, err := c.meta.conn.NextWriter(websocket.BinaryMessage)
-
-		if checkErr(err) {
-			return
-		}
-		_, err = cw.Write(message)
-
-		if checkErr(err) {
-			return
-		}
-
-		// flush the message to the network
-		err = cw.Close()
-
-		if checkErr(err) {
+		if !process(message) {
 			return
 		}
 	}
-}
-
-// registerTimeout will register the timeout in the timeout queue
-func (c *Client) registerTimeout() {
-	// using a full lock here as this functions will
-	// be called by both the sender and the receiver.
-	c.lock.Lock()
-	defer c.lock.Unlock()
-	if c.status != Active {
-		return
-	}
-
-	// TODO: Timer
-	c.status = Timeout
-
-	c.queue.Shutdown()
-	// close the connection
-	_ = c.meta.conn.Close()
-	// set the activity state to false
-	_ = c.isActive.SetFalse()
-	// close queue
-	c.queue.Shutdown()
 }
 
 // recvData is the actuall function used to run the client read loop
@@ -314,5 +257,84 @@ func (c *Client) shutdownHandler() {
 	_ = c.meta.conn.Close()
 
 	// terminate the queue
+	c.queue.Shutdown()
+}
+
+// Shutdown will shutdown the client and the queue.
+func (c *Client) Shutdown(ctx context.Context) {
+	if c.checkOffline() {
+		return
+	}
+
+	defer func() {
+		c.lock.Lock()
+		c.status = Offline
+		c.lock.Unlock()
+	}()
+
+	logger.Debugf("Shutting down client [%d]", c.meta.eId)
+
+	c.registerTimeout()
+
+	c.shutdownHandler()
+	c.lock.Lock()
+	// set the state of the client to shutting down
+	c.status = ShuttingDown
+	c.lock.Unlock()
+
+	// send the deconnect opcode
+	// ignore error as it is not important
+	// TODO: figure out what to do here...
+	//_ = c.SendData(server.NewDisconnect())
+
+	// make a channel on which, we can wait on.
+	runs := make(chan struct{})
+
+	// Make a waiter that will (hopefully) shutdown soon.
+	go func() {
+
+		// close the connection
+		// error is irrelevant as we already send the
+		// disconnect message
+		c.meta.conn.Close()
+
+		c.queue.Shutdown()
+
+		// wait until the workgroup reaches zero
+		c.wg.Wait()
+
+		// toggle the completed shutdown cannel
+		close(runs)
+	}()
+
+	select {
+	case <-runs:
+		// TODO: log the a clean shutdown was a success
+		logger.Debugf("Shutdown of client [%d] complete", c.meta.eId)
+	case <-ctx.Done():
+		// TODO: log the a forced shutdown was made
+		logger.Debugf("forced shutdown of client [%d], due to timeout", c.meta.eId)
+	}
+}
+
+// registerTimeout will register the timeout in the timeout queue
+func (c *Client) registerTimeout() {
+	// using a full lock here as this functions will
+	// be called by both the sender and the receiver.
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	if c.status != Active {
+		return
+	}
+
+	// TODO: Timer
+	c.status = Timeout
+
+	c.queue.Shutdown()
+	// close the connection
+	_ = c.meta.conn.Close()
+	// set the activity state to false
+	_ = c.isActive.SetFalse()
+	// close queue
 	c.queue.Shutdown()
 }
