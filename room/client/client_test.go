@@ -133,6 +133,8 @@ func TestClientSend(t *testing.T) {
 	cq, hq := helpers.NewWorkQueue()
 	cmeta, mock := getClientMeta(1)
 
+	done := make(chan struct{})
+
 	// make the connections blocking, so that we can run other
 	// stuff while it waits
 	funcTransferReader := make(chan func() (int, io.Reader, error), 10)
@@ -152,16 +154,10 @@ func TestClientSend(t *testing.T) {
 		// shutdown the resv as it is the only part of the system that may
 		// do that.
 		funcTransferReader <- func() (int, io.Reader, error) {
-			t.Log("read")
+			close(done)
 			return 0, nil, websocket.ErrCloseSent
 		}
 
-		// shutdown the client send, this has to be send first
-		// as to hinder any race conditions.
-		funcTransferWriter <- func(messageType int) (io.WriteCloser, error) {
-			t.Log("wrote")
-			return nil, websocket.ErrCloseSent
-		}
 		return nil
 	}
 
@@ -174,11 +170,6 @@ func TestClientSend(t *testing.T) {
 		return mock.mwc, nil
 	}
 
-	client := NewClient(1, cmeta, cq)
-	defer client.Shutdown(context.TODO())
-
-	client.Run()
-
 	// send the information to the server
 	exp := []byte{server.DisconnectOpcode.Value()}
 	err := hq.Enqueue(exp)
@@ -187,6 +178,14 @@ func TestClientSend(t *testing.T) {
 		t.Error("the queue should be open and receiving here")
 		return
 	}
+
+	client := NewClient(1, cmeta, cq)
+	defer client.Shutdown(context.TODO())
+
+	client.Run()
+	mock.Close()
+
+	<-done
 
 	gotten := mock.mwc.Bytes()
 

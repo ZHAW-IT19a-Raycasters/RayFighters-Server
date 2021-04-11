@@ -127,7 +127,10 @@ func (c *Client) Shutdown(ctx context.Context) {
 
 	logger.Debugf("Shutting down client [%d]", c.meta.eId)
 
+	c.registerTimeout()
+
 	c.lock.Lock()
+	c.shutdownHandler()
 	// set the state of the client to shutting down
 	c.status = ShuttingDown
 	c.lock.Unlock()
@@ -297,17 +300,19 @@ func (c *Client) recvData() {
 		}
 	}
 }
+
+// shutdownHandler will handle closing the connections
 func (c *Client) shutdownHandler() {
+
+	// only shutdown once
+	if !c.isActive.SetFalse() {
+		return
+	}
 
 	// Error here is not important as the connections already died
 	// before reaching this position.
 	_ = c.meta.conn.Close()
 
-	// set the isActive variable to false
-	// result is not important as here the status
-	// of the connection has to be per definition
-	// false.
-	_ = c.isActive.SetFalse()
-
+	// terminate the queue
 	c.queue.Shutdown()
 }
