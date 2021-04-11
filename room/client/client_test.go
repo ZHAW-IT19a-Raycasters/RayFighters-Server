@@ -9,6 +9,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	pclient "github.zhaw.ch/raycasters/server/protocol/client"
+	"github.zhaw.ch/raycasters/server/protocol/server"
 	"github.zhaw.ch/raycasters/server/room/helpers"
 )
 
@@ -60,10 +61,15 @@ func TestClientResv(t *testing.T) {
 	cq, hq := helpers.NewWorkQueue()
 	cmeta, mock := getClientMeta(1)
 
-	funcTransfer := make(chan func() (int, io.Reader, error))
+	funcTransferReader := make(chan func() (int, io.Reader, error))
+	funcTransferWriter := make(chan func(messageType int) (io.WriteCloser, error))
 
 	mock.funcNextReader = func() (int, io.Reader, error) {
-		return (<-funcTransfer)()
+		return (<-funcTransferReader)()
+	}
+
+	mock.funcNextWriter = func(messageType int) (io.WriteCloser, error) {
+		return (<-funcTransferWriter)(messageType)
 	}
 
 	client := NewClient(1, cmeta, cq)
@@ -72,13 +78,82 @@ func TestClientResv(t *testing.T) {
 
 	// fill up the channel
 	buffer := []byte{pclient.DisconnectOpcode.Value()}
-	funcTransfer <- func() (int, io.Reader, error) {
+	funcTransferReader <- func() (int, io.Reader, error) {
 		return 0, bytes.NewReader(buffer), nil
 	}
-	funcTransfer <- func() (int, io.Reader, error) {
+
+	data, err := hq.Dequeue()
+	if err != nil {
+		t.Error("There should not be an error here, as the channel should be opened")
+		return
+	}
+	compareByteSlices(buffer, data, t)
+
+	funcTransferReader <- func() (int, io.Reader, error) {
+		return 0, nil, websocket.ErrCloseSent
+	}
+	_, err = hq.Dequeue()
+
+	if err == nil {
+		t.Error("The channel should be closed here")
+	}
+}
+
+func TestClientSend(t *testing.T) {
+	cq, hq := helpers.NewWorkQueue()
+	cmeta, mock := getClientMeta(1)
+
+	funcTransferReader := make(chan func() (int, io.Reader, error), 10)
+	funcTransferWriter := make(chan func(messageType int) (io.WriteCloser, error), 10)
+
+	// make the connections blocking, so that we can run other
+	// stuff while it waits
+	mock.funcNextReader = func() (int, io.Reader, error) {
+		return (<-funcTransferReader)()
+	}
+
+	mock.funcNextWriter = func(messageType int) (io.WriteCloser, error) {
+		return (<-funcTransferWriter)(messageType)
+	}
+
+	// send this first as to not have a race condition with
+	// the enqueue
+	funcTransferWriter <- func(messageType int) (io.WriteCloser, error) {
+		if messageType != websocket.BinaryMessage {
+			t.Errorf("Wrong message type used [%d] should be [%d]", messageType, websocket.BinaryMessage)
+		}
+		return mock.mwc, nil
+	}
+
+	client := NewClient(1, cmeta, cq)
+	defer client.Shutdown(context.TODO())
+
+	client.Run()
+
+	// send the information to the server
+	exp := []byte{server.DisconnectOpcode.Value()}
+	err := hq.Enqueue(exp)
+
+	if err != nil {
+		t.Error("the queue should be open and receiving here")
+		return
+	}
+
+	// shutdown the resv as it is the only part of the system that may
+	// do that.
+	funcTransferReader <- func() (int, io.Reader, error) {
 		return 0, nil, websocket.ErrCloseSent
 	}
 
-	data, _ := hq.Dequeue()
-	compareByteSlices(buffer, data, t)
+	// shutdown the client send, this has to be send first
+	// as to hinder any race conditions.
+	funcTransferWriter <- func(messageType int) (io.WriteCloser, error) {
+		return nil, websocket.ErrCloseSent
+	}
+
+	client.Shutdown(context.TODO())
+
+	gotten := mock.mwc.Bytes()
+
+	compareByteSlices(exp, gotten, t)
 }

@@ -17,6 +17,10 @@ var logger = log.Log()
 
 var ErrClientReaderAlreadyActive = errors.New("the client worker is already active")
 
+// MaxClientCommand is the prepared lenght of the opcode data slice
+// Attention this value has to be changed once the protocol changes.
+const MaxClientCommand = 17
+
 type Client struct {
 	info     ClientGame
 	meta     ClientInternalMeta
@@ -172,21 +176,42 @@ func (c *Client) sendData() error {
 			// this means that we have to shutdown the system
 			return nil
 		}
+
 		cw, err := c.meta.conn.NextWriter(websocket.BinaryMessage)
 
 		if err != nil {
-			// TODO: create a fixed error
-			// return error
-			return errors.New("something went wrong with creating NextWriter")
+			// try to register a timeout
+			c.registerTimeout()
+
+			// break out of the endless loop to a shutdown
+			return nil
 		}
+
 		_, _ = cw.Write(message)
+
+		// flush the message to the network
+		err = cw.Close()
+
+		if err != nil {
+			// try to register a timeout
+			c.registerTimeout()
+
+			// break out of the endless loop to a shutdown
+			return nil
+		}
 	}
 }
 
 // registerTimeout will register the timeout in the timeout queue
 func (c *Client) registerTimeout() {
+	// using a full lock here as this functions will
+	// be called by both the sender and the receiver.
 	c.lock.Lock()
 	defer c.lock.Unlock()
+	if c.status != Active {
+		return
+	}
+
 	// TODO: Timer
 	c.status = Timeout
 
@@ -228,9 +253,8 @@ func (c *Client) recvData() {
 		// error
 		if err != nil {
 
-			// TODO: figure out how to handle the timeout
 			if websocket.IsCloseError(err, websocket.CloseAbnormalClosure) {
-				logger.Debugf("Client [%d] lost connection, setting to timeout", c.meta.id)
+				logger.Warnf("Client [%d] lost connection, setting to timeout", c.meta.id)
 			} else if websocket.IsCloseError(err,
 				websocket.CloseProtocolError, websocket.CloseNoStatusReceived,
 				websocket.CloseInvalidFramePayloadData,
@@ -249,7 +273,8 @@ func (c *Client) recvData() {
 			return
 		}
 
-		readData := [17]byte{}
+		// prepare a zero sized array of size 17
+		var readData [MaxClientCommand]byte
 		readBytes, err := message.Read(readData[:])
 
 		if readBytes == 0 {
@@ -263,6 +288,6 @@ func (c *Client) recvData() {
 
 		// handle the gotten data on an other go thread
 		// as to not block the next readers
-		c.queue.Enqueue(readData[:])
+		c.queue.Enqueue(readData[:readBytes])
 	}
 }

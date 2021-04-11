@@ -230,14 +230,6 @@ func TestClientManagerRemoveClients(t *testing.T) {
 	}
 }
 
-func setupLogger() *bytes.Buffer {
-	buffer := new(bytes.Buffer)
-	builder := log.NewBuilder()
-	builder.RegisterHandler(log.NewWriterHandler(log.Debug, buffer))
-	builder.Build()
-	return buffer
-}
-
 func TestClientManagerShutdown(t *testing.T) {
 	buffer := new(bytes.Buffer)
 	// setup logger
