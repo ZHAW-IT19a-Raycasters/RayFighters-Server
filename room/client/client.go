@@ -139,13 +139,13 @@ func (c *Client) sendData() {
 
 		cw, err := c.meta.conn.NextWriter(websocket.BinaryMessage)
 
-		if checkErr(err) {
+		if !checkErr(err) {
 			return false
 		}
 
 		_, err = cw.Write(message)
 
-		if checkErr(err) {
+		if !checkErr(err) {
 			return false
 		}
 

@@ -64,20 +64,37 @@ func newMockedConnection() MockedConnection {
 }
 
 type MockedWriteCloser struct {
-	*bytes.Buffer
-	cl func() error
+	lock   *sync.Mutex
+	buffer *bytes.Buffer
+	cl     func() error
 }
 
 func newMockedWriteCloser() MockedWriteCloser {
 	bff := new(bytes.Buffer)
 	cl := func() error { return nil }
+	lock := &sync.Mutex{}
 	return MockedWriteCloser{
+		lock,
 		bff,
 		cl,
 	}
 }
 
+func (mwc *MockedWriteCloser) Bytes() []byte {
+	mwc.lock.Lock()
+	defer mwc.lock.Unlock()
+	return mwc.buffer.Bytes()
+}
+
+func (mwc *MockedWriteCloser) Write(p []byte) (n int, err error) {
+	mwc.lock.Lock()
+	defer mwc.lock.Unlock()
+	return mwc.buffer.Write(p)
+}
+
 func (mwc *MockedWriteCloser) Close() error {
+	mwc.lock.Lock()
+	defer mwc.lock.Unlock()
 	return mwc.cl()
 }
 

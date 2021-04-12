@@ -140,8 +140,12 @@ func TestClientSend(t *testing.T) {
 	funcTransferReader := make(chan func() (int, io.Reader, error), 10)
 	funcTransferWriter := make(chan func(messageType int) (io.WriteCloser, error), 10)
 
+	mock.mwc.cl = func() error {
+		close(done)
+		return nil
+	}
+
 	mock.funcNextReader = func() (int, io.Reader, error) {
-		t.Log("Reading from the read queue")
 		select {
 		case <-done:
 			return 0, nil, websocket.ErrCloseSent
@@ -151,7 +155,6 @@ func TestClientSend(t *testing.T) {
 	}
 
 	mock.funcNextWriter = func(messageType int) (io.WriteCloser, error) {
-		t.Log("Reading from the write queue")
 		select {
 		case <-done:
 			return nil, websocket.ErrCloseSent
@@ -162,12 +165,6 @@ func TestClientSend(t *testing.T) {
 
 	// override the closer, so that the channels don't get changed by it
 	mock.funcCloser = func() error {
-		select {
-		case <-done:
-			break
-		default:
-			close(done)
-		}
 		return nil
 	}
 
@@ -175,7 +172,6 @@ func TestClientSend(t *testing.T) {
 	// the enqueue
 	funcTransferWriter <- func(messageType int) (io.WriteCloser, error) {
 		// shutdown the client
-		defer close(done)
 		if messageType != websocket.BinaryMessage {
 			t.Errorf("Wrong message type used [%d] should be [%d]", messageType, websocket.BinaryMessage)
 		}
