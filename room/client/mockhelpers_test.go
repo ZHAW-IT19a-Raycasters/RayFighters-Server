@@ -9,7 +9,7 @@ import (
 )
 
 type MockedConnection struct {
-	lock           sync.Mutex
+	lock           sync.RWMutex
 	mr             *MockedReader
 	mwc            *MockedWriteCloser
 	funcNextReader func() (int, io.Reader, error)
@@ -18,14 +18,14 @@ type MockedConnection struct {
 }
 
 func (m *MockedConnection) NextReader() (int, io.Reader, error) {
-	m.lock.Lock()
-	defer m.lock.Unlock()
+	m.lock.RLock()
+	defer m.lock.RUnlock()
 	return m.funcNextReader()
 }
 
 func (m *MockedConnection) NextWriter(messageType int) (io.WriteCloser, error) {
-	m.lock.Lock()
-	defer m.lock.Unlock()
+	m.lock.RLock()
+	defer m.lock.RUnlock()
 	return m.funcNextWriter(messageType)
 }
 
@@ -48,7 +48,7 @@ func newMockedConnection() MockedConnection {
 	pmr := &mr
 	pmwc := &mwc
 	return MockedConnection{
-		lock: sync.Mutex{},
+		lock: sync.RWMutex{},
 		mr:   pmr,
 		mwc:  pmwc,
 		funcNextReader: func() (int, io.Reader, error) {

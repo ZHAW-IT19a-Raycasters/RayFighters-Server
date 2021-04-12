@@ -133,7 +133,7 @@ func TestClientSend(t *testing.T) {
 	cq, hq := helpers.NewWorkQueue()
 	cmeta, mock := getClientMeta(1)
 
-	done2 := make(chan struct{})
+	done := make(chan struct{})
 
 	// make the connections blocking, so that we can run other
 	// stuff while it waits
@@ -143,7 +143,7 @@ func TestClientSend(t *testing.T) {
 	mock.funcNextReader = func() (int, io.Reader, error) {
 		t.Log("Reading from the read queue")
 		select {
-		case <-done2:
+		case <-done:
 			return 0, nil, websocket.ErrCloseSent
 		case d := <-funcTransferReader:
 			return d()
@@ -153,7 +153,7 @@ func TestClientSend(t *testing.T) {
 	mock.funcNextWriter = func(messageType int) (io.WriteCloser, error) {
 		t.Log("Reading from the write queue")
 		select {
-		case <-done2:
+		case <-done:
 			return nil, websocket.ErrCloseSent
 		case d := <-funcTransferWriter:
 			return d(messageType)
@@ -162,8 +162,12 @@ func TestClientSend(t *testing.T) {
 
 	// override the closer, so that the channels don't get changed by it
 	mock.funcCloser = func() error {
-		// shutdown the resv as it is the only part of the system that may
-		// do that.
+		select {
+		case <-done:
+			break
+		default:
+			close(done)
+		}
 		return nil
 	}
 
@@ -171,7 +175,7 @@ func TestClientSend(t *testing.T) {
 	// the enqueue
 	funcTransferWriter <- func(messageType int) (io.WriteCloser, error) {
 		// shutdown the client
-		defer close(done2)
+		defer close(done)
 		if messageType != websocket.BinaryMessage {
 			t.Errorf("Wrong message type used [%d] should be [%d]", messageType, websocket.BinaryMessage)
 		}
@@ -191,6 +195,8 @@ func TestClientSend(t *testing.T) {
 	defer client.Shutdown(context.TODO())
 
 	client.Run()
+
+	<-done
 
 	// wait until the client has shutdown
 	// completely

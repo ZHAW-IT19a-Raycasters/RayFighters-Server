@@ -27,7 +27,6 @@ type Client struct {
 	queue    helpers.ClientQueue
 	status   ConnectionStatus
 	isActive utils.AtomicBool
-	run      chan struct{}
 	wg       sync.WaitGroup
 	lock     sync.RWMutex
 }
@@ -244,6 +243,22 @@ func (c *Client) recvData() {
 	}
 }
 
+// registerTimeout will register the timeout in the timeout queue
+func (c *Client) registerTimeout() {
+	// using a full lock here as this functions will
+	// be called by both the sender and the receiver.
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	if c.status != Active {
+		return
+	}
+
+	// TODO: Timer
+	c.status = Timeout
+
+	c.shutdownHandler()
+}
+
 // shutdownHandler will handle closing the connections
 func (c *Client) shutdownHandler() {
 
@@ -274,9 +289,8 @@ func (c *Client) Shutdown(ctx context.Context) {
 
 	logger.Debugf("Shutting down client [%d]", c.meta.eId)
 
-	c.registerTimeout()
-
 	c.shutdownHandler()
+
 	c.lock.Lock()
 	// set the state of the client to shutting down
 	c.status = ShuttingDown
@@ -315,26 +329,4 @@ func (c *Client) Shutdown(ctx context.Context) {
 		// TODO: log the a forced shutdown was made
 		logger.Debugf("forced shutdown of client [%d], due to timeout", c.meta.eId)
 	}
-}
-
-// registerTimeout will register the timeout in the timeout queue
-func (c *Client) registerTimeout() {
-	// using a full lock here as this functions will
-	// be called by both the sender and the receiver.
-	c.lock.Lock()
-	defer c.lock.Unlock()
-	if c.status != Active {
-		return
-	}
-
-	// TODO: Timer
-	c.status = Timeout
-
-	c.queue.Shutdown()
-	// close the connection
-	_ = c.meta.conn.Close()
-	// set the activity state to false
-	_ = c.isActive.SetFalse()
-	// close queue
-	c.queue.Shutdown()
 }
