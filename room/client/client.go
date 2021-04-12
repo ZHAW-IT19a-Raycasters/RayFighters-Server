@@ -37,8 +37,8 @@ func (c ConnectionStatus) String() string {
 
 type ClientGame struct {
 	pos    gamemap.Coordinate
-	kills  uint
-	deaths uint
+	kills  uint16
+	deaths uint16
 }
 
 func NewClientGame(pos gamemap.Coordinate) ClientGame {
@@ -47,6 +47,18 @@ func NewClientGame(pos gamemap.Coordinate) ClientGame {
 		kills:  0,
 		deaths: 0,
 	}
+}
+
+func (cg ClientGame) GetPosition() gamemap.Coordinate {
+	return cg.pos
+}
+
+func (cg ClientGame) GetKills() uint16 {
+	return cg.kills
+}
+
+func (cg ClientGame) GetDeaths() uint16 {
+	return cg.deaths
 }
 
 type ClientMeta struct {
@@ -70,8 +82,12 @@ type ClientInternalMeta struct {
 	conn ClientConnection
 }
 
-func (c ClientInternalMeta) getMeta() ClientMeta {
+func (c ClientInternalMeta) GetMeta() ClientMeta {
 	return NewClientMeta(c.eId, c.name, c.conn)
+}
+
+func (c ClientInternalMeta) GetName() string {
+	return c.name
 }
 
 func NewClientInternalMeta(id uint8, client ClientMeta) ClientInternalMeta {
@@ -107,6 +123,14 @@ func NewClient(id uint8, meta ClientMeta, queue helpers.ClientQueue) *Client {
 	c.registerConn(meta, queue)
 
 	return &c
+}
+
+func (c Client) GetInternalMeta() ClientInternalMeta {
+	return c.meta
+}
+
+func (c Client) GetInfo() ClientGame {
+	return c.info
 }
 
 // registerConn will register the new client with it's exclusive hub connection.

@@ -71,6 +71,10 @@ func NewClientManager() ClientManager {
 	}
 }
 
+func (manager ClientManager) GetClients() map[uint8]*Client {
+	return manager.clients
+}
+
 // Size will return the current client count.
 // Attention although this is a threadsafe
 // locking functions it is not recommended
