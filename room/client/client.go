@@ -13,14 +13,21 @@ import (
 	"github.zhaw.ch/raycasters/server/log"
 )
 
+// logger is responsible for logging to the system logger.
 var logger = log.Log()
 
+// ErrClientReaderAlreadyActive is the error that as the name implies
+// tries to show to the caller that the respective client already
+// has a running send and receiver pump thread.
 var ErrClientReaderAlreadyActive = errors.New("the client worker is already active")
 
 // MaxClientCommand is the prepared length of the opcode data slice
 // Attention this value has to be changed once the protocol changes.
 const MaxClientCommand = 17
 
+// Client represents a client in it's full configuration.
+// This struct stores all the information about a single
+// client instance in a hub.
 type Client struct {
 	info     ClientGame
 	meta     clientInternalMeta
@@ -31,6 +38,7 @@ type Client struct {
 	lock     sync.RWMutex
 }
 
+// NewClient creates and sets up a new client from it's meta information.
 func NewClient(id uint8, meta ClientMeta, queue helpers.ClientQueue) *Client {
 	c := Client{
 		info:     NewClientGame(gamemap.NewCoordinate()),
@@ -71,11 +79,21 @@ func (c *Client) registerConn(conn ClientMeta, queue helpers.ClientQueue) error 
 	return nil
 }
 
+// Run starts the client send and receive pumps.
+// It will return an error, if the function is
+// called, while the pumps are already working.
+// This function might block in case of
+// reconnection, where a pump might still be
+// cleaning up the buffers.
 func (c *Client) Run() error {
 	// check if there already is an active worker
 	if !c.isActive.SetTrue() {
 		return ErrClientReaderAlreadyActive
 	}
+
+	// wait until there are no working connections
+	c.wg.Wait()
+
 	// setup the states needed to run the client
 	// this has to run in this thread here or else
 	// the counter might be wrong
@@ -103,6 +121,9 @@ func (c *Client) Run() error {
 	return nil
 }
 
+// checkOffline will check based on the
+// current client state, if the client
+// already as been set to offline.
 func (c *Client) checkOffline() bool {
 	// this write lock is needed in the later parts
 	// of the processes
@@ -276,6 +297,8 @@ func (c *Client) shutdownHandler() {
 }
 
 // Shutdown will shutdown the client and the queue.
+// Attention this is a blocking call until the
+// context expires.
 func (c *Client) Shutdown(ctx context.Context) {
 	if c.checkOffline() {
 		return
