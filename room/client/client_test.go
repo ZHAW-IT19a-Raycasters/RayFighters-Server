@@ -75,7 +75,7 @@ func TestClientRecv(t *testing.T) {
 	}
 
 	mock.funcCloser = func() error {
-		// shutdown the resv as it is the only part of the system that may
+		// shutdown the recv as it is the only part of the system that may
 		// do that.
 		funcTransferReader <- func() (int, io.Reader, error) {
 			return 0, nil, websocket.ErrCloseSent

@@ -30,13 +30,13 @@ func NewErrClientDoesntExist(meta ClientMeta) ErrClientDoesntExist {
 	}
 }
 
-// Error is the function used to fullfill the error interface.
+// Error is the function used to fulfill the error interface.
 func (err ErrClientDoesntExist) Error() string {
 	return fmt.Sprintf("client doesn't exist [%d] - [%s]", err.meta.id, err.meta.name)
 }
 
 // Is satisfies the error.Is requirements, so that
-// the error above can be recogised correctly.
+// the error above can be recognized correctly.
 func (err ErrClientDoesntExist) Is(target error) bool {
 	_, ok := target.(ErrClientDoesntExist)
 	return ok
@@ -47,11 +47,11 @@ func (err ErrClientDoesntExist) Is(target error) bool {
 type ClientManager struct {
 	// an overview of all the clients in the room currently.
 	clients map[uint8]*Client
-	// mapps from the external uuid to the internally used
+	// maps from the external UUID to the internally used
 	mapping map[uuid.UUID]uint8
 	// manages all the available ids
 	idManager helpers.IdManager
-	// Counts the ammount of connections are currently open and
+	// Counts the amount of connections are currently open and
 	// running.
 	wg *sync.WaitGroup
 	// The read writer lock used to block the client list on inserting
@@ -72,9 +72,9 @@ func NewClientManager() ClientManager {
 }
 
 // Size will return the current client count.
-// Attention although this is a threadsafe
+// Attention although this is a thread safe
 // locking functions it is not recommended
-// to be used, as it forces the usege of
+// to be used, as it forces the usage of
 // a reader lock and that will slow down
 // other write processes.
 func (manager *ClientManager) Size() int {
@@ -86,7 +86,7 @@ func (manager *ClientManager) Size() int {
 // MapId will map the client meta information with the internal value.
 // If there is no such person this function will return false and
 // a zero value.
-// Attention this is threadsafe, but fairly slow due to the lock.
+// Attention this is thread safe, but fairly slow due to the lock.
 func (manager *ClientManager) MapId(meta ClientMeta) (uint8, bool) {
 	manager.lock.RLock()
 	defer manager.lock.RUnlock()
@@ -94,8 +94,8 @@ func (manager *ClientManager) MapId(meta ClientMeta) (uint8, bool) {
 }
 
 // mapToInternalId is the lock free version to the MapId function,
-// it is intendet to be used, with external locking inplace as
-// it itself does not lock, but assumes the caller allready
+// it is intended to be used, with external locking in place as
+// it itself does not lock, but assumes the caller already
 // has one.
 func (manager *ClientManager) mapToInternalId(meta ClientMeta) (uint8, bool) {
 	id, ok := manager.mapping[meta.id]
@@ -105,7 +105,7 @@ func (manager *ClientManager) mapToInternalId(meta ClientMeta) (uint8, bool) {
 // AddClient will add a new client to the manager, if the client has
 // once before been added, then the previous connection will be
 // replaced, as per definition a client can only reconnect,
-// over a new connection. If the client uuid already has a working
+// over a new connection. If the client UUID already has a working
 // connection, an error will be returned.
 //
 // If there is no more space left in the client manager
@@ -118,7 +118,7 @@ func (manager *ClientManager) AddClient(meta ClientMeta, queue helpers.ClientQue
 
 	// check if client ID already exists.
 	if id, ok := manager.mapToInternalId(meta); ok {
-		// the person already exisited in the Hub
+		// the person already existed in the Hub
 		// add him back
 		if client, ok := manager.clients[id]; ok {
 			// get client
@@ -149,7 +149,7 @@ func (manager *ClientManager) AddClient(meta ClientMeta, queue helpers.ClientQue
 		// add a new client
 		manager.wg.Add(1)
 
-		// map the UUID to the internaly used
+		// map the UUID to the internally used
 		manager.mapping[meta.id] = id
 
 		// create the client with the correct information
@@ -172,7 +172,7 @@ func (manager *ClientManager) RemoveClient(meta ClientMeta) error {
 
 	val := manager.clients[id]
 
-	// make sure it is shutdown, at most wait for the timout
+	// make sure it is shutdown, at most wait for the timeout
 	// afterwards kill it.
 	cxt, cancel := context.WithTimeout(context.Background(), ClientShutdownTime)
 
@@ -230,7 +230,7 @@ func (manager *ClientManager) RemoveClient(meta ClientMeta) error {
 
 // Shutdown is a completed Shutdown of all the client manager
 // there is no way to restart a manager, as to speed up the Shutdown
-// the clients will only partially be deregistered.
+// the clients will only partially be unregistered.
 func (manager *ClientManager) Shutdown(cxt context.Context) {
 	// Will tell all the clients to shutdown in the given shutdown time.
 	childCxt, chancelCxt := context.WithTimeout(cxt, ClientShutdownTime)
@@ -251,7 +251,7 @@ func (manager *ClientManager) Shutdown(cxt context.Context) {
 	closeClient := func(val *Client) {
 		val.Shutdown(childCxt)
 		// Decrement the wait group here
-		// as there is no degregisteation.
+		// as there there is no unregistration.
 		manager.wg.Done()
 	}
 

@@ -17,7 +17,7 @@ var logger = log.Log()
 
 var ErrClientReaderAlreadyActive = errors.New("the client worker is already active")
 
-// MaxClientCommand is the prepared lenght of the opcode data slice
+// MaxClientCommand is the prepared length of the opcode data slice
 // Attention this value has to be changed once the protocol changes.
 const MaxClientCommand = 17
 
@@ -51,7 +51,7 @@ func NewClient(id uint8, meta ClientMeta, queue helpers.ClientQueue) *Client {
 // Attention this function assumes that there already is a lock on the client
 // object.
 func (c *Client) registerConn(conn ClientMeta, queue helpers.ClientQueue) error {
-	// check if the recv is running
+	// check if the receiving routine is running
 	if c.isActive.Get() {
 		return ErrClientReaderAlreadyActive
 	}
@@ -60,7 +60,7 @@ func (c *Client) registerConn(conn ClientMeta, queue helpers.ClientQueue) error 
 	defer c.lock.Unlock()
 
 	// make sure that there is no chance of this conn
-	// already beeing registered
+	// already being registered
 	if c.status == Registered {
 		return ErrClientReaderAlreadyActive
 	}
@@ -114,9 +114,9 @@ func (c *Client) checkOffline() bool {
 	return c.status == Offline
 }
 
-// sendData is the actuall function used to run the client send loop
+// sendData is the actual function used to run the client send loop
 // it will also handle all the outgoing data packages.
-// Attention this function is a blocking call, so be carefull, while
+// Attention this function is a blocking call, so be careful, while
 // reading form it.
 // This function uses no locking as per the condition of the atomic
 // condition this function will only ever be called a single time
@@ -164,8 +164,8 @@ func (c *Client) sendData() {
 			// this means that we have to shutdown the system
 
 			// due to how the client works this error can
-			// be ignored as it would implie an other
-			// drainer
+			// be ignored as it would imply an other
+			// queue worker or drainer
 			messages, _ := c.queue.DequeueDrain()
 			for _, message = range messages {
 				if !process(message) {
@@ -182,9 +182,9 @@ func (c *Client) sendData() {
 	}
 }
 
-// recvData is the actuall function used to run the client read loop
-// it will also handle all the incomming opcode commands.
-// Attention this function is a blocking call, so be carefull, while
+// recvData is the actual function used to run the client read loop
+// it will also handle all the incoming opcode commands.
+// Attention this function is a blocking call, so be careful, while
 // reading form it.
 func (c *Client) recvData() {
 	// TODO: refactor out of this function
@@ -207,10 +207,10 @@ func (c *Client) recvData() {
 				websocket.CloseProtocolError, websocket.CloseNoStatusReceived,
 				websocket.CloseInvalidFramePayloadData,
 			) {
-				logger.Warnf("unexpected websocket clusure error received for client [%d] "+
+				logger.Warnf("unexpected web socket closure error received for client [%d] "+
 					"- see https://rfc-editor.org/rfc/rfc6455.html#section-11.7 for more information\n[%s]", c.meta.id, err.Error())
 			} else {
-				logger.Warnf("unexpected error happend\n%s", err.Error())
+				logger.Warnf("unexpected error happened\n%s", err.Error())
 			}
 
 			// if there was an unexpected close error
@@ -296,8 +296,9 @@ func (c *Client) Shutdown(ctx context.Context) {
 	c.status = ShuttingDown
 	c.lock.Unlock()
 
-	// send the deconnect opcode
+	// send the disconnect opcode
 	// ignore error as it is not important
+
 	// TODO: figure out what to do here...
 	//_ = c.SendData(server.NewDisconnect())
 
@@ -314,10 +315,10 @@ func (c *Client) Shutdown(ctx context.Context) {
 
 		c.queue.Shutdown()
 
-		// wait until the workgroup reaches zero
+		// wait until the work group reaches zero
 		c.wg.Wait()
 
-		// toggle the completed shutdown cannel
+		// toggle the completed shutdown channel
 		close(runs)
 	}()
 

@@ -31,12 +31,12 @@ func compareByteSlices(expeced, gotten []byte, t *testing.T) bool {
 	}
 
 	if expeced == nil {
-		t.Error("exptected bytes are nil")
+		t.Error("expected bytes are nil")
 		return false
 	}
 
 	if len(expeced) != len(gotten) {
-		t.Errorf("incorrect byte slice lenght exp: [%d], got: [%d]", len(expeced), len(gotten))
+		t.Errorf("incorrect byte slice length exp: [%d], got: [%d]", len(expeced), len(gotten))
 		return false
 	}
 
@@ -70,7 +70,7 @@ func TestClientManagerAddClientSigle(t *testing.T) {
 	err := cm.AddClient(clientMeta, clientQueue)
 
 	if err != nil {
-		t.Errorf("An unexpected error occuered, while adding a new client\n[%s]", err.Error())
+		t.Errorf("An unexpected error occurred, while adding a new client\n[%s]", err.Error())
 		return
 	}
 
@@ -115,7 +115,7 @@ func TestClientManagerAddClientTwice(t *testing.T) {
 
 	err := cm.AddClient(clientMeta, clientQueue)
 	if err != nil {
-		t.Errorf("An unexpected error occuered, while adding a new client\n[%s]", err.Error())
+		t.Errorf("An unexpected error occurred, while adding a new client\n[%s]", err.Error())
 		return
 	}
 
@@ -132,7 +132,7 @@ func TestClientManagerAddClientTwice(t *testing.T) {
 
 	err = cm.AddClient(clientMeta, clientQueue)
 	if err != nil {
-		t.Errorf("An unexpected error occuered, while adding a new client\n[%s]", err.Error())
+		t.Errorf("An unexpected error occurred, while adding a new client\n[%s]", err.Error())
 		return
 	}
 
@@ -159,7 +159,7 @@ func TestClientManagerMaxClients(t *testing.T) {
 		err := cm.AddClient(meta, clientQueue)
 
 		if err != nil {
-			t.Errorf("Durring fill up of client manager, an error happend:\n[%s]", err.Error())
+			t.Errorf("During fill up of client manager, an error happened:\n[%s]", err.Error())
 			return
 		}
 
@@ -175,7 +175,7 @@ func TestClientManagerMaxClients(t *testing.T) {
 	clientQueue, _ := helpers.NewWorkQueue()
 	err := cm.AddClient(meta, clientQueue)
 	if err == nil {
-		t.Error("A client was added illigaly here.")
+		t.Error("A client was added illegally here.")
 	}
 }
 
@@ -331,7 +331,7 @@ func TestClientManagerNotExistingClientRemoved(t *testing.T) {
 	} else if !errors.Is(err, ErrClientDoesntExist{}) {
 		t.Error("Wrong error type used")
 	} else if !strings.Contains(err.Error(), "client doesn't exist") {
-		t.Error("incorrect retuern string used")
+		t.Error("incorrect returned string used")
 	}
 }
 

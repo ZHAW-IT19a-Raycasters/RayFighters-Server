@@ -3,7 +3,7 @@ package client
 import "testing"
 
 func TestConnectionStatusString(t *testing.T) {
-	// This test does not test anything interessting
+	// This test does not test anything interesting
 	// but is only for coverage
 	vals := [...]string{
 		"Active", "Registered", "Timeout", "ShuttingDown", "Offline",
