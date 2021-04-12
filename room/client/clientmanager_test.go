@@ -3,6 +3,7 @@ package client
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"strings"
@@ -317,7 +318,24 @@ func TestClientManagerIncorrectAddClient(t *testing.T) {
 	_ = cm.AddClient(meta, clientQueue)
 }
 
-func TestClientManagerIncorrectRemoveClient(t *testing.T) {
+func TestClientManagerNotExistingClientRemoved(t *testing.T) {
+	// test for panic on logging in after lost connection
+	// and incorrect removal of client data
+	cm := NewClientManager()
+	defer cm.Shutdown(context.TODO())
+
+	meta, _ := getClientMeta(0)
+	err := cm.RemoveClient(meta)
+	if err == nil {
+		t.Error("There should be an error here, as the client was never added")
+	} else if !errors.Is(err, ErrClientDoesntExist{}) {
+		t.Error("Wrong error type used")
+	} else if !strings.Contains(err.Error(), "client doesn't exist") {
+		t.Error("incorrect retuern string used")
+	}
+}
+
+func TestClientManagerIncorrectRemoveClientID(t *testing.T) {
 	// test for panic on logging in after lost connection
 	// and incorrect removal of client data
 	cm := NewClientManager()

@@ -167,7 +167,7 @@ func (manager *ClientManager) AddClient(meta ClientMeta, queue helpers.ClientQue
 func (manager *ClientManager) RemoveClient(meta ClientMeta) error {
 	id, ok := manager.MapId(meta)
 	if !ok {
-		return ErrClientDoesntExist{meta}
+		return NewErrClientDoesntExist(meta)
 	}
 
 	val := manager.clients[id]
