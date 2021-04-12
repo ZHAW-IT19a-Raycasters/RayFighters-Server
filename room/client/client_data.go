@@ -15,7 +15,7 @@ const (
 	Active ConnectionStatus = iota
 	// Registered represents the state after
 	// the connections, was added to the user.
-	Registeredthe
+	Registered
 	// Timeout represents the state that happens
 	// once there are connections errors between
 	// client and server. It shows a temporary

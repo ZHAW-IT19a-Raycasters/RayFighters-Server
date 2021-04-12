@@ -23,7 +23,7 @@ const MaxClientCommand = 17
 
 type Client struct {
 	info     ClientGame
-	meta     ClientInternalMeta
+	meta     clientInternalMeta
 	queue    helpers.ClientQueue
 	status   ConnectionStatus
 	isActive utils.AtomicBool
@@ -65,7 +65,7 @@ func (c *Client) registerConn(conn ClientMeta, queue helpers.ClientQueue) error 
 		return ErrClientReaderAlreadyActive
 	}
 	c.status = Registered
-	c.meta = NewClientInternalMeta(c.meta.id, conn)
+	c.meta = newClientInternalMeta(c.meta.id, conn)
 	c.queue = queue
 
 	return nil
