@@ -10,11 +10,17 @@ import (
 // QueueSize is the max buffer size of the queue
 const QueueSize = 10
 
-// ErrQueueClosed is the error that is returned, if the
-// queue invariant is not fulfilled.
-var ErrQueueClosed = errors.New("queue is closed")
-var ErrQueueIsDraining = errors.New("queue is already draining")
-var ErrQueueEmpty = errors.New("queue is empty")
+var (
+	// ErrQueueClosed is the error that is returned, if the
+	// queue invariant is not fulfilled.
+	ErrQueueClosed = errors.New("queue is closed")
+	// ErrQueueIsDraining is the error returned while the queue
+	// is draining.
+	ErrQueueIsDraining = errors.New("queue is already draining")
+	// ErrQueueEmpty is the error returned, when the queue is
+	// empty so that there is nothing else to drain.
+	ErrQueueEmpty = errors.New("queue is empty")
+)
 
 // HubQueue is the connection used by the hub to talk to the
 // client.
@@ -28,7 +34,7 @@ type ClientQueue struct {
 	packageQueue
 }
 
-// packageQueue contains the two queues used for inter thread comminication.
+// packageQueue contains the two queues used for inter thread communication.
 type packageQueue struct {
 	// running is used a a two way shutdown signal
 	// and hinders eternal blocking on the channels.
@@ -65,10 +71,10 @@ func (pq packageQueue) Enqueue(data protocol.Package) error {
 	return nil
 }
 
-// Dequeue will block the gorutine until a new package from
+// Dequeue will block the goroutine until a new package from
 // the paired until will be received.
 // Attention use this function inside of a select, or
-// else this function will block all your executations.
+// else this function will block all your executions.
 func (pq packageQueue) Dequeue() (protocol.Package, error) {
 	if !pq.isActive.Get() {
 		return nil, ErrQueueClosed
@@ -96,10 +102,10 @@ func (pq packageQueue) DequeueDrain() ([]protocol.Package, error) {
 	// set the system back to running
 	defer pq.isActive.Set(false)
 
-	// preallocate to the max queue size possible
+	// pre-allocate to the max queue size possible
 	data := make([]protocol.Package, 0, QueueSize)
 
-	// itterate over channel until empty
+	// iterate over channel until empty
 	for {
 		select {
 		case value := <-pq.inQueue:
@@ -110,8 +116,8 @@ func (pq packageQueue) DequeueDrain() ([]protocol.Package, error) {
 	}
 }
 
-// Shutdown will shutdown the transmitions.
-// Onces they shutdown there is no way to restart them.
+// Shutdown will shutdown the transmissions.
+// Once they shutdown there is no way to restart them.
 func (pq packageQueue) Shutdown() {
 	if !pq.isActive.SetFalse() {
 		return
@@ -125,7 +131,9 @@ func NewWorkQueue() (ClientQueue, HubQueue) {
 	pactive := &active
 	drain := utils.NewAtomicBool(false)
 	pdrain := &drain
+
 	running := make(chan struct{})
+
 	aChan := make(chan protocol.Package, QueueSize)
 	bChan := make(chan protocol.Package, QueueSize)
 

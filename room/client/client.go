@@ -9,83 +9,28 @@ import (
 	"github.zhaw.ch/raycasters/server/room/helpers"
 	"github.zhaw.ch/raycasters/server/utils"
 
-	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.zhaw.ch/raycasters/server/log"
 )
 
+// logger is responsible for logging to the system logger.
 var logger = log.Log()
 
+// ErrClientReaderAlreadyActive is the error that as the name implies
+// tries to show to the caller that the respective client already
+// has a running send and receiver pump thread.
 var ErrClientReaderAlreadyActive = errors.New("the client worker is already active")
 
-type ConnectionStatus uint
+// MaxClientCommand is the prepared length of the opcode data slice
+// Attention this value has to be changed once the protocol changes.
+const MaxClientCommand = 17
 
-const (
-	Active ConnectionStatus = iota
-	Registered
-	Timeout
-	ShuttingDown
-	Offline
-)
-
-func (c ConnectionStatus) String() string {
-	vals := [...]string{
-		"Active", "Registered", "Timeout", "ShuttingDown", "Offline",
-	}
-	return vals[c]
-}
-
-type ClientGame struct {
-	pos    gamemap.Coordinate
-	kills  uint
-	deaths uint
-}
-
-func NewClientGame(pos gamemap.Coordinate) ClientGame {
-	return ClientGame{
-		pos:    pos,
-		kills:  0,
-		deaths: 0,
-	}
-}
-
-type ClientMeta struct {
-	id   uuid.UUID
-	name string
-	conn ClientConnection
-}
-
-func NewClientMeta(id uuid.UUID, name string, conn ClientConnection) ClientMeta {
-	return ClientMeta{
-		id:   id,
-		name: name,
-		conn: conn,
-	}
-}
-
-type ClientInternalMeta struct {
-	id   uint8
-	eId  uuid.UUID
-	name string
-	conn ClientConnection
-}
-
-func (c ClientInternalMeta) getMeta() ClientMeta {
-	return NewClientMeta(c.eId, c.name, c.conn)
-}
-
-func NewClientInternalMeta(id uint8, client ClientMeta) ClientInternalMeta {
-	return ClientInternalMeta{
-		id:   id,
-		eId:  client.id,
-		name: client.name,
-		conn: client.conn,
-	}
-}
-
+// Client represents a client in it's full configuration.
+// This struct stores all the information about a single
+// client instance in a hub.
 type Client struct {
 	info     ClientGame
-	meta     ClientInternalMeta
+	meta     clientInternalMeta
 	queue    helpers.ClientQueue
 	status   ConnectionStatus
 	isActive utils.AtomicBool
@@ -93,6 +38,7 @@ type Client struct {
 	lock     sync.RWMutex
 }
 
+// NewClient creates and sets up a new client from it's meta information.
 func NewClient(id uint8, meta ClientMeta, queue helpers.ClientQueue) *Client {
 	c := Client{
 		info:     NewClientGame(gamemap.NewCoordinate()),
@@ -113,28 +59,41 @@ func NewClient(id uint8, meta ClientMeta, queue helpers.ClientQueue) *Client {
 // Attention this function assumes that there already is a lock on the client
 // object.
 func (c *Client) registerConn(conn ClientMeta, queue helpers.ClientQueue) error {
-	// check if the recv is running
+	// check if the receiving routine is running
 	if c.isActive.Get() {
 		return ErrClientReaderAlreadyActive
 	}
 
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
 	// make sure that there is no chance of this conn
-	// already beeing registered
+	// already being registered
 	if c.status == Registered {
 		return ErrClientReaderAlreadyActive
 	}
 	c.status = Registered
-	c.meta = NewClientInternalMeta(c.meta.id, conn)
+	c.meta = newClientInternalMeta(c.meta.id, conn)
 	c.queue = queue
 
 	return nil
 }
 
+// Run starts the client send and receive pumps.
+// It will return an error, if the function is
+// called, while the pumps are already working.
+// This function might block in case of
+// reconnection, where a pump might still be
+// cleaning up the buffers.
 func (c *Client) Run() error {
 	// check if there already is an active worker
 	if !c.isActive.SetTrue() {
 		return ErrClientReaderAlreadyActive
 	}
+
+	// wait until there are no working connections
+	c.wg.Wait()
+
 	// setup the states needed to run the client
 	// this has to run in this thread here or else
 	// the counter might be wrong
@@ -162,6 +121,9 @@ func (c *Client) Run() error {
 	return nil
 }
 
+// checkOffline will check based on the
+// current client state, if the client
+// already as been set to offline.
 func (c *Client) checkOffline() bool {
 	// this write lock is needed in the later parts
 	// of the processes
@@ -173,113 +135,82 @@ func (c *Client) checkOffline() bool {
 	return c.status == Offline
 }
 
-func (c *Client) Shutdown(ctx context.Context) {
-	if c.checkOffline() {
-		return
+// sendData is the actual function used to run the client send loop
+// it will also handle all the outgoing data packages.
+// Attention this function is a blocking call, so be careful, while
+// reading form it.
+// This function uses no locking as per the condition of the atomic
+// condition this function will only ever be called a single time
+// per run.
+func (c *Client) sendData() {
+	defer c.shutdownHandler()
+
+	checkErr := func(err error) bool {
+		if err != nil {
+			// try to register a timeout
+			c.registerTimeout()
+
+			// break out of the endless loop to a shutdown
+			return false
+		}
+		return true
 	}
 
-	defer func() {
-		c.lock.Lock()
-		c.status = Offline
-		c.lock.Unlock()
-	}()
+	process := func(message []byte) bool {
 
-	logger.Debugf("Shutting down client [%d]", c.meta.eId)
+		cw, err := c.meta.conn.NextWriter(websocket.BinaryMessage)
 
-	c.lock.Lock()
-	// set the state of the client to shutting down
-	c.status = ShuttingDown
-	c.lock.Unlock()
+		if !checkErr(err) {
+			return false
+		}
 
-	// send the deconnect opcode
-	// ignore error as it is not important
-	//_ = c.SendData(server.NewDisconnect())
+		_, err = cw.Write(message)
 
-	// make a channel on which, we can wait on.
-	runs := make(chan struct{})
+		if !checkErr(err) {
+			return false
+		}
 
-	// Make a waiter that will (hopefully) shutdown soon.
-	go func() {
-		// close the connection
-		// error is irrelevant as we already send the
-		// disconnect message
-		c.meta.conn.Close()
+		// flush the message to the network
+		err = cw.Close()
 
-		// wait until the workgroup reaches zero
-		c.wg.Wait()
-
-		// toggle the completed shutdown cannel
-		close(runs)
-	}()
-
-	select {
-	case <-runs:
-		// TODO: log the a clean shutdown was a success
-		logger.Debugf("Shutdown of client [%d] complete", c.meta.eId)
-	case <-ctx.Done():
-		// TODO: log the a forced shutdown was made
-		logger.Debugf("forced shutdown of client [%d], due to timeout", c.meta.eId)
+		return !checkErr(err)
 	}
-}
-
-func (c *Client) sendData() error {
-
-	if !c.isActive.Get() {
-		return ErrClientReaderAlreadyActive
-	}
-
+	// No checks for activation are needed
+	// due to that this function will only
+	// be called from the run function
 	for {
 		message, err := c.queue.Dequeue()
 
 		if err != nil {
 			// this means that we have to shutdown the system
-			return nil
-		}
-		cw, err := c.meta.conn.NextWriter(websocket.BinaryMessage)
 
-		if err != nil {
-			// TODO: create a fixed error
-			// return error
-			return errors.New("something went wrong with creating NextWriter")
+			// due to how the client works this error can
+			// be ignored as it would imply an other
+			// queue worker or drainer
+			messages, _ := c.queue.DequeueDrain()
+			for _, message = range messages {
+				if !process(message) {
+					return
+				}
+			}
+
+			return
 		}
-		_, _ = cw.Write(message)
+
+		if !process(message) {
+			return
+		}
 	}
 }
 
-// registerTimeout will register the timeout in the timeout queue
-func (c *Client) registerTimeout() {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-	// TODO: Timer
-	c.status = Timeout
-
-	c.queue.Shutdown()
-	// close the connection
-	_ = c.meta.conn.Close()
-	// set the activity state to false
-	_ = c.isActive.SetFalse()
-}
-
-// recvData is the actuall function used to run the client read loop
-// it will also handle all the incomming opcode commands.
-// Attention this function is a blocking call, so be carefull, while
+// recvData is the actual function used to run the client read loop
+// it will also handle all the incoming opcode commands.
+// Attention this function is a blocking call, so be careful, while
 // reading form it.
 func (c *Client) recvData() {
-	// This function needs no locking
-	// as per the condition of the atomic
-	// condition this function will only
-	// ever be called a single time per
-	// run
-	defer func() {
-		// Error here is not important as the connections already died
-		// before reaching this position.
-		_ = c.meta.conn.Close()
-		// set the isActive variable to false
-		// result is not important as here the status
-		// of the connection has to be per definition
-		// false.
-		_ = c.isActive.SetFalse()
-	}()
+	// TODO: refactor out of this function
+
+	defer c.shutdownHandler()
 
 	for {
 		_, message, err := c.meta.conn.NextReader()
@@ -291,17 +222,16 @@ func (c *Client) recvData() {
 		// error
 		if err != nil {
 
-			// TODO: figure out how to handle the timeout
 			if websocket.IsCloseError(err, websocket.CloseAbnormalClosure) {
-				logger.Debugf("Client [%d] lost connection, setting to timeout", c.meta.id)
+				logger.Warnf("Client [%d] lost connection, setting to timeout", c.meta.id)
 			} else if websocket.IsCloseError(err,
 				websocket.CloseProtocolError, websocket.CloseNoStatusReceived,
 				websocket.CloseInvalidFramePayloadData,
 			) {
-				logger.Warnf("unexpected websocket clusure error received for client [%d] "+
+				logger.Warnf("unexpected web socket closure error received for client [%d] "+
 					"- see https://rfc-editor.org/rfc/rfc6455.html#section-11.7 for more information\n[%s]", c.meta.id, err.Error())
 			} else {
-				logger.Warnf("unexpected error happend\n%s", err.Error())
+				logger.Warnf("unexpected error happened\n%s", err.Error())
 			}
 
 			// if there was an unexpected close error
@@ -312,7 +242,8 @@ func (c *Client) recvData() {
 			return
 		}
 
-		readData := [17]byte{}
+		// prepare a zero sized array of size 17
+		var readData [MaxClientCommand]byte
 		readBytes, err := message.Read(readData[:])
 
 		if readBytes == 0 {
@@ -326,6 +257,100 @@ func (c *Client) recvData() {
 
 		// handle the gotten data on an other go thread
 		// as to not block the next readers
-		c.queue.Enqueue(readData[:])
+		err = c.queue.Enqueue(readData[:readBytes])
+		if err != nil {
+			return
+		}
+	}
+}
+
+// registerTimeout will register the timeout in the timeout queue
+func (c *Client) registerTimeout() {
+	// using a full lock here as this functions will
+	// be called by both the sender and the receiver.
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	if c.status != Active {
+		return
+	}
+
+	// TODO: Timer
+	c.status = Timeout
+
+	c.shutdownHandler()
+}
+
+// shutdownHandler will handle closing the connections
+func (c *Client) shutdownHandler() {
+
+	// only shutdown once
+	if !c.isActive.SetFalse() {
+		return
+	}
+
+	// Error here is not important as the connections already died
+	// before reaching this position.
+	_ = c.meta.conn.Close()
+
+	// terminate the queue
+	c.queue.Shutdown()
+}
+
+// Shutdown will shutdown the client and the queue.
+// Attention this is a blocking call until the
+// context expires.
+func (c *Client) Shutdown(ctx context.Context) {
+	if c.checkOffline() {
+		return
+	}
+
+	defer func() {
+		c.lock.Lock()
+		c.status = Offline
+		c.lock.Unlock()
+	}()
+
+	logger.Debugf("Shutting down client [%d]", c.meta.eId)
+
+	c.shutdownHandler()
+
+	c.lock.Lock()
+	// set the state of the client to shutting down
+	c.status = ShuttingDown
+	c.lock.Unlock()
+
+	// send the disconnect opcode
+	// ignore error as it is not important
+
+	// TODO: figure out what to do here...
+	//_ = c.SendData(server.NewDisconnect())
+
+	// make a channel on which, we can wait on.
+	runs := make(chan struct{})
+
+	// Make a waiter that will (hopefully) shutdown soon.
+	go func() {
+
+		// close the connection
+		// error is irrelevant as we already send the
+		// disconnect message
+		c.meta.conn.Close()
+
+		c.queue.Shutdown()
+
+		// wait until the work group reaches zero
+		c.wg.Wait()
+
+		// toggle the completed shutdown channel
+		close(runs)
+	}()
+
+	select {
+	case <-runs:
+		// TODO: log the a clean shutdown was a success
+		logger.Debugf("Shutdown of client [%d] complete", c.meta.eId)
+	case <-ctx.Done():
+		// TODO: log the a forced shutdown was made
+		logger.Debugf("forced shutdown of client [%d], due to timeout", c.meta.eId)
 	}
 }
