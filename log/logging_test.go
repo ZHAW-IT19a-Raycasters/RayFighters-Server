@@ -14,8 +14,8 @@ import (
 // down to no configurations.
 // Attention this function is used only for testing.
 func resetILogger() {
-	// remove all the previous configuration
-	iLogger = newInternalLogger()
+	builder := NewBuilder()
+	builder.Reset()
 }
 
 func cleanUpTmpFile(name string) {
