@@ -1,99 +1,82 @@
-package main
+package gamemap
 
 import (
 	"bufio"
-	"fmt"
 	"os"
 	"strconv"
 )
 
-type Coordinates struct {
-	x, y int
+type GameMap struct {
+	GMap [][]MapElement //slice
 }
-type ObjectType int
 
-//0 is error
+func (gm GameMap) GetMapElement(coord_x int, coord_y int) MapElement {
+	return gm.GMap[coord_x][coord_y]
+}
+
+// Declaring enum
+type MapElement int
+
+// 0 = error
 const (
-	Floor = iota + 1
+	Floor MapElement = iota + 1
 	Wall
 	MedkitSpawn
 	WreaponSpawn
 )
 
-// if not found
-var runeToObjectType = map[rune]ObjectType{
-	rune('0'): Floor,
-	rune('1'): Wall,
-	rune('+'): MedkitSpawn,
-	rune('*'): WreaponSpawn,
+//switch(static) vs. map (dynamic)
+func runeToMapElement(r rune) MapElement {
+	switch r {
+	case '0':
+		return Floor
+	case '+':
+		return MedkitSpawn
+	case '*':
+		return WreaponSpawn
+	default:
+		return Wall
+	}
 }
 
 const numberOfLinesInMapHeader int = 5
 
-var GameMap map[Coordinates]ObjectType
+func MapParser(filePath string) (GameMap, error) {
+	var gameMap GameMap
 
-func main() {
-	//fmt.Println(byte("0"))
-	//fmt.Println(runeToObjectType[rune('+')])
-	GameMap = make(map[Coordinates]ObjectType)
-	//file, err := os.Open("gamemap/testmap_01_valid.txt")
-	file, err := os.Open("gamemap/testmap_02_valid_specialsymbols.txt")
-	//file, err := os.Open("gamemap/testmap_04_illegalsymbol.txt")
-
+	file, err := os.Open(filePath)
 	if err != nil {
-		fmt.Println("%s", err)
-		return
+		return GameMap{}, err
 	}
 	defer file.Close()
 
 	scanner := bufio.NewScanner(file)
 	var mapDimesion int
-	count := 0
 
-	row := 0
-	for scanner.Scan() {
-		count++
-		//read map dimention
-		if count == numberOfLinesInMapHeader {
-			mapDimesion, err = strconv.Atoi(scanner.Text())
-			if err != nil {
-				fmt.Printf("%s: %s\n", "Invalid map format: expected int map dimesion", err)
-				return
-			}
-		}
-		if count > numberOfLinesInMapHeader {
-			row = count - numberOfLinesInMapHeader - 1
-			line := scanner.Text()
-
-			//check if map has defined columns of rows
-			if len(line) != mapDimesion {
-				fmt.Printf("%s. Expected: %d Is: %d\n", "Map missformat: row length missmatch", mapDimesion, len(line))
-				return
-			}
-
-			// fill the row
-			column := 0
-			for _, c := range line { //??what for is the 2 argument in range
-				var obj ObjectType = runeToObjectType[c]
-				if obj == 0 {
-					fmt.Printf("Unsupported symbol: %s", string(c))
-					return
-				}
-				fmt.Printf("rune: %d obj: %d\n", c, obj)
-				GameMap[Coordinates{row, column}] = obj
-				column++
-			}
-		}
-
+	// skip first 'numberOfLinesInMapHeader' of header
+	for i := 0; i < numberOfLinesInMapHeader; i += 1 {
+		scanner.Scan()
 	}
-	//check if map has defined number of rows > no need because is a quadr
-	if mapDimesion != (count - numberOfLinesInMapHeader) {
-		fmt.Printf("%s: \n", "Invalid map format: lines count missmatch")
-		return
+	mapDimesion, _ = strconv.Atoi(scanner.Text())
+	gameMap.GMap = make([][]MapElement, mapDimesion)
+
+	for rowIndex := 0; rowIndex < mapDimesion; rowIndex += 1 {
+		gameMap.GMap[rowIndex] = make([]MapElement, mapDimesion)
+		scanner.Scan()
+
+		line := scanner.Text()
+		parseLine(line, &gameMap.GMap[rowIndex])
 	}
 
-	fmt.Println("map dimension is:", mapDimesion)
-	fmt.Println(GameMap)
-	fmt.Println(GameMap[Coordinates{0, 1}])
-	//fmt.Println(runeToObjectType[rune('.')])// for non existing symbol map returns 0
+	return gameMap, nil
+}
+
+func parseLine(line string, gmRow *[]MapElement) {
+	for columnIndex, c := range line {
+		(*gmRow)[columnIndex] = runeToMapElement(c)
+	}
+}
+
+func (e MapElement) String() string {
+	return [...]string{"Floor", ""}[e]
 }
