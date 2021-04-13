@@ -12,6 +12,10 @@ import (
 	"github.com/lestrrat-go/jwx/jwt"
 )
 
+const (
+	JWTCOOKIENAME = "jwt"
+)
+
 // Create a struct to read the username and password from the request body
 type Credentials struct {
 	Username string `json:"username"`
@@ -58,7 +62,7 @@ func ServeAuthWithKey(privKey *rsa.PrivateKey) (HandleFunc func(w http.ResponseW
 		// Finally, we set the client cookie for "token" as the JWT we just generated
 		// we also set an expiry time which is the same as the token itself
 		http.SetCookie(w, &http.Cookie{
-			Name:    "token",
+			Name:    JWTCOOKIENAME,
 			Value:   string(signed[:]),
 		})
 		
@@ -84,9 +88,20 @@ type authenticationMiddleware struct {
 func (amw *authenticationMiddleware) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
-		token, err := jwt.ParseHeader(r.Header,"Authorization",jwt.WithVerify(jwa.RS512, amw.privateKey.PublicKey))
+		// get cookie from request
+		jwtCookie, err := r.Cookie(JWTCOOKIENAME)
+		if err != nil{
+			fmt.Printf("no JWT found in Cookies")
+			http.Error(w, "no JWT found in Cookies", http.StatusUnauthorized)
+		}
+
+		fmt.Printf("JWT found in cookies, %s", jwtCookie.Name)
+
+		// #CONTINUE: Parse from cookie not from header. 2 different versions of tokes in "Authentication" and cookie
+		token, err := jwt.ParseString(jwtCookie.Value,jwt.WithVerify(jwa.RS512, amw.privateKey.PublicKey))
 		if err != nil {
-			http.Error(w, "Forbidden", http.StatusForbidden)
+			fmt.Printf("unauthenticated request")
+			http.Error(w, "Forbidden", http.StatusUnauthorized)
 		} else {
 			if user, ok := token.Get(`username`); ok {
 				fmt.Printf("Authenticated user %s\n", user)

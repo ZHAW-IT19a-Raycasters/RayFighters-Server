@@ -67,14 +67,19 @@ func TestAuthRequestWithValidJson(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	router := mux.NewRouter()
-	// #TODO: generate key
-    router.HandleFunc("/auth", ServeAuthWithKey(nil))
+	// generate private key
+	privKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		fmt.Printf("failed to generate private key: %s\n", err)
+	}
+    router.HandleFunc("/auth", ServeAuthWithKey(privKey))
 	router.ServeHTTP(rr, req)
 	res := rr.Result()
 	if res.StatusCode != http.StatusOK {
 		t.Errorf("handler returned wrong status code: got %v want %v",
 		res.StatusCode, http.StatusOK)
 	}
+
 }
 
 
@@ -99,5 +104,9 @@ func TestAuthTokenResponseVaild(t *testing.T) {
 	if res.StatusCode != http.StatusOK {
 		t.Errorf("handler returned wrong status code: got %v want %v",
 		res.StatusCode, http.StatusOK)
+	}
+
+	if res.Header.Get("Set-Cookie") == "" {
+		t.Errorf("did not receive JWT via Set-Cookie")
 	}
 }
