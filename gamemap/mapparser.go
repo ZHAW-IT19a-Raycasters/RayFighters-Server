@@ -58,10 +58,11 @@ func MapParser(filePath string) (GameMap, error) {
 		scanner.Scan()
 	}
 	mapDimesion, _ = strconv.Atoi(scanner.Text())
-	gameMap.GMap = make([][]MapElement, mapDimesion)
+	gameMap.GMap = make([][]MapElement, 0, mapDimesion)
 
 	for rowIndex := 0; rowIndex < mapDimesion; rowIndex += 1 {
-		gameMap.GMap[rowIndex] = make([]MapElement, mapDimesion)
+		gameMap.GMap = append(gameMap.GMap, make([]MapElement, 0, mapDimesion))
+
 		scanner.Scan()
 
 		line := scanner.Text()
@@ -72,11 +73,7 @@ func MapParser(filePath string) (GameMap, error) {
 }
 
 func parseLine(line string, gmRow *[]MapElement) {
-	for columnIndex, c := range line {
-		(*gmRow)[columnIndex] = runeToMapElement(c)
+	for _, c := range line {
+		*gmRow = append(*gmRow, runeToMapElement(c))
 	}
-}
-
-func (e MapElement) String() string {
-	return [...]string{"Floor", ""}[e]
 }
