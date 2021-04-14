@@ -193,6 +193,47 @@ func TestMovementPlayerBytes(t *testing.T) {
 	}
 }
 
+func TestTeleportPlayer(t *testing.T) {
+	// used https://www.binaryconvert.com/result_double.html?
+	// for manual convertion
+
+	// writing out the values to make sure the
+	// compiler will use the correct size.
+	var userId uint8 = 0x44
+
+	// 1.00000000000000005551115123126E-1
+	// 0x3FB999999999999A
+	var coorX float64 = 0.1
+
+	// 0x3FC999999999999A
+	// 2.00000000000000011102230246252E-1
+	var coorY float64 = 0.2
+
+	expectedData := [...]byte{
+		server.MovementPlayerOpcode.Value(),
+		userId,
+		// 0x3F 0xB9 0x99 0x99 0x99 0x99 0x99 0x9A
+		0x9A, 0x99, 0x99, 0x99, 0x99, 0x99, 0xB9, 0x3F,
+		// 0x3F 0xC9 0x99 0x99 0x99 0x99 0x99 0x9A
+		0x9A, 0x99, 0x99, 0x99, 0x99, 0x99, 0xC9, 0x3F,
+	}
+
+	mp := server.NewTeleportPlayer(userId, coorX, coorY)
+	gottenData := mp.Bytes()
+
+	compareByteArrays(expectedData[:], gottenData, t)
+
+	// make sure the values are correctly set
+	// basically testing getters
+	if userId != mp.UserId() {
+		t.Error("UserId has been wrongly set")
+	} else if coorX != mp.CoorX() {
+		t.Error("CoorX has been wrongly set")
+	} else if coorY != mp.CoorY() {
+		t.Error("CoorY has been wrongly set")
+	} 
+}
+
 func TestShootingPlayer(t *testing.T) {
 	// used https://www.binaryconvert.com/result_double.html?
 	// for manual convertion
