@@ -1,7 +1,0 @@
-de_dust
-darksky.jpg
-FAFAFA;C0C0C0
-FFFFFF;0B0B0B
-2
-0*
-1*

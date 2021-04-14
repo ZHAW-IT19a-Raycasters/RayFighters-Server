@@ -7,91 +7,66 @@ import (
 	"testing"
 )
 
+var expected_map = [][]MapElement{
+	{Floor, Floor, Floor, Floor, Floor},
+	{Floor, Floor, Floor, Floor, Floor},
+	{Floor, Floor, Floor, Floor, Floor},
+	{Floor, Floor, Floor, Floor, Floor},
+	{Floor, Floor, Floor, Floor, Floor},
+}
+var testFolderPath string = "/testmaps"
+
 func TestValidMap(t *testing.T) {
-	path, err := os.Getwd()
-	if err != nil {
-		t.Errorf("Error while getting the working directory:\n[%s]", err.Error())
-		return
-	}
-	path = filepath.Join(path, "testmap_01_small_valid.txt")
-
-	expected_gmap := [][]MapElement{
-		{Floor, Floor, Floor, Floor, Floor},
-		{Floor, Floor, Floor, Floor, Floor},
-		{Floor, Floor, Floor, Floor, Floor},
-		{Floor, Floor, Floor, Floor, Floor},
-		{Floor, Floor, Floor, Floor, Floor},
-	}
-
-	gotten_gmap, err := MapParser(path)
-
+	actual_map, err := loadMap("testmap_01_small_valid.txt")
 	if err != nil {
 		t.Errorf("Error: %s", err.Error())
 		return
 	}
-
-	if status, err := Equal(expected_gmap, gotten_gmap.GMap, t); !status {
+	if status, err := compare2DSlices(expected_map, actual_map.GMap); !status {
 		t.Errorf(err.Error())
 		return
 	}
 }
-func TestUnvalidMapRowMissDimention(t *testing.T) {
-	path, err := os.Getwd()
-	if err != nil {
-		t.Errorf("Error while getting the working directory:\n[%s]", err.Error())
-		return
-	}
-	path = filepath.Join(path, "testmap_03_small_invalid_rowdim.txt")
-
-	expected_gmap := [][]MapElement{
-		{Floor, Floor, Floor, Floor, Floor},
-		{Floor, Floor, Floor, Floor, Floor},
-		{Floor, Floor, Floor, Floor, Floor},
-		{Floor, Floor, Floor, Floor, Floor},
-		{Floor, Floor, Floor, Floor, Floor},
-	}
-
-	gotten_gmap, err := MapParser(path)
-
+func TestMapWrongColumnDimension(t *testing.T) {
+	actual_map, err := loadMap("testmap_02_small_invalid_dimension_column.txt")
 	if err != nil {
 		t.Errorf("Error: %s", err.Error())
 		return
 	}
 
-	if status, _ := Equal(expected_gmap, gotten_gmap.GMap, t); status {
+	if status, _ := compare2DSlices(expected_map, actual_map.GMap); status {
+		t.Error("Expected: Column number missmatch.")
+		return
+	}
+}
+func TestMapWrongRowDimension(t *testing.T) {
+	actual_map, err := loadMap("testmap_03_small_invalid_dimension_row.txt")
+	if err != nil {
+		t.Errorf("Error: %s", err.Error())
+		return
+	}
+
+	if status, _ := compare2DSlices(expected_map, actual_map.GMap); status {
 		t.Error("Expected: Row length missmatch.")
 		return
 	}
 }
-func TestUnvalidMapColumnsMissDimention(t *testing.T) {
+
+func loadMap(fileName string) (GameMap, error) {
+
 	path, err := os.Getwd()
 	if err != nil {
-		t.Errorf("Error while getting the working directory:\n[%s]", err.Error())
-		return
+		return GameMap{}, fmt.Errorf("Error while getting the working directory:\n[%s]", err.Error())
 	}
-	path = filepath.Join(path, "testmap_03_small_invalid_rowdim.txt")
-
-	expected_gmap := [][]MapElement{
-		{Floor, Floor, Floor, Floor, Floor},
-		{Floor, Floor, Floor, Floor, Floor},
-		{Floor, Floor, Floor, Floor, Floor},
-		{Floor, Floor, Floor, Floor, Floor},
-		{Floor, Floor, Floor, Floor, Floor},
-	}
-
-	gotten_gmap, err := MapParser(path)
-
+	path = filepath.Join(path, testFolderPath, fileName)
+	actual_map, err := LoadMap(path)
 	if err != nil {
-		t.Errorf("Error: %s", err.Error())
-		return
+		return GameMap{}, fmt.Errorf("Error: %s", err.Error())
 	}
-
-	if status, _ := Equal(expected_gmap, gotten_gmap.GMap, t); status {
-		t.Error("Expected: Columns number missmatch.")
-		return
-	}
+	return actual_map, nil
 }
-func Equal(exp, act [][]MapElement, t *testing.T) (bool, error) {
+
+func compare2DSlices(exp, act [][]MapElement) (bool, error) {
 	if len(exp) != len(act) {
 		return false, fmt.Errorf("Error: columns number missmatch. (Exp: %d, Act: %d)", len(exp), len(act))
 	}

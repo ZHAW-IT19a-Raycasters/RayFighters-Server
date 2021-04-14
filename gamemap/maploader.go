@@ -7,17 +7,16 @@ import (
 )
 
 type GameMap struct {
-	GMap [][]MapElement //slice
+	GMap [][]MapElement
 }
 
 func (gm GameMap) GetMapElement(coord_x int, coord_y int) MapElement {
 	return gm.GMap[coord_x][coord_y]
 }
 
-// Declaring enum
+// Declare enum
 type MapElement int
 
-// 0 = error
 const (
 	Floor MapElement = iota + 1
 	Wall
@@ -25,7 +24,8 @@ const (
 	WreaponSpawn
 )
 
-//switch(static) vs. map (dynamic)
+// Use switch(static) (instead of map (dynamic))
+// to performe better
 func runeToMapElement(r rune) MapElement {
 	switch r {
 	case '0':
@@ -39,9 +39,10 @@ func runeToMapElement(r rune) MapElement {
 	}
 }
 
+// Define map-header length
 const numberOfLinesInMapHeader int = 5
 
-func MapParser(filePath string) (GameMap, error) {
+func LoadMap(filePath string) (GameMap, error) {
 	var gameMap GameMap
 
 	file, err := os.Open(filePath)
