@@ -28,7 +28,8 @@ const (
 	DisconnectOpcode        ServerOpcode = 0x64
 	UnknownOpcode           ServerOpcode = 0x65
 	MovementPlayerOpcode    ServerOpcode = 0x6E
-	ShootingPlayerOpcode    ServerOpcode = 0x6F
+	TeleportPlayerOpcode    ServerOpcode = 0x6F
+	ShootingPlayerOpcode    ServerOpcode = 0x70
 	PlayerDeathOpcode       ServerOpcode = 0x78
 	PlayerJoinedOpcode      ServerOpcode = 0x7A
 	PlayerLeftOpcode        ServerOpcode = 0x7B
@@ -41,6 +42,7 @@ var Overview = [...]ServerOpcode{
 	DisconnectOpcode,
 	UnknownOpcode,
 	MovementPlayerOpcode,
+	TeleportPlayerOpcode,
 	ShootingPlayerOpcode,
 	PlayerDeathOpcode,
 	PlayerJoinedOpcode,
@@ -141,6 +143,64 @@ func (pd PlayerDeath) Bytes() []byte {
 	return buffer
 }
 
+
+// MovementPlayer represents a movement made by a specific player.
+// It contains the user id and the respective offsets size the last
+// time the command was send.
+type TeleportPlayer struct {
+	userId                uint8
+	coorX, coorY float64
+}
+
+// NewMovemementPlayer will construct a new player object.
+func NewTeleportPlayer(userId uint8, coorX, coorY float64) TeleportPlayer {
+	return TeleportPlayer{
+		userId:  userId,
+		coorX:   coorX,
+		coorY:   coorY,
+	}
+}
+
+// UserId will return the user whom has made the given movement.
+func (mp TeleportPlayer) UserId() uint8 {
+	return mp.userId
+}
+
+// CoorX is the offset on the x axis done by the player.
+func (mp TeleportPlayer) CoorX() float64 {
+	return mp.coorX
+}
+
+// CoorY is the offset on the y axis done by the player.
+func (mp TeleportPlayer) CoorY() float64 {
+	return mp.coorY
+}
+
+
+func (mp TeleportPlayer) ByteSize() int {
+	//     Op          + UserId     + CoorX + CoorY 
+	return opcodeSize + userIdSize + coordSize * 2 
+}
+
+// Bytes will turn the movement instance into a sendable byte stream.
+func (mp TeleportPlayer) Bytes() []byte {
+
+	// using the buffer write interface for simplisity
+	buffer := make([]byte, mp.ByteSize())
+
+	buffer[0] = MovementPlayerOpcode.Value()
+	buffer[1] = mp.UserId()
+
+	// write floats into the bytes buffer
+	data := [...]float64{mp.CoorX(), mp.CoorY()}
+	for i, val := range data {
+		offset := 2 + i*coordSize
+		offsetEnd := offset + coordSize
+		utils.FloatToBinary(val, buffer[offset:offsetEnd])
+	}
+
+	return buffer
+}
 // MovementPlayer represents a movement made by a specific player.
 // It contains the user id and the respective offsets size the last
 // time the command was send.
