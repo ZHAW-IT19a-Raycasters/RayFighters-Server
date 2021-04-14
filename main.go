@@ -35,7 +35,6 @@ func main() {
 		return
 	}
 
-
 	err := setupLogger()
 
 	if err != nil {

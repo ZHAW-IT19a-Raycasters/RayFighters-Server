@@ -18,7 +18,7 @@ const (
 	MovementOpcode            ClientOpcode = 0x0A
 	ShootingOpcode            ClientOpcode = 0x14
 	RequestOtherPlayersOpcode ClientOpcode = 0x1E
-	RequestPlayerKDOpcode	  ClientOpcode = 0x1F
+	RequestPlayerKDOpcode     ClientOpcode = 0x1F
 )
 
 var Overview = [...]ClientOpcode{
@@ -79,7 +79,7 @@ func (o ClientOpcode) ByteSize() int {
 		return 1
 	case MovementOpcode:
 		// Opcode + 2 * Float64
-		return 1 + 2*8
+		return 1 + 3*8
 	case ShootingOpcode:
 		// Opcode + Flaot64
 		return 1 + 8
@@ -171,7 +171,7 @@ func NewUnknownByte(data []byte) (*Unknown, error) {
 }
 
 // Disconnect represents a request for a Player.
-type WhoAmI struct {}
+type WhoAmI struct{}
 
 // Will initialize the WhoAmI struct.
 func NewWhoAmI() WhoAmI {
@@ -193,7 +193,7 @@ func NewWhoAmIByte(data []byte) (*WhoAmI, error) {
 
 // Movement represents a user Movement.
 type Movement struct {
-	coorX, coorY float64
+	coorX, coorY, anglPl float64
 }
 
 // CooX returns the Movements x Coordinate as float64.
@@ -206,11 +206,16 @@ func (m Movement) CoorY() float64 {
 	return m.coorY
 }
 
+func (m Movement) AnglPl() float64 {
+	return m.anglPl
+}
+
 // NewMovement constructs a new Movement object.
-func NewMovement(coorX, coorY float64) Movement {
+func NewMovement(coorX, coorY, anglPl float64) Movement {
 	return Movement{
-		coorX: coorX,
-		coorY: coorY,
+		coorX:  coorX,
+		coorY:  coorY,
+		anglPl: anglPl,
 	}
 }
 
@@ -222,9 +227,10 @@ func NewMovementByte(data []byte) (*Movement, error) {
 	}
 
 	coorX := utils.BinaryToFloat(data[1:9])
-	coorY := utils.BinaryToFloat(data[9:])
+	coorY := utils.BinaryToFloat(data[9:17])
+	anglPl := utils.BinaryToFloat(data[17:])
 
-	val := NewMovement(coorX, coorY)
+	val := NewMovement(coorX, coorY, anglPl)
 
 	return &val, nil
 }
@@ -272,7 +278,7 @@ func NewRequestOtherPlayers() RequestOtherPlayers {
 }
 
 // Disconnect represents a request for a Player.
-type RequestPlayerKD struct {}
+type RequestPlayerKD struct{}
 
 // Will initialize the WhoAmI struct.
 func NewRequestPlayerKD() RequestPlayerKD {
