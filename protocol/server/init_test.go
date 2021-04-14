@@ -24,7 +24,7 @@ func comparePlayers(got, exp server.Player, t *testing.T) bool {
 func compareByteArrays(expectedData, gottenData []byte, t *testing.T) bool {
 
 	if len(expectedData) != len(gottenData) {
-		t.Errorf("Different lenght of results [%d] - [%d]", len(expectedData), len(gottenData))
+		t.Errorf("Different lenght of results exp: [%d] - got: [%d]", len(expectedData), len(gottenData))
 		return false
 	}
 
@@ -32,8 +32,7 @@ func compareByteArrays(expectedData, gottenData []byte, t *testing.T) bool {
 		exp := expectedData[i]
 		got := gottenData[i]
 		if exp != got {
-
-			t.Errorf("Bytes at position [%d] are different [%d] - [%d]", i, exp, got)
+			t.Errorf("Bytes at position [%d] are different exp: [%d] - got: [%d]", i, exp, got)
 			return false
 		}
 	}
@@ -156,9 +155,14 @@ func TestMovementPlayerBytes(t *testing.T) {
 	// 1.00000000000000005551115123126E-1
 	// 0x3FB999999999999A
 	var coorX float64 = 0.1
+
 	// 0x3FC999999999999A
 	// 2.00000000000000011102230246252E-1
 	var coorY float64 = 0.2
+
+	// 0x4072C40000000000
+	// 3.0025E2
+	var anglePl float64 = 300.25
 
 	expectedData := [...]byte{
 		server.MovementPlayerOpcode.Value(),
@@ -167,8 +171,11 @@ func TestMovementPlayerBytes(t *testing.T) {
 		0x9A, 0x99, 0x99, 0x99, 0x99, 0x99, 0xB9, 0x3F,
 		// 0x3F 0xC9 0x99 0x99 0x99 0x99 0x99 0x9A
 		0x9A, 0x99, 0x99, 0x99, 0x99, 0x99, 0xC9, 0x3F,
+		// 0x40 0x72 0xC4 0x00 0x00 0x00 0x00 0x00
+		0x00, 0x00, 0x00, 0x00, 0x00, 0xC4, 0x72, 0x40,
 	}
-	mp := server.NewMovementPlayer(userId, coorX, coorY)
+
+	mp := server.NewMovementPlayer(userId, coorX, coorY, anglePl)
 	gottenData := mp.Bytes()
 
 	compareByteArrays(expectedData[:], gottenData, t)
@@ -181,7 +188,76 @@ func TestMovementPlayerBytes(t *testing.T) {
 		t.Error("CoorX has been wrongly set")
 	} else if coorY != mp.CoorY() {
 		t.Error("CoorY has been wrongly set")
+	} else if anglePl != mp.AnglePl() {
+		t.Error("AngePL has been wrongly set")
 	}
+}
+
+func TestTeleportPlayer(t *testing.T) {
+	// used https://www.binaryconvert.com/result_double.html?
+	// for manual convertion
+
+	// writing out the values to make sure the
+	// compiler will use the correct size.
+	var userId uint8 = 0x44
+
+	// 1.00000000000000005551115123126E-1
+	// 0x3FB999999999999A
+	var coorX float64 = 0.1
+
+	// 0x3FC999999999999A
+	// 2.00000000000000011102230246252E-1
+	var coorY float64 = 0.2
+
+	expectedData := [...]byte{
+		server.MovementPlayerOpcode.Value(),
+		userId,
+		// 0x3F 0xB9 0x99 0x99 0x99 0x99 0x99 0x9A
+		0x9A, 0x99, 0x99, 0x99, 0x99, 0x99, 0xB9, 0x3F,
+		// 0x3F 0xC9 0x99 0x99 0x99 0x99 0x99 0x9A
+		0x9A, 0x99, 0x99, 0x99, 0x99, 0x99, 0xC9, 0x3F,
+	}
+
+	mp := server.NewTeleportPlayer(userId, coorX, coorY)
+	gottenData := mp.Bytes()
+
+	compareByteArrays(expectedData[:], gottenData, t)
+
+	// make sure the values are correctly set
+	// basically testing getters
+	if userId != mp.UserId() {
+		t.Error("UserId has been wrongly set")
+	} else if coorX != mp.CoorX() {
+		t.Error("CoorX has been wrongly set")
+	} else if coorY != mp.CoorY() {
+		t.Error("CoorY has been wrongly set")
+	} 
+}
+
+func TestShootingPlayer(t *testing.T) {
+	// used https://www.binaryconvert.com/result_double.html?
+	// for manual convertion
+
+	// writing out the values to make sure the
+	// compiler will use the correct size.
+
+	var userId uint8 = 0x44
+	// 0x4072C40000000000
+	// 3.0025E2
+	var anglePl float64 = 300.25
+
+	expectedData := [...]byte{
+		server.ShootingPlayerOpcode.Value(),
+		userId,
+		// 0x40 0x72 0xC4 0x00 0x00 0x00 0x00 0x00
+		0x00, 0x00, 0x00, 0x00, 0x00, 0xC4, 0x72, 0x40,
+	}
+
+	sp := server.NewShootingPlayer(userId, anglePl)
+
+	data := sp.Bytes()
+
+	compareByteArrays(expectedData[:], data, t)
 }
 
 func TestPlayerLeft(t *testing.T) {
@@ -225,7 +301,6 @@ func TestPlayerDeath(t *testing.T) {
 		server.PlayerDeathOpcode.Value(),
 		killedId,
 		killerId,
-
 	}
 
 	pd := server.NewPlayerDeath(killedId, killerId)
@@ -287,7 +362,6 @@ func TestYouAreCalled(t *testing.T) {
 	exp := [...]byte{
 		server.YouAreCalledOpcode.Value(),
 		userId,
-
 	}
 
 	yac := server.NewYouAreCalled(userId)

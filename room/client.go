@@ -403,7 +403,7 @@ func (c *Client) handleMovement(t []byte) {
 		newUnknown := server.NewUnknown()
 		c.SendData(newUnknown)
 	} else {
-		newMovementPlayer := server.NewMovementPlayer(c.meta.id, movement.CoorX(), movement.CoorY())
+		newMovementPlayer := server.NewMovementPlayer(c.meta.id, movement.CoorX(), movement.CoorY(), movement.AnglPl())
 		c.SendData(newMovementPlayer)
 	}
 }
