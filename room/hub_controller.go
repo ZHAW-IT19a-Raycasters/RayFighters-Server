@@ -17,6 +17,7 @@ type hubController struct {
 	connections   map[uint8]helpers.HubQueue
 	wg            sync.WaitGroup
 	lock          sync.RWMutex
+	gameState	  GameState
 }
 
 func newHubController() *hubController {
@@ -26,6 +27,7 @@ func newHubController() *hubController {
 		connections:   make(map[uint8]helpers.HubQueue),
 		wg:            sync.WaitGroup{},
 		lock:          sync.RWMutex{},
+		gameState:     NewGameState(),
 	}
 }
 
@@ -190,8 +192,9 @@ func (hc *hubController) handleDisconnect(t []byte, id uint8) protocol.Bytefy {
 		return newUnknown
 	} else {
 		newDisconnect := server.NewDisconnect()
-
-		hc.removeClient(hc.clientManager.GetClients()[id].GetInternalMeta().GetMeta())
+		// We ignore the ok because this function can't be called without the user already existing
+		meta, _ := hc.clientManager.MapMeta(id)
+		err = hc.removeClient(meta)
 		return newDisconnect
 	}
 }
@@ -207,7 +210,7 @@ func (hc *hubController) handleWhoAmI(t []byte, id uint8) protocol.Bytefy {
 		newUnknown := server.NewUnknown()
 		return newUnknown
 	} else {
-		newYouAreCalled := server.NewYouAreCalled(id) // TODO: Find ID
+		newYouAreCalled := server.NewYouAreCalled(id)
 		return newYouAreCalled
 	}
 }
@@ -244,12 +247,7 @@ func (hc *hubController) handleRequestOtherPlayer(t []byte, id uint8) protocol.B
 		newUnknown := server.NewUnknown()
 		return newUnknown
 	} else {
-		var players []server.Player
-		for _, c := range hc.clientManager.GetClients() {
-			player := server.NewPlayer(id, c.GetInternalMeta().GetName())
-			players = append(players, player)
-		}
-		newPlayerInfo := server.NewSendAllPlayerInfo(players)
+		newPlayerInfo := server.NewSendAllPlayerInfo(hc.clientManager.GetPlayers())
 		return newPlayerInfo
 	}
 }
@@ -261,12 +259,7 @@ func (hc *hubController) handleRequestPlayerKD(t []byte, id uint8) protocol.Byte
 		newUnknown := server.NewUnknown()
 		return newUnknown
 	} else {
-		var playersKD []server.PlayerKD
-		for _, c := range hc.clientManager.GetClients() {
-			playerKD := server.NewPlayerKD(id, c.GetInfo().GetKills(), c.GetInfo().GetDeaths())
-			playersKD = append(playersKD, playerKD)
-		}
-		newPlayersKD := server.NewPlayersKD(playersKD)
+		newPlayersKD := hc.gameState.GetPlayersKD()
 		return newPlayersKD
 	}
 }

@@ -55,6 +55,14 @@ func NewClient(id uint8, meta ClientMeta, queue helpers.ClientQueue) *Client {
 	return &c
 }
 
+func (c *Client) GetInternalMeta() clientInternalMeta{
+	return c.meta
+}
+
+func (c *Client) GetInfo() ClientGame {
+	return c.info
+}
+
 // registerConn will register the new client with it's exclusive hub connection.
 // Attention this function assumes that there already is a lock on the client
 // object.

@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 	"fmt"
+	"github.zhaw.ch/raycasters/server/protocol/server"
 	"sync"
 	"time"
 
@@ -71,10 +72,6 @@ func NewClientManager() ClientManager {
 	}
 }
 
-func (manager ClientManager) GetClients() map[uint8]*Client {
-	return manager.clients
-}
-
 // Size will return the current client count.
 // Attention although this is a thread safe
 // locking functions it is not recommended
@@ -87,7 +84,7 @@ func (manager *ClientManager) Size() int {
 	return len(manager.clients)
 }
 
-// MapId will map the client meta information with the internal value.
+// MapMeta will map the client meta information with the internal value.
 // If there is no such person this function will return false and
 // a zero value.
 // Attention this is thread safe, but fairly slow due to the lock.
@@ -97,6 +94,25 @@ func (manager *ClientManager) MapId(meta ClientMeta) (uint8, bool) {
 	return manager.mapToInternalId(meta)
 }
 
+func (manager *ClientManager) MapMeta(id uint8) (ClientMeta, bool) {
+	manager.lock.RLock()
+	defer manager.lock.RUnlock()
+	return manager.mapToExternalMeta(id)
+}
+
+
+// mapToExternalId is the lock free version to the MapMeta function,
+// it is intended to be used, with external locking in place as
+// it itself does not lock, but assumes the caller already
+// has one.
+func (manager *ClientManager) mapToExternalMeta(id uint8) (ClientMeta, bool) {
+	client, ok := manager.clients[id]
+	if !ok {
+		return ClientMeta{}, ok
+	}
+	return client.meta.GetMeta(), ok
+}
+
 // mapToInternalId is the lock free version to the MapId function,
 // it is intended to be used, with external locking in place as
 // it itself does not lock, but assumes the caller already
@@ -104,6 +120,18 @@ func (manager *ClientManager) MapId(meta ClientMeta) (uint8, bool) {
 func (manager *ClientManager) mapToInternalId(meta ClientMeta) (uint8, bool) {
 	id, ok := manager.mapping[meta.id]
 	return id, ok
+}
+
+func (manager *ClientManager) GetPlayers() []server.Player {
+	manager.lock.RLock()
+	defer manager.lock.RUnlock()
+
+	size := len(manager.clients)
+	players := make([]server.Player, 0, size)
+	for _, client := range manager.clients {
+		players = append(players, client.meta.GetPlayer())
+	}
+	return players
 }
 
 // AddClient will add a new client to the manager, if the client has

@@ -42,7 +42,7 @@ func (m *MockedConnection) Close() error {
 	return m.funcCloser()
 }
 
-func newMockedConnection() MockedConnection {
+func NewMockedConnection() MockedConnection {
 	mr := newMockedReader()
 	mwc := newMockedWriteCloser()
 	pmr := &mr

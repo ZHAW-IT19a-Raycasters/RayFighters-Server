@@ -20,7 +20,7 @@ func TestClientregisterConn(t *testing.T) {
 	defer client.Shutdown(context.TODO())
 
 	// test get meta
-	if meta.id != client.meta.getMeta().id {
+	if meta.id != client.meta.GetMeta().id {
 		t.Error("wrong id returned")
 		return
 	}

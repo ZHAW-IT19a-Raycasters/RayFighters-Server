@@ -19,7 +19,7 @@ func getClientMeta(i int) (ClientMeta, *MockedConnection) {
 	// if a new one is called here.
 	uuid := uuid.New()
 	name := fmt.Sprintf("id: %d", i)
-	mock := newMockedConnection()
+	mock := NewMockedConnection()
 	pmock := &mock
 	return NewClientMeta(uuid, name, pmock), pmock
 }
@@ -75,7 +75,7 @@ func TestClientManagerAddClientSigle(t *testing.T) {
 	}
 
 	// check if the client was added
-	lenClients := len(cm.Clients)
+	lenClients := len(cm.GetClients())
 	lenMapping := len(cm.mapping)
 	if lenClients != 1 {
 		t.Errorf("client size is not equals 1 -> [%d]", lenClients)
@@ -91,7 +91,7 @@ func TestClientManagerAddClientSigle(t *testing.T) {
 		return
 	}
 
-	client, ok := cm.Clients[iId]
+	client, ok := cm.GetClients()[iId]
 
 	if !ok {
 		t.Error("Client has not been mapped correctly, missing entry in clients")
@@ -125,7 +125,7 @@ func TestClientManagerAddClientTwice(t *testing.T) {
 	val.Shutdown(context.Background())
 
 	// adding a connection, while client conn is still active
-	mock := newMockedConnection()
+	mock := NewMockedConnection()
 	clientMeta.conn = &mock
 
 	clientQueue, _ = helpers.NewWorkQueue()

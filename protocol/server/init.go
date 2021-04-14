@@ -416,8 +416,8 @@ func (p PlayerKD) PutBytes(data []byte) {
 	_ = data[p.ByteSize()-1]
 
 	data[0] = p.id
-	binary.LittleEndian.PutUint16(data[1:3], p.kills)
-	binary.LittleEndian.PutUint16(data[3:5], p.deaths)
+	binary.LittleEndian.PutUint16(data[1:3], uint16(p.kills))
+	binary.LittleEndian.PutUint16(data[3:5], uint16(p.deaths))
 }
 
 // SendAllPlayerInfo is a request that will have to return any and
