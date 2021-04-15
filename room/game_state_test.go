@@ -2,6 +2,21 @@ package room
 
 import "testing"
 
+func compareByteArraysNoError(expectedData, gottenData []byte) bool {
+	if len(expectedData) != len(gottenData) {
+		return false
+	}
+
+	for i := range expectedData {
+		exp := expectedData[i]
+		got := gottenData[i]
+		if exp != got {
+			return false
+		}
+	}
+	return true
+}
+
 func TestNewGameState(t *testing.T) {
 	stateGame := NewGameState()
 	err := stateGame.AddClient(1)
@@ -161,7 +176,8 @@ func TestGameStateGetPlayersKD(t *testing.T) {
 
 	playersKD := stateGame.GetPlayersKD()
 
-	if !compareByteArrays(expected1, playersKD.Bytes(), t) && !compareByteArrays(expected2, playersKD.Bytes(), t) {
+	if !compareByteArraysNoError(expected1, playersKD.Bytes()) &&
+		!compareByteArraysNoError(expected2, playersKD.Bytes()) {
 		t.Error("Something went wrong with Byte generation")
 	}
 
