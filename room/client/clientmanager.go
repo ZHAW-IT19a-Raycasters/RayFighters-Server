@@ -3,9 +3,10 @@ package client
 import (
 	"context"
 	"fmt"
-	"github.zhaw.ch/raycasters/server/protocol/server"
 	"sync"
 	"time"
+
+	"github.zhaw.ch/raycasters/server/protocol/server"
 
 	"github.com/google/uuid"
 	"github.zhaw.ch/raycasters/server/room/helpers"
@@ -84,7 +85,7 @@ func (manager *ClientManager) Size() int {
 	return len(manager.clients)
 }
 
-// MapMeta will map the client meta information with the internal value.
+// MapId will map the client meta information with the internal value.
 // If there is no such person this function will return false and
 // a zero value.
 // Attention this is thread safe, but fairly slow due to the lock.
@@ -94,12 +95,16 @@ func (manager *ClientManager) MapId(meta ClientMeta) (uint8, bool) {
 	return manager.mapToInternalId(meta)
 }
 
+// MapMeta will map the client internal id with the correct meta
+// information.
+// If there is no such person this function will return false and
+// a zero value.
+// Attention this is thread safe, but fairly slow due to the lock.
 func (manager *ClientManager) MapMeta(id uint8) (ClientMeta, bool) {
 	manager.lock.RLock()
 	defer manager.lock.RUnlock()
 	return manager.mapToExternalMeta(id)
 }
-
 
 // mapToExternalId is the lock free version to the MapMeta function,
 // it is intended to be used, with external locking in place as
@@ -122,6 +127,8 @@ func (manager *ClientManager) mapToInternalId(meta ClientMeta) (uint8, bool) {
 	return id, ok
 }
 
+// GetPlayers will retuen a slice of all the currently
+// registered players in the server.
 func (manager *ClientManager) GetPlayers() []server.Player {
 	manager.lock.RLock()
 	defer manager.lock.RUnlock()
