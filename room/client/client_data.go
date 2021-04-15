@@ -101,6 +101,17 @@ func NewClientMeta(id uuid.UUID, name string, conn ClientConnection) ClientMeta 
 	}
 }
 
+// GetId will reutrn the externally used
+// id
+func (cm ClientMeta) GetId() uuid.UUID {
+	return cm.id
+}
+
+// GetName will return the client name
+func (cm ClientMeta) GetName() string {
+	return cm.name
+}
+
 // clientInternalMeta is the internal representation of a client meta
 // it also contains the internal id of the client.
 type clientInternalMeta struct {
@@ -115,8 +126,8 @@ type clientInternalMeta struct {
 func newClientInternalMeta(id uint8, client ClientMeta) clientInternalMeta {
 	return clientInternalMeta{
 		id:   id,
-		eId:  client.id,
-		name: client.name,
+		eId:  client.GetId(),
+		name: client.GetName(),
 		conn: client.conn,
 	}
 }

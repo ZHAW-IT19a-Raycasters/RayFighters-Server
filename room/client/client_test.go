@@ -105,6 +105,16 @@ func TestClientregisterConn(t *testing.T) {
 	}
 
 	client.Shutdown(context.TODO())
+
+	// this is primarily for coverage
+	// check on the internal meta
+	imeta := client.GetInternalMeta()
+
+	if imeta.GetUUID() != meta.GetId() {
+		t.Error("Incorrect id was used")
+	} else if imeta.GetName() != meta.GetName() {
+		t.Error("Incorrect name was returned")
+	}
 }
 
 func TestClientRecv(t *testing.T) {
