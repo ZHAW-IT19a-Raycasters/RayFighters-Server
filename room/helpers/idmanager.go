@@ -12,10 +12,12 @@ var (
 	ErrIdManagerEmpty = errors.New("incorrect handling of the idManager, is is empty")
 )
 
-const IdCountLimit = uint32(math.MaxUint8 + 1)
+// IdCountLimit is the limit of possible id handled
+// by the id manager.
+const IdCountLimit int = math.MaxUint8 + 1
 
 // IdManager is an abstraction over the standard library
-// linkedlist implementation for uint8 values.
+// linked list implementation for uint8 values.
 type IdManager struct {
 	// The list of currently ids user ids
 	// if this is empty all ids have been used.
@@ -25,7 +27,7 @@ type IdManager struct {
 // Will create a new idManager and fills it up with all values for uint8.
 func NewIdManager() IdManager {
 	ids := make(chan uint8, IdCountLimit)
-	for i := uint32(0); i <= IdCountLimit-1; i += 1 {
+	for i := 0; i <= IdCountLimit-1; i += 1 {
 		// make sure that only uint8 values are pushed into the
 		// queue
 		ids <- uint8(i)
@@ -70,5 +72,5 @@ func (m IdManager) IsEmpty() bool {
 
 // IsFull will check if there is still space for more ids.
 func (m IdManager) IsFull() bool {
-	return len(m.ids) == int(IdCountLimit)
+	return len(m.ids) == IdCountLimit
 }

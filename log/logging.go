@@ -44,6 +44,18 @@ func (b *builder) Build() error {
 	return iLogger.copy(b.handlers)
 }
 
+// Reset will forcefully reset the configuration
+// of the global logger.
+// Attention this does not reset the
+// builder configuration.
+// Attention use this function with
+// caution as it will create issues
+// if used. It should only be used
+// for tests.
+func (b *builder) Reset() {
+	iLogger.reset()
+}
+
 // logger is a pseudo wrapper around the internal logger singleton.
 // It does not contain any values, but the methods written for the
 // logger all point to the internal logger variable one.
