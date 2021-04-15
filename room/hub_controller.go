@@ -223,7 +223,7 @@ func (hc *hubController) handleMovement(t []byte, id uint8) protocol.Bytefy {
 		newUnknown := server.NewUnknown()
 		return newUnknown
 	} else {
-		newMovementPlayer := server.NewMovementPlayer(id, movement.CoorX(), movement.CoorY())
+		newMovementPlayer := server.NewMovementPlayer(id, movement.CoorX(), movement.CoorY(), movement.AnglPl())
 		return newMovementPlayer
 	}
 }
