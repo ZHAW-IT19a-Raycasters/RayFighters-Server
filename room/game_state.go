@@ -1,25 +1,26 @@
 package room
 
 import (
+	"sync"
+
 	"github.zhaw.ch/raycasters/server/gamemap"
 	"github.zhaw.ch/raycasters/server/protocol/server"
 	"github.zhaw.ch/raycasters/server/room/client"
-	"sync"
 )
 
 type GameState struct {
-	clients map[uint8]client.ClientGame
-	lock *sync.RWMutex
+	clients map[uint8]*client.ClientGame
+	lock    *sync.RWMutex
 }
 
-func NewGameState() GameState{
+func NewGameState() GameState {
 	return GameState{
-		clients: make(map[uint8]client.ClientGame),
+		clients: make(map[uint8]*client.ClientGame),
 		lock:    &sync.RWMutex{},
 	}
 }
 
-func (gs GameState) GetClient(id uint8) (client.ClientGame, bool) {
+func (gs GameState) GetClient(id uint8) (*client.ClientGame, bool) {
 	gs.lock.RLock()
 	defer gs.lock.RUnlock()
 	c, ok := gs.clients[id]
@@ -56,7 +57,9 @@ func (gs *GameState) AddClient(id uint8) error {
 		// TODO: FIND A MORE ACCURATE ERROR
 		return ErrHubIsFull
 	}
-	gs.clients[id] = client.NewClientGame(gamemap.NewCoordinate())
+	c := client.NewClientGame(gamemap.NewCoordinate())
+
+	gs.clients[id] = &c
 	return nil
 }
 

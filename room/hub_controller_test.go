@@ -2,11 +2,12 @@ package room
 
 import (
 	"fmt"
+	"testing"
+
 	"github.com/google/uuid"
 	"github.zhaw.ch/raycasters/server/protocol/client"
 	"github.zhaw.ch/raycasters/server/protocol/server"
 	rClient "github.zhaw.ch/raycasters/server/room/client"
-	"testing"
 )
 
 func getClientMeta(i int) (rClient.ClientMeta, *MockedConnection) {
@@ -18,7 +19,6 @@ func getClientMeta(i int) (rClient.ClientMeta, *MockedConnection) {
 	pmock := &mock
 	return rClient.NewClientMeta(uuid, name, pmock), pmock
 }
-
 
 func compareByteArrays(expectedData, gottenData []byte, t *testing.T) bool {
 	if len(expectedData) != len(gottenData) {
@@ -83,7 +83,7 @@ func TestHandleDisconnect(t *testing.T) {
 	meta, _ := getClientMeta(1)
 
 	hub.registerClient(meta)
-	hub.clientManager.GetClients()
+	// hub.clientManager.GetClients()
 	magic := hub.handleDisconnect([]byte{client.DisconnectOpcode.Value()}, 0)
 	t.Log(magic)
 }

@@ -75,7 +75,7 @@ func TestClientManagerAddClientSigle(t *testing.T) {
 	}
 
 	// check if the client was added
-	lenClients := len(cm.GetClients())
+	lenClients := cm.Size()
 	lenMapping := len(cm.mapping)
 	if lenClients != 1 {
 		t.Errorf("client size is not equals 1 -> [%d]", lenClients)
@@ -91,7 +91,7 @@ func TestClientManagerAddClientSigle(t *testing.T) {
 		return
 	}
 
-	client, ok := cm.GetClients()[iId]
+	client, ok := cm.clients[iId]
 
 	if !ok {
 		t.Error("Client has not been mapped correctly, missing entry in clients")
