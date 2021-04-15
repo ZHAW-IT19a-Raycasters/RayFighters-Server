@@ -98,6 +98,15 @@ func (hc *hubController) removeClient(meta client.ClientMeta) error {
 // byte interface to a given client.
 func (hc *hubController) broadCast(msg protocol.Bytefy, except helpers.IdSet) {
 	// TODO: implement
+	hc.lock.RLock()
+	defer hc.lock.RUnlock()
+	data := msg.Bytes()
+	for id, clientQueue := range hc.connections {
+		if except.Has(id) {
+			continue
+		}
+		clientQueue.Enqueue(data)
+	}
 }
 
 func (hc *hubController) shutdown(cxt context.Context) {
