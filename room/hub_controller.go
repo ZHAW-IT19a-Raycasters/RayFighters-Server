@@ -2,8 +2,9 @@ package room
 
 import (
 	"context"
-	"github.zhaw.ch/raycasters/server/protocol/server"
 	"sync"
+
+	"github.zhaw.ch/raycasters/server/protocol/server"
 
 	"github.zhaw.ch/raycasters/server/protocol"
 	pclient "github.zhaw.ch/raycasters/server/protocol/client"
@@ -17,7 +18,7 @@ type hubController struct {
 	connections   map[uint8]helpers.HubQueue
 	wg            sync.WaitGroup
 	lock          sync.RWMutex
-	gameState	  GameState
+	gameState     GameState
 }
 
 func newHubController() *hubController {
@@ -140,7 +141,6 @@ func (hc *hubController) shutdown(cxt context.Context) {
 // 	return players
 // }
 
-
 func (hc *hubController) handleRead(data []byte, id uint8) protocol.Bytefy {
 	switch pclient.Detect(data[0]) {
 	case pclient.DisconnectOpcode:
@@ -194,7 +194,8 @@ func (hc *hubController) handleDisconnect(t []byte, id uint8) protocol.Bytefy {
 		newDisconnect := server.NewDisconnect()
 		// We ignore the ok because this function can't be called without the user already existing
 		meta, _ := hc.clientManager.MapMeta(id)
-		err = hc.removeClient(meta)
+		// We ignore the error here, as it is impossible per definition
+		_ = hc.removeClient(meta)
 		return newDisconnect
 	}
 }
