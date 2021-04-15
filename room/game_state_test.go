@@ -137,7 +137,7 @@ func TestGameStateGetPlayersKD(t *testing.T) {
 	stateGame.IncKill(1)
 	stateGame.IncDeaths(2)
 
-	expected := []byte {
+	expected1 := []byte {
 		// PlayersKD Opcode
 		0x83,
 		// Amount of Players
@@ -146,11 +146,22 @@ func TestGameStateGetPlayersKD(t *testing.T) {
 		0x01, 0x01, 0x00, 0x02, 0x00,
 		// Player with id 2
 		0x02, 0x02, 0x00, 0x01, 0x00,
-
 	}
+
+	expected2 := []byte {
+		// PlayersKD Opcode
+		0x83,
+		// Amount of Players
+		0x02,
+		// Player with id 1
+		0x02, 0x02, 0x00, 0x01, 0x00,
+		// Player with id 2
+		0x01, 0x01, 0x00, 0x02, 0x00,
+	}
+
 	playersKD := stateGame.GetPlayersKD()
 
-	if !compareByteArrays(expected, playersKD.Bytes(), t) {
+	if !compareByteArrays(expected1, playersKD.Bytes(), t) && !compareByteArrays(expected2, playersKD.Bytes(), t) {
 		t.Error("Something went wrong with Byte generation")
 	}
 
