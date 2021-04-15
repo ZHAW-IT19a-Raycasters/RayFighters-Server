@@ -179,6 +179,83 @@ func TestClientSend(t *testing.T) {
 	}
 
 	// send the information to the server
+	// opcode type is irrelevant with the
+	// exception of the disconnect, as that
+	// needs a different frame to send the
+	// information to
+	exp := []byte{server.PlayerDeathOpcode.Value()}
+	err := hq.Enqueue(exp)
+
+	if err != nil {
+		t.Error("the queue should be open and receiving here")
+		return
+	}
+
+	client := NewClient(1, cmeta, cq)
+	defer client.Shutdown(context.TODO())
+
+	client.Run()
+
+	<-done
+
+	// wait until the client has shutdown
+	// completely
+	client.Shutdown(context.TODO())
+
+	gotten := mock.mwc.Bytes()
+
+	compareByteSlices(exp, gotten, t)
+}
+
+func TestClientSendShutdown(t *testing.T) {
+	cq, hq := helpers.NewWorkQueue()
+	cmeta, mock := getClientMeta(1)
+
+	done := make(chan struct{})
+
+	// make the connections blocking, so that we can run other
+	// stuff while it waits
+	funcTransferReader := make(chan func() (int, io.Reader, error), 10)
+	funcTransferWriter := make(chan func(messageType int) (io.WriteCloser, error), 10)
+
+	mock.mwc.cl = func() error {
+		close(done)
+		return nil
+	}
+
+	mock.funcNextReader = func() (int, io.Reader, error) {
+		select {
+		case <-done:
+			return 0, nil, websocket.ErrCloseSent
+		case d := <-funcTransferReader:
+			return d()
+		}
+	}
+
+	mock.funcNextWriter = func(messageType int) (io.WriteCloser, error) {
+		select {
+		case <-done:
+			return nil, websocket.ErrCloseSent
+		case d := <-funcTransferWriter:
+			return d(messageType)
+		}
+	}
+
+	// override the closer, so that the channels don't get changed by it
+	mock.funcCloser = func() error {
+		return nil
+	}
+
+	// send this first as to not have a race condition with
+	// the enqueue
+	funcTransferWriter <- func(messageType int) (io.WriteCloser, error) {
+		// shutdown the client
+		if messageType != websocket.CloseMessage {
+			t.Errorf("Wrong message type used [%d] should be [%d]", messageType, websocket.BinaryMessage)
+		}
+		return mock.mwc, nil
+	}
+
 	exp := []byte{server.DisconnectOpcode.Value()}
 	err := hq.Enqueue(exp)
 
