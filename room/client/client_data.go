@@ -1,7 +1,7 @@
 package client
 
 import (
-	"sync"
+	"sync/atomic"
 
 	"github.com/google/uuid"
 	"github.zhaw.ch/raycasters/server/protocol/server"
@@ -48,9 +48,8 @@ func (c ConnectionStatus) String() string {
 
 // ClientGame represents the state of the client in the game
 type ClientGame struct {
-	kills  uint16
-	deaths uint16
-	lock   *sync.RWMutex
+	kills  uint32
+	deaths uint32
 }
 
 // NewClientGame creates the default client object.
@@ -58,32 +57,31 @@ func NewClientGame() ClientGame {
 	return ClientGame{
 		kills:  0,
 		deaths: 0,
-		lock:   &sync.RWMutex{},
 	}
 }
 
-func (cg ClientGame) GetKills() uint16 {
-	cg.lock.RLock()
-	defer cg.lock.RUnlock()
-	return cg.kills
+// GetKills will return the current kill count
+// of the client.
+func (cg *ClientGame) GetKills() uint16 {
+	return uint16(atomic.LoadUint32(&cg.kills))
 }
 
-func (cg ClientGame) GetDeaths() uint16 {
-	cg.lock.RLock()
-	defer cg.lock.RUnlock()
-	return cg.deaths
+// GetDeaths will reutrn the death count
+// of the client.
+func (cg *ClientGame) GetDeaths() uint16 {
+	return uint16(atomic.LoadUint32(&cg.deaths))
 }
 
+// IncKills will increment the kill count
+// of the player
 func (cg *ClientGame) IncKills() {
-	cg.lock.Lock()
-	defer cg.lock.Unlock()
-	cg.kills += 1
+	atomic.AddUint32(&cg.kills, 1)
 }
 
+// IncDeaths will increment the
+// death counter by one
 func (cg *ClientGame) IncDeaths() {
-	cg.lock.Lock()
-	defer cg.lock.Unlock()
-	cg.deaths += 1
+	atomic.AddUint32(&cg.deaths, 1)
 }
 
 // ClientMeta contains the shared meta information of a
@@ -123,6 +121,8 @@ func newClientInternalMeta(id uint8, client ClientMeta) clientInternalMeta {
 	}
 }
 
+// GetPlayer will return a sendable representation
+//  of the client.
 func (c clientInternalMeta) GetPlayer() server.Player {
 	return server.NewPlayer(c.id, c.name)
 }
@@ -132,14 +132,18 @@ func (c clientInternalMeta) GetMeta() ClientMeta {
 	return NewClientMeta(c.GetUUID(), c.GetName(), c.conn)
 }
 
+// GetName will return the clients registered name
 func (c clientInternalMeta) GetName() string {
 	return c.name
 }
 
+// GetId will return the internal id of the client
 func (c clientInternalMeta) GetId() uint8 {
 	return c.id
 }
 
+// GetUUID will return the external unique id of the
+// client.
 func (c clientInternalMeta) GetUUID() uuid.UUID {
 	return c.eId
 }
