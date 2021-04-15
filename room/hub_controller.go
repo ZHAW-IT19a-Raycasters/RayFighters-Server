@@ -2,6 +2,7 @@ package room
 
 import (
 	"context"
+	"github.zhaw.ch/raycasters/server/protocol/server"
 	"sync"
 
 	"github.zhaw.ch/raycasters/server/protocol"
@@ -16,6 +17,7 @@ type hubController struct {
 	connections   map[uint8]helpers.HubQueue
 	wg            sync.WaitGroup
 	lock          sync.RWMutex
+	gameState	  GameState
 }
 
 func newHubController() *hubController {
@@ -25,6 +27,7 @@ func newHubController() *hubController {
 		connections:   make(map[uint8]helpers.HubQueue),
 		wg:            sync.WaitGroup{},
 		lock:          sync.RWMutex{},
+		gameState:     NewGameState(),
 	}
 }
 
@@ -75,7 +78,7 @@ func (hc *hubController) registerClient(meta client.ClientMeta) error {
 			}
 
 			go func() {
-				gotten := hc.handleRead(data)
+				gotten := hc.handleRead(data, id)
 				hqueue.Enqueue(gotten.Bytes())
 			}()
 		}
@@ -92,11 +95,12 @@ func (hc *hubController) removeClient(meta client.ClientMeta) error {
 
 // BroadCast will as the name implies broadcast a given
 // byte interface to a given client.
-func (h *hubController) broadCast(msg protocol.Bytefy) {
+
+func (hc *hubController) broadCast(msg protocol.Bytefy) {
 	// TODO: implement
 }
 
-func (h *hubController) shutdown(cxt context.Context) {
+func (hc *hubController) shutdown(cxt context.Context) {
 	// TODO:
 }
 
@@ -136,126 +140,126 @@ func (h *hubController) shutdown(cxt context.Context) {
 // 	return players
 // }
 
-func (c *hubController) handleRead(data []byte) protocol.Bytefy {
+
+func (hc *hubController) handleRead(data []byte, id uint8) protocol.Bytefy {
 	switch pclient.Detect(data[0]) {
 	case pclient.DisconnectOpcode:
 		// Received a Disconnect request from client
-		c.handleDisconnect(data)
+		return hc.handleDisconnect(data, id)
 	case pclient.UnknownOpcode:
 		// hubController received Unknown request from Server
-		c.handleUnknownSent(data)
+		hc.handleUnknownSent()
 	case pclient.WhoAmIOpcode:
 		// Received a WhoAmI request from client
-		c.handleWhoAmI(data)
+		return hc.handleWhoAmI(data, id)
 	case pclient.MovementOpcode:
 		// Received a Movement request from client
-		c.handleMovement(data)
+		return hc.handleMovement(data, id)
 	case pclient.ShootingOpcode:
 		// Received a Shooting request from client
-		c.handleShooting(data)
+		return hc.handleShooting(data, id)
 	case pclient.RequestOtherPlayersOpcode:
 		// Received a RequestOtherPlayers request from client
-		c.handleRequestOtherPlayer(data)
+		return hc.handleRequestOtherPlayer(data, id)
 	case pclient.RequestPlayerKDOpcode:
 		// Received a RequestOtherPlayers request from client
-		c.handleRequestOtherPlayer(data)
+		return hc.handleRequestOtherPlayer(data, id)
 	default:
 		// Received Unknown Code from client
-		c.handleUnknownReceived(data)
+		return hc.handleUnknownReceived(data)
 	}
 	// TODO: change to actuall return
 	return nil
 }
 
-func (c *hubController) handleUnknownReceived(t []byte) {
+func (hc *hubController) handleUnknownReceived(t []byte) protocol.Bytefy {
 	_, err := pclient.NewUnknownByte(t)
 	if err != nil {
 		logger.Info(err)
-		//newUnknown := server.NewUnknown()
-		//c.SendData(newUnknown)
+		newUnknown := server.NewUnknown()
+		return newUnknown
 	} else {
-		//newUnknown := server.NewUnknown()
-		//c.SendData(newUnknown)
+		newUnknown := server.NewUnknown()
+		return newUnknown
 	}
 }
 
-func (c *hubController) handleDisconnect(t []byte) {
+func (hc *hubController) handleDisconnect(t []byte, id uint8) protocol.Bytefy {
 	_, err := pclient.NewDisconnectByte(t)
 	if err != nil {
 		logger.Info(err)
-		//newUnknown := server.NewUnknown()
-		//c.SendData(newUnknown)
+		newUnknown := server.NewUnknown()
+		return newUnknown
 	} else {
-		//newDisconnect := server.NewDisconnect()
-		//c.SendData(newDisconnect)
-
-		//c.hub.UnregisterhubController(c.meta.getMeta())
+		newDisconnect := server.NewDisconnect()
+		// We ignore the ok because this function can't be called without the user already existing
+		meta, _ := hc.clientManager.MapMeta(id)
+		err = hc.removeClient(meta)
+		return newDisconnect
 	}
 }
 
-func (c *hubController) handleUnknownSent(t []byte) {
+func (hc *hubController) handleUnknownSent() {
 	logger.Error("Unknown Opcode was sent")
 }
 
-func (c *hubController) handleWhoAmI(t []byte) {
+func (hc *hubController) handleWhoAmI(t []byte, id uint8) protocol.Bytefy {
 	_, err := pclient.NewWhoAmIByte(t)
 	if err != nil {
 		logger.Info(err)
-		//newUnknown := server.NewUnknown()
-		//c.SendData(newUnknown)
+		newUnknown := server.NewUnknown()
+		return newUnknown
 	} else {
-		//newYouAreCalled := server.NewYouAreCalled(c.meta.id)
-		//c.SendData(newYouAreCalled)
+		newYouAreCalled := server.NewYouAreCalled(id)
+		return newYouAreCalled
 	}
 }
 
-func (c *hubController) handleMovement(t []byte) {
-	_, err := pclient.NewMovementByte(t)
+func (hc *hubController) handleMovement(t []byte, id uint8) protocol.Bytefy {
+	movement, err := pclient.NewMovementByte(t)
 	if err != nil {
 		logger.Info(err)
-		//newUnknown := server.NewUnknown()
-		//c.SendData(newUnknown)
+		newUnknown := server.NewUnknown()
+		return newUnknown
 	} else {
-		//newMovementPlayer := server.NewMovementPlayer(c.meta.id, movement.CoorX(), movement.CoorY())
-		//c.SendData(newMovementPlayer)
+		newMovementPlayer := server.NewMovementPlayer(id, movement.CoorX(), movement.CoorY())
+		return newMovementPlayer
 	}
 }
 
-func (c *hubController) handleShooting(t []byte) {
+func (hc *hubController) handleShooting(t []byte, id uint8) protocol.Bytefy {
 	_, err := pclient.NewShootingBytes(t)
 	if err != nil {
 		logger.Info(err)
-		///newUnknown := server.NewUnknown()
-		//c.SendData(newUnknown)
+		newUnknown := server.NewUnknown()
+		return newUnknown
 	} else {
-		//hit, player := c.hub.PlayerGotHit()
-		//if hit {
-		//	newAnotherPlayerKilled := server.NewPlayerDeath(player.UserId(), c.meta.id)
-		//	c.SendData(newAnotherPlayerKilled)
-		//}
+		// TODO: IMPLEMENT SHOOTING FUNCTION WITH RAYCASTING
+		newAnotherPlayerKilled := server.NewPlayerDeath(id, id)
+		return newAnotherPlayerKilled
 	}
 }
 
-func (c *hubController) handleRequestOtherPlayer(t []byte) {
+func (hc *hubController) handleRequestOtherPlayer(t []byte, id uint8) protocol.Bytefy {
 	_, err := pclient.NewRequestOtherPlayersBytes(t)
 	if err != nil {
 		logger.Info(err)
-		//newUnknown := server.NewUnknown()
-		//c.SendData(newUnknown)
+		newUnknown := server.NewUnknown()
+		return newUnknown
 	} else {
-		//newPlayerInfo := server.NewSendAllPlayerInfo(c.hub.GetAllPlayers())
-		//c.SendData(newPlayerInfo)
+		newPlayerInfo := server.NewSendAllPlayerInfo(hc.clientManager.GetPlayers())
+		return newPlayerInfo
 	}
 }
 
-func (c *hubController) handleRequestPlayerKD(t []byte) {
+func (hc *hubController) handleRequestPlayerKD(t []byte, id uint8) protocol.Bytefy {
 	_, err := pclient.NewRequestPlayerKDByte(t)
 	if err != nil {
 		logger.Info(err)
-		//newUnknown := server.NewUnknown()
-		//c.SendData(newUnknown)
+		newUnknown := server.NewUnknown()
+		return newUnknown
 	} else {
-		//newPlayersKD := server.NewPlayersKD(c.hub.PlayersKD())
-		//c.SendData(newPlayersKD)
+		newPlayersKD := hc.gameState.GetPlayersKD()
+		return newPlayersKD
 	}
 }

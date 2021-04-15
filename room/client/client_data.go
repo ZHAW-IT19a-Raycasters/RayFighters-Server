@@ -3,6 +3,8 @@ package client
 import (
 	"github.com/google/uuid"
 	"github.zhaw.ch/raycasters/server/gamemap"
+	"github.zhaw.ch/raycasters/server/protocol/server"
+	"sync"
 )
 
 // ConnectionStatus is an enum type used for showing the
@@ -47,8 +49,9 @@ func (c ConnectionStatus) String() string {
 // ClientGame represents the state of the client in the game
 type ClientGame struct {
 	pos    gamemap.Coordinate
-	kills  uint
-	deaths uint
+	kills  uint16
+	deaths uint16
+	lock *sync.RWMutex
 }
 
 // NewClientGame creates the default client object.
@@ -57,7 +60,38 @@ func NewClientGame(pos gamemap.Coordinate) ClientGame {
 		pos:    pos,
 		kills:  0,
 		deaths: 0,
+		lock: &sync.RWMutex{},
 	}
+}
+
+func (cg ClientGame) GetPosition() gamemap.Coordinate {
+	cg.lock.RLock()
+	defer cg.lock.RUnlock()
+	return cg.pos
+}
+
+func (cg ClientGame) GetKills() uint16 {
+	cg.lock.RLock()
+	defer cg.lock.RUnlock()
+	return cg.kills
+}
+
+func (cg ClientGame) GetDeaths() uint16 {
+	cg.lock.RLock()
+	defer cg.lock.RUnlock()
+	return cg.deaths
+}
+
+func (cg *ClientGame) IncKills() {
+	cg.lock.Lock()
+	defer cg.lock.Unlock()
+	cg.kills+=1
+}
+
+func (cg *ClientGame) IncDeaths() {
+	cg.lock.Lock()
+	defer cg.lock.Unlock()
+	cg.deaths+=1
 }
 
 // ClientMeta contains the shared meta information of a
@@ -97,7 +131,15 @@ func newClientInternalMeta(id uint8, client ClientMeta) clientInternalMeta {
 	}
 }
 
+func (c clientInternalMeta) GetPlayer() server.Player {
+	return server.NewPlayer(c.id, c.name)
+}
+
 // getMeta will return the meta information of the client.
-func (c clientInternalMeta) getMeta() ClientMeta {
+func (c clientInternalMeta) GetMeta() ClientMeta {
 	return NewClientMeta(c.eId, c.name, c.conn)
+}
+
+func (c clientInternalMeta) GetName() string {
+	return c.name
 }
