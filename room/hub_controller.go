@@ -43,7 +43,7 @@ func (hc *hubController) clientExists(meta client.ClientMeta) bool {
 }
 
 func (hc *hubController) registerClient(meta client.ClientMeta) error {
-	// TODO: implement
+	// TODO: implement broadcast to all available players
 
 	// prepare the queues
 	cqueue, hqueue := helpers.NewWorkQueue()
@@ -96,50 +96,13 @@ func (hc *hubController) removeClient(meta client.ClientMeta) error {
 
 // BroadCast will as the name implies broadcast a given
 // byte interface to a given client.
-
-func (hc *hubController) broadCast(msg protocol.Bytefy) {
+func (hc *hubController) broadCast(msg protocol.Bytefy, except helpers.IdSet) {
 	// TODO: implement
 }
 
 func (hc *hubController) shutdown(cxt context.Context) {
-	// TODO:
+	// TODO: shutdown the
 }
-
-// func (h *hubController) PlayerGotHit() (bool, server.Player) {
-// 	// TODO: implement the player got hit interface
-// 	// figure out if this is the correct path for
-// 	// comminication
-// 	return false, server.NewPlayer(0, "")
-// }
-
-// func (h *hubController) PlayersKD() []server.PlayerKD {
-// 	// TODO: implement this
-// 	// figure out if this is the correct path
-// 	// for communication between the client
-// 	// and the hub
-
-// 	return []server.PlayerKD{}
-// }
-
-// // GetAllPlayers will generate a slice
-// // of send able player data.
-// func (h *hubController) GetAllPlayers() []server.Player {
-// 	// lock the client manager, so that there is no
-// 	// changes during this process.
-// 	h.clientManager.lock.RLock()
-// 	defer h.clientManager.lock.RUnlock()
-
-// 	// pre-allocate all the players
-// 	players := make([]server.Player, h.clientManager.size())
-
-// 	i := 0 // add counter
-// 	for userID, client := range h.clientManager.clients {
-// 		players[i] = server.NewPlayer(userID, client.meta.name)
-// 		i += 1
-// 	}
-
-// 	return players
-// }
 
 func (hc *hubController) handleRead(data []byte, id uint8) protocol.Bytefy {
 	switch pclient.Detect(data[0]) {
@@ -168,7 +131,6 @@ func (hc *hubController) handleRead(data []byte, id uint8) protocol.Bytefy {
 		// Received Unknown Code from client
 		return hc.handleUnknownReceived(data)
 	}
-	// TODO: change to actuall return
 	return nil
 }
 
