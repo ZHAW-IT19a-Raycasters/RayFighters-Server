@@ -365,3 +365,69 @@ func TestClientManagerIncorrectRemoveClientID(t *testing.T) {
 
 	_ = cm.RemoveClient(meta)
 }
+
+func TestClientManagerMapping(t *testing.T) {
+
+	cm := NewClientManager()
+
+	meta, _ := getClientMeta(0)
+
+	cq, _ := helpers.NewWorkQueue()
+	_ = cm.AddClient(meta, cq)
+	defer cm.Shutdown(context.TODO())
+
+	// get the id
+	id, ok := cm.MapId(meta)
+
+	if !ok {
+		t.Error("the meta should be represented in the client manager")
+		return
+	}
+
+	cimeta, ok := cm.MapMeta(id)
+
+	if !ok {
+		t.Error("the id should be represented in the client manager")
+		return
+	}
+
+	if cimeta.GetId() != meta.GetId() {
+		t.Error("incorrect external id was returned")
+	}
+
+	cm.RemoveClient(meta)
+
+	_, ok = cm.MapMeta(id)
+
+	if ok {
+		t.Error("there should be no valid mapping for the given client")
+	}
+}
+
+func TestClientManagerGetPlayers(t *testing.T) {
+	cm := NewClientManager()
+
+	meta, _ := getClientMeta(0)
+
+	cq, _ := helpers.NewWorkQueue()
+
+	_ = cm.AddClient(meta, cq)
+	id, _ := cm.MapId(meta)
+
+	defer cm.Shutdown(context.TODO())
+
+	pls := cm.GetPlayers()
+
+	if len(pls) != 1 {
+		t.Error("wrong slice lenght for players")
+		return
+	}
+
+	player := pls[0]
+	if player.Name() != meta.GetName() {
+		t.Error("Incorrect name used for player")
+	} else if player.UserId() != id {
+		t.Error("incorrect id was used for player")
+	}
+
+}

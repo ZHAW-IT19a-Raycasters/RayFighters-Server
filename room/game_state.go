@@ -3,7 +3,6 @@ package room
 import (
 	"sync"
 
-	"github.zhaw.ch/raycasters/server/gamemap"
 	"github.zhaw.ch/raycasters/server/protocol/server"
 	"github.zhaw.ch/raycasters/server/room/client"
 )
@@ -57,7 +56,7 @@ func (gs *GameState) AddClient(id uint8) error {
 		// TODO: FIND A MORE ACCURATE ERROR
 		return ErrHubIsFull
 	}
-	c := client.NewClientGame(gamemap.NewCoordinate())
+	c := client.NewClientGame()
 
 	gs.clients[id] = &c
 	return nil

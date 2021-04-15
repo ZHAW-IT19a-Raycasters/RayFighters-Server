@@ -88,8 +88,36 @@ func (hc *hubController) registerClient(meta client.ClientMeta) error {
 	return nil
 }
 
+// removeClient will ad the name implies remove a client from the
+// client.
+// Attention this function assumes the client was already send or
+// has send a disconnection message.
 func (hc *hubController) removeClient(meta client.ClientMeta) error {
 	// TODO: add implementation
+	if !hc.clientExists(meta) {
+		return client.NewErrClientDoesntExist(meta)
+	}
+
+	// client exists so lock everything down to remove him
+
+	// error is not needed as per definition the client has to exists
+	// at this point
+	id, _ := hc.clientManager.MapId(meta)
+	_ = hc.clientManager.RemoveClient(meta)
+
+	// close queue
+	q := hc.connections[id]
+	q.Shutdown()
+
+	// only lock here as the remove client function is a blocking call
+	hc.lock.RLock()
+	defer hc.lock.RUnlock()
+
+	// TODO: remove from map
+	_ = hc.gameState.RemoveClient(id)
+
+	// remove queue
+	delete(hc.connections, id)
 
 	return nil
 }
@@ -100,7 +128,9 @@ func (hc *hubController) broadCast(msg protocol.Bytefy, except helpers.IdSet) {
 	// TODO: implement
 	hc.lock.RLock()
 	defer hc.lock.RUnlock()
+	// get the bytes first
 	data := msg.Bytes()
+
 	for id, clientQueue := range hc.connections {
 		if except.Has(id) {
 			continue
@@ -109,8 +139,13 @@ func (hc *hubController) broadCast(msg protocol.Bytefy, except helpers.IdSet) {
 	}
 }
 
+// shutdown will shutdown the controller
 func (hc *hubController) shutdown(cxt context.Context) {
-	// TODO: shutdown the
+	// send shutdown message to all the clients
+	hc.broadCast(server.NewDisconnect(), helpers.NewIdSet())
+
+	// shutdown the controller
+	hc.clientManager.Shutdown(cxt)
 }
 
 func (hc *hubController) handleRead(data []byte, id uint8) protocol.Bytefy {

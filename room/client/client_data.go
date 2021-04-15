@@ -1,10 +1,10 @@
 package client
 
 import (
+	"sync/atomic"
+
 	"github.com/google/uuid"
-	"github.zhaw.ch/raycasters/server/gamemap"
 	"github.zhaw.ch/raycasters/server/protocol/server"
-	"sync"
 )
 
 // ConnectionStatus is an enum type used for showing the
@@ -48,50 +48,40 @@ func (c ConnectionStatus) String() string {
 
 // ClientGame represents the state of the client in the game
 type ClientGame struct {
-	pos    gamemap.Coordinate
-	kills  uint16
-	deaths uint16
-	lock *sync.RWMutex
+	kills  uint32
+	deaths uint32
 }
 
 // NewClientGame creates the default client object.
-func NewClientGame(pos gamemap.Coordinate) ClientGame {
+func NewClientGame() ClientGame {
 	return ClientGame{
-		pos:    pos,
 		kills:  0,
 		deaths: 0,
-		lock: &sync.RWMutex{},
 	}
 }
 
-func (cg ClientGame) GetPosition() gamemap.Coordinate {
-	cg.lock.RLock()
-	defer cg.lock.RUnlock()
-	return cg.pos
+// GetKills will return the current kill count
+// of the client.
+func (cg *ClientGame) GetKills() uint16 {
+	return uint16(atomic.LoadUint32(&cg.kills))
 }
 
-func (cg ClientGame) GetKills() uint16 {
-	cg.lock.RLock()
-	defer cg.lock.RUnlock()
-	return cg.kills
+// GetDeaths will reutrn the death count
+// of the client.
+func (cg *ClientGame) GetDeaths() uint16 {
+	return uint16(atomic.LoadUint32(&cg.deaths))
 }
 
-func (cg ClientGame) GetDeaths() uint16 {
-	cg.lock.RLock()
-	defer cg.lock.RUnlock()
-	return cg.deaths
-}
-
+// IncKills will increment the kill count
+// of the player
 func (cg *ClientGame) IncKills() {
-	cg.lock.Lock()
-	defer cg.lock.Unlock()
-	cg.kills+=1
+	atomic.AddUint32(&cg.kills, 1)
 }
 
+// IncDeaths will increment the
+// death counter by one
 func (cg *ClientGame) IncDeaths() {
-	cg.lock.Lock()
-	defer cg.lock.Unlock()
-	cg.deaths+=1
+	atomic.AddUint32(&cg.deaths, 1)
 }
 
 // ClientMeta contains the shared meta information of a
@@ -111,6 +101,17 @@ func NewClientMeta(id uuid.UUID, name string, conn ClientConnection) ClientMeta 
 	}
 }
 
+// GetId will reutrn the externally used
+// id
+func (cm ClientMeta) GetId() uuid.UUID {
+	return cm.id
+}
+
+// GetName will return the client name
+func (cm ClientMeta) GetName() string {
+	return cm.name
+}
+
 // clientInternalMeta is the internal representation of a client meta
 // it also contains the internal id of the client.
 type clientInternalMeta struct {
@@ -125,21 +126,35 @@ type clientInternalMeta struct {
 func newClientInternalMeta(id uint8, client ClientMeta) clientInternalMeta {
 	return clientInternalMeta{
 		id:   id,
-		eId:  client.id,
-		name: client.name,
+		eId:  client.GetId(),
+		name: client.GetName(),
 		conn: client.conn,
 	}
 }
 
+// GetPlayer will return a sendable representation
+//  of the client.
 func (c clientInternalMeta) GetPlayer() server.Player {
 	return server.NewPlayer(c.id, c.name)
 }
 
 // getMeta will return the meta information of the client.
 func (c clientInternalMeta) GetMeta() ClientMeta {
-	return NewClientMeta(c.eId, c.name, c.conn)
+	return NewClientMeta(c.GetUUID(), c.GetName(), c.conn)
 }
 
+// GetName will return the clients registered name
 func (c clientInternalMeta) GetName() string {
 	return c.name
+}
+
+// GetId will return the internal id of the client
+func (c clientInternalMeta) GetId() uint8 {
+	return c.id
+}
+
+// GetUUID will return the external unique id of the
+// client.
+func (c clientInternalMeta) GetUUID() uuid.UUID {
+	return c.eId
 }

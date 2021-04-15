@@ -5,7 +5,7 @@ import (
 	"errors"
 	"sync"
 
-	"github.zhaw.ch/raycasters/server/gamemap"
+	"github.zhaw.ch/raycasters/server/protocol/server"
 	"github.zhaw.ch/raycasters/server/room/helpers"
 	"github.zhaw.ch/raycasters/server/utils"
 
@@ -29,7 +29,6 @@ const MaxClientCommand = 17
 // This struct stores all the information about a single
 // client instance in a hub.
 type Client struct {
-	info     ClientGame
 	meta     clientInternalMeta
 	queue    helpers.ClientQueue
 	status   ConnectionStatus
@@ -41,7 +40,6 @@ type Client struct {
 // NewClient creates and sets up a new client from it's meta information.
 func NewClient(id uint8, meta ClientMeta, queue helpers.ClientQueue) *Client {
 	c := Client{
-		info:     NewClientGame(gamemap.NewCoordinate()),
 		queue:    queue,
 		status:   Offline,
 		isActive: utils.NewAtomicBool(false),
@@ -55,12 +53,8 @@ func NewClient(id uint8, meta ClientMeta, queue helpers.ClientQueue) *Client {
 	return &c
 }
 
-func (c *Client) GetInternalMeta() clientInternalMeta{
+func (c *Client) GetInternalMeta() clientInternalMeta {
 	return c.meta
-}
-
-func (c *Client) GetInfo() ClientGame {
-	return c.info
 }
 
 // registerConn will register the new client with it's exclusive hub connection.
@@ -151,6 +145,8 @@ func (c *Client) checkOffline() bool {
 // condition this function will only ever be called a single time
 // per run.
 func (c *Client) sendData() {
+	const defaultMessageType = websocket.BinaryMessage
+	const shutdownMessageType = websocket.CloseMessage
 	defer c.shutdownHandler()
 
 	checkErr := func(err error) bool {
@@ -164,9 +160,9 @@ func (c *Client) sendData() {
 		return true
 	}
 
-	process := func(message []byte) bool {
+	process := func(message []byte, messageType int) bool {
 
-		cw, err := c.meta.conn.NextWriter(websocket.BinaryMessage)
+		cw, err := c.meta.conn.NextWriter(messageType)
 
 		if !checkErr(err) {
 			return false
@@ -183,6 +179,21 @@ func (c *Client) sendData() {
 
 		return !checkErr(err)
 	}
+
+	drainProcess := func() {
+		// this means that we have to shutdown the system
+
+		// due to how the client works this error can
+		// be ignored as it would imply an other
+		// queue worker or drainer
+		messages, _ := c.queue.DequeueDrain()
+		for _, message := range messages {
+			if !process(message, defaultMessageType) {
+				return
+			}
+		}
+	}
+
 	// No checks for activation are needed
 	// due to that this function will only
 	// be called from the run function
@@ -190,22 +201,19 @@ func (c *Client) sendData() {
 		message, err := c.queue.Dequeue()
 
 		if err != nil {
-			// this means that we have to shutdown the system
+			// the receiver has shutdown
 
-			// due to how the client works this error can
-			// be ignored as it would imply an other
-			// queue worker or drainer
-			messages, _ := c.queue.DequeueDrain()
-			for _, message = range messages {
-				if !process(message) {
-					return
-				}
-			}
-
+			// try to drain and send the values
+			drainProcess()
+			return
+		}
+		// if there is a disconnect here
+		if message[0] == server.DisconnectOpcode.Value() {
+			process(message, shutdownMessageType)
 			return
 		}
 
-		if !process(message) {
+		if !process(message, defaultMessageType) {
 			return
 		}
 	}
@@ -327,12 +335,6 @@ func (c *Client) Shutdown(ctx context.Context) {
 	c.status = ShuttingDown
 	c.lock.Unlock()
 
-	// send the disconnect opcode
-	// ignore error as it is not important
-
-	// TODO: figure out what to do here...
-	//_ = c.SendData(server.NewDisconnect())
-
 	// make a channel on which, we can wait on.
 	runs := make(chan struct{})
 
@@ -355,10 +357,8 @@ func (c *Client) Shutdown(ctx context.Context) {
 
 	select {
 	case <-runs:
-		// TODO: log the a clean shutdown was a success
 		logger.Debugf("Shutdown of client [%d] complete", c.meta.eId)
 	case <-ctx.Done():
-		// TODO: log the a forced shutdown was made
 		logger.Debugf("forced shutdown of client [%d], due to timeout", c.meta.eId)
 	}
 }
