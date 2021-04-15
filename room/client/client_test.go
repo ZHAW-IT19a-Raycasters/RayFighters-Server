@@ -13,6 +13,56 @@ import (
 	"github.zhaw.ch/raycasters/server/room/helpers"
 )
 
+type blockChan chan struct{}
+
+type chanFuncReader chan func() (int, io.Reader, error)
+
+type chanFuncWriter chan func(messageType int) (io.WriteCloser, error)
+
+func setupMock(mock *MockedConnection) (blockChan, chanFuncReader, chanFuncWriter) {
+
+	done := make(blockChan)
+
+	// make the connections blocking, so that we can run other
+	// stuff while it waits
+	funcTransferReader := make(chanFuncReader, 10)
+	funcTransferWriter := make(chanFuncWriter, 10)
+
+	mock.mwc.cl = func() error {
+		close(done)
+		return nil
+	}
+
+	mock.funcNextReader = func() (int, io.Reader, error) {
+		select {
+		case <-done:
+			return 0, nil, websocket.ErrCloseSent
+		case d := <-funcTransferReader:
+			return d()
+		}
+	}
+
+	mock.funcNextWriter = func(messageType int) (io.WriteCloser, error) {
+		select {
+		case <-done:
+			return nil, websocket.ErrCloseSent
+		case d := <-funcTransferWriter:
+			return d(messageType)
+		}
+	}
+
+	// override the closer, so that the channels don't get changed by it
+	mock.funcCloser = func() error {
+		select {
+		case <-done:
+		default:
+			close(done)
+		}
+		return nil
+	}
+	return done, funcTransferReader, funcTransferWriter
+}
+
 func TestClientregisterConn(t *testing.T) {
 	clientQueue, _ := helpers.NewWorkQueue()
 	meta, _ := getClientMeta(42)
@@ -61,33 +111,7 @@ func TestClientRecv(t *testing.T) {
 	cq, hq := helpers.NewWorkQueue()
 	cmeta, mock := getClientMeta(1)
 
-	// make the connections blocking, so that we can run other
-	// stuff while it waits
-	funcTransferReader := make(chan func() (int, io.Reader, error), 10)
-	funcTransferWriter := make(chan func(messageType int) (io.WriteCloser, error), 10)
-
-	mock.funcNextReader = func() (int, io.Reader, error) {
-		return (<-funcTransferReader)()
-	}
-
-	mock.funcNextWriter = func(messageType int) (io.WriteCloser, error) {
-		return (<-funcTransferWriter)(messageType)
-	}
-
-	mock.funcCloser = func() error {
-		// shutdown the recv as it is the only part of the system that may
-		// do that.
-		funcTransferReader <- func() (int, io.Reader, error) {
-			return 0, nil, websocket.ErrCloseSent
-		}
-
-		// shutdown the client send, this has to be send first
-		// as to hinder any race conditions.
-		funcTransferWriter <- func(messageType int) (io.WriteCloser, error) {
-			return nil, websocket.ErrCloseSent
-		}
-		return nil
-	}
+	_, funcTransferReader, _ := setupMock(mock)
 
 	client := NewClient(1, cmeta, cq)
 	defer client.Shutdown(context.TODO())
@@ -133,40 +157,7 @@ func TestClientSend(t *testing.T) {
 	cq, hq := helpers.NewWorkQueue()
 	cmeta, mock := getClientMeta(1)
 
-	done := make(chan struct{})
-
-	// make the connections blocking, so that we can run other
-	// stuff while it waits
-	funcTransferReader := make(chan func() (int, io.Reader, error), 10)
-	funcTransferWriter := make(chan func(messageType int) (io.WriteCloser, error), 10)
-
-	mock.mwc.cl = func() error {
-		close(done)
-		return nil
-	}
-
-	mock.funcNextReader = func() (int, io.Reader, error) {
-		select {
-		case <-done:
-			return 0, nil, websocket.ErrCloseSent
-		case d := <-funcTransferReader:
-			return d()
-		}
-	}
-
-	mock.funcNextWriter = func(messageType int) (io.WriteCloser, error) {
-		select {
-		case <-done:
-			return nil, websocket.ErrCloseSent
-		case d := <-funcTransferWriter:
-			return d(messageType)
-		}
-	}
-
-	// override the closer, so that the channels don't get changed by it
-	mock.funcCloser = func() error {
-		return nil
-	}
+	done, _, funcTransferWriter := setupMock(mock)
 
 	// send this first as to not have a race condition with
 	// the enqueue
@@ -206,45 +197,11 @@ func TestClientSend(t *testing.T) {
 
 	compareByteSlices(exp, gotten, t)
 }
-
 func TestClientSendShutdown(t *testing.T) {
 	cq, hq := helpers.NewWorkQueue()
 	cmeta, mock := getClientMeta(1)
 
-	done := make(chan struct{})
-
-	// make the connections blocking, so that we can run other
-	// stuff while it waits
-	funcTransferReader := make(chan func() (int, io.Reader, error), 10)
-	funcTransferWriter := make(chan func(messageType int) (io.WriteCloser, error), 10)
-
-	mock.mwc.cl = func() error {
-		close(done)
-		return nil
-	}
-
-	mock.funcNextReader = func() (int, io.Reader, error) {
-		select {
-		case <-done:
-			return 0, nil, websocket.ErrCloseSent
-		case d := <-funcTransferReader:
-			return d()
-		}
-	}
-
-	mock.funcNextWriter = func(messageType int) (io.WriteCloser, error) {
-		select {
-		case <-done:
-			return nil, websocket.ErrCloseSent
-		case d := <-funcTransferWriter:
-			return d(messageType)
-		}
-	}
-
-	// override the closer, so that the channels don't get changed by it
-	mock.funcCloser = func() error {
-		return nil
-	}
+	done, _, funcTransferWriter := setupMock(mock)
 
 	// send this first as to not have a race condition with
 	// the enqueue
@@ -278,4 +235,30 @@ func TestClientSendShutdown(t *testing.T) {
 	gotten := mock.mwc.Bytes()
 
 	compareByteSlices(exp, gotten, t)
+}
+
+func TestClientSendNextWriterError(t *testing.T) {
+	cq, hq := helpers.NewWorkQueue()
+	cmeta, mock := getClientMeta(1)
+
+	done, _, _ := setupMock(mock)
+
+	exp := []byte{server.PlayerJoinedOpcode.Value()}
+	err := hq.Enqueue(exp)
+
+	if err != nil {
+		t.Error("the queue should be open and receiving here")
+		return
+	}
+
+	client := NewClient(1, cmeta, cq)
+	defer client.Shutdown(context.TODO())
+
+	client.Run()
+
+	close(done)
+
+	// wait until the client has shutdown
+	// completely
+	client.Shutdown(context.TODO())
 }

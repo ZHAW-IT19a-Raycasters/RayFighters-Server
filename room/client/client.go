@@ -5,7 +5,6 @@ import (
 	"errors"
 	"sync"
 
-	"github.zhaw.ch/raycasters/server/gamemap"
 	"github.zhaw.ch/raycasters/server/protocol/server"
 	"github.zhaw.ch/raycasters/server/room/helpers"
 	"github.zhaw.ch/raycasters/server/utils"
@@ -30,7 +29,6 @@ const MaxClientCommand = 17
 // This struct stores all the information about a single
 // client instance in a hub.
 type Client struct {
-	info     ClientGame
 	meta     clientInternalMeta
 	queue    helpers.ClientQueue
 	status   ConnectionStatus
@@ -42,7 +40,6 @@ type Client struct {
 // NewClient creates and sets up a new client from it's meta information.
 func NewClient(id uint8, meta ClientMeta, queue helpers.ClientQueue) *Client {
 	c := Client{
-		info:     NewClientGame(gamemap.NewCoordinate()),
 		queue:    queue,
 		status:   Offline,
 		isActive: utils.NewAtomicBool(false),
@@ -58,10 +55,6 @@ func NewClient(id uint8, meta ClientMeta, queue helpers.ClientQueue) *Client {
 
 func (c *Client) GetInternalMeta() clientInternalMeta {
 	return c.meta
-}
-
-func (c *Client) GetInfo() ClientGame {
-	return c.info
 }
 
 // registerConn will register the new client with it's exclusive hub connection.
@@ -342,12 +335,6 @@ func (c *Client) Shutdown(ctx context.Context) {
 	c.status = ShuttingDown
 	c.lock.Unlock()
 
-	// send the disconnect opcode
-	// ignore error as it is not important
-
-	// TODO: figure out what to do here...
-	//_ = c.SendData(server.NewDisconnect())
-
 	// make a channel on which, we can wait on.
 	runs := make(chan struct{})
 
@@ -370,10 +357,8 @@ func (c *Client) Shutdown(ctx context.Context) {
 
 	select {
 	case <-runs:
-		// TODO: log the a clean shutdown was a success
 		logger.Debugf("Shutdown of client [%d] complete", c.meta.eId)
 	case <-ctx.Done():
-		// TODO: log the a forced shutdown was made
 		logger.Debugf("forced shutdown of client [%d], due to timeout", c.meta.eId)
 	}
 }
