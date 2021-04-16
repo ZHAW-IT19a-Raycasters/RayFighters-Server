@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
+	"github.com/lestrrat-go/jwx/jwt"
 	"github.zhaw.ch/raycasters/server/log"
 	"github.zhaw.ch/raycasters/server/room"
 	"github.zhaw.ch/raycasters/server/web/helpers"
@@ -42,6 +43,9 @@ func NewServer(conf *webconfig.WebConfig) *Server {
 	if err != nil {
 		fmt.Printf("failed to generate private key: %s\n", err)
 	}
+
+	// init global jwt decoding
+	jwt.RegisterCustomField("uuid", uuid.UUID{})
 
 	amw := authenticationMiddleware{privKey}
 
@@ -116,15 +120,32 @@ func serveWs(hubs []*room.Hub, w http.ResponseWriter, r *http.Request) {
 	// upgrade HTTP to Websocket connection
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
+		// upgrader itself writes http error response
 		logger.Error(err)
 		return
 	}
 
-	logger.Infof("%s request to join room %d", r.RemoteAddr, roomID)
+	// get cookie from request
+	jwtCookie, err := r.Cookie(JWTCOOKIENAME)
+	if err != nil{
+		http.Error(w, "no JWT found in Cookies", http.StatusUnauthorized)
+		return
+	}
+
+	// unmarshal the token
+	token, err := jwt.ParseString(jwtCookie.Value)
+	usernameI, userOk := token.Get(`username`)
+	uuidI, uuidOk := token.Get(`uuid`)
+	if (userOk && uuidOk) {
+		uuid := uuidI.(uuid.UUID)
+		username := fmt.Sprintf("%v", usernameI)
+		cm := room.NewClientMeta(uuid, username, conn)
+		hubs[roomID].RegisterClient(cm)
+		logger.Infof("user %s with uuid %s joined room %d", username, uuid,roomID)
+	}
+
+	
 
 	// #TODO: read from token
-	uuid := uuid.New()
-	cm := room.NewClientMeta(uuid, "john dude", conn)
-
-	hubs[roomID].RegisterClient(cm)
+	logger.Infof("%s requests to join room %d", r.RemoteAddr, roomID)
 }
