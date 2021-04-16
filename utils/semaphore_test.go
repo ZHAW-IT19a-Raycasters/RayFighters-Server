@@ -10,7 +10,7 @@ import (
 const limit uint32 = 42
 
 func TestSemaphoreBase(t *testing.T) {
-	ac := utils.NewSemaphore(limit)
+	ac := utils.NewCountingSemaphore(limit)
 
 	if ac.Value() != 0 {
 		t.Error("Base value is incorrect.")
@@ -28,7 +28,7 @@ func TestSemaphoreBase(t *testing.T) {
 }
 
 func TestSemaphoreInc(t *testing.T) {
-	ac := utils.NewSemaphore(limit)
+	ac := utils.NewCountingSemaphore(limit)
 
 	err := ac.Acquire()
 
@@ -84,7 +84,7 @@ func TestSemaphoreInc(t *testing.T) {
 }
 
 func TestSemaphoreDec(t *testing.T) {
-	ac := utils.NewSemaphore(limit)
+	ac := utils.NewCountingSemaphore(limit)
 
 	ac.Acquire()
 
@@ -126,7 +126,7 @@ func TestSemaphoreDec(t *testing.T) {
 }
 
 func TestSemaphoreFilledAndEmpty(t *testing.T) {
-	ac := utils.NewSemaphore(limit)
+	ac := utils.NewCountingSemaphore(limit)
 
 	for i := 0; i < int(limit); i += 1 {
 		err := ac.Acquire()
@@ -174,7 +174,7 @@ func TestSemaphoreFilledAndEmpty(t *testing.T) {
 func TestSemaphoreFilledAndEmptyConcurrent(t *testing.T) {
 	var wg sync.WaitGroup
 
-	ac := utils.NewSemaphore(limit)
+	ac := utils.NewCountingSemaphore(limit)
 	waiForDec := make(chan struct{})
 	waitForAtLimit := make(chan struct{})
 
