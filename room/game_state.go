@@ -101,7 +101,9 @@ func (gs *GameState) IncDeaths(id uint8) {
 func (gs *GameState) AddClient(id uint8) error {
 	gs.lock.Lock()
 	defer gs.lock.Unlock()
+
 	_, ok := gs.clients[id]
+
 	if ok {
 		return ErrClientExists{
 			id: id,
@@ -119,8 +121,9 @@ func (gs *GameState) RemoveClient(id uint8) error {
 	defer gs.lock.Unlock()
 	_, ok := gs.clients[id]
 	if !ok {
-		// TODO: FIND A MORE ACCURATE ERROR
-		return ErrHubIsFull
+		return ErrClientDoesNotExist{
+			id: id,
+		}
 	}
 	delete(gs.clients, id)
 	return nil
