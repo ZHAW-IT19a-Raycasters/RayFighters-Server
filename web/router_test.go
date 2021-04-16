@@ -43,10 +43,11 @@ func TestAPIRoot(t *testing.T) {
 	}
 }
 
+
+
 func TestWebSocketHandshake(t *testing.T) {
 	// runs the server and establishes a websocket connection
 
-	// TODO: couldn't read config via utils. do manually for now:
 	var conf = webconfig.WebConfig{
 		Ip: "localhost",
 		Port: 8081,
@@ -84,11 +85,10 @@ func TestWSBadRoomID(t *testing.T) {
     router.HandleFunc("/ws/{roomID:[0-9]+}", func(rw http.ResponseWriter, r *http.Request) {serveWs([]*room.Hub{} ,rw, r)})
 	router.ServeHTTP(rr, req)
 	res := rr.Result()
-	body, _ := io.ReadAll(res.Body)
-	t.Log(string(body))
-	if res.StatusCode != http.StatusForbidden {
+	io.ReadAll(res.Body)
+	if res.StatusCode != http.StatusConflict {
 		t.Errorf("handler returned wrong status code for bad request: got %v want %v",
-		res.StatusCode, http.StatusForbidden)
+		res.StatusCode, http.StatusConflict)
 	}
 }
 

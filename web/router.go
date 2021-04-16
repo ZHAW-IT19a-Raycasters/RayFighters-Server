@@ -104,7 +104,7 @@ func serveWs(hubs []*room.Hub, w http.ResponseWriter, r *http.Request) {
 	if (roomID < 0 || roomID >= hubsCount) {
 		err := fmt.Errorf("no room with id %d available",roomID)
 		logger.Error(err)
-		http.Error(w, err.Error(), http.StatusForbidden)
+		http.Error(w, err.Error(), http.StatusConflict)
 		return
 	}
 
@@ -122,7 +122,7 @@ func serveWs(hubs []*room.Hub, w http.ResponseWriter, r *http.Request) {
 
 	logger.Infof("%s request to join room %d", r.RemoteAddr, roomID)
 
-	// create and register client
+	// #TODO: read from token
 	uuid := uuid.New()
 	cm := room.NewClientMeta(uuid, "john dude", conn)
 
