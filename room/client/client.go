@@ -53,6 +53,8 @@ func NewClient(id uint8, meta ClientMeta, queue helpers.ClientQueue) *Client {
 	return &c
 }
 
+// GetInternalMeta will return the internal version of the
+// client meta information.
 func (c *Client) GetInternalMeta() clientInternalMeta {
 	return c.meta
 }
@@ -66,6 +68,10 @@ func (c *Client) registerConn(conn ClientMeta, queue helpers.ClientQueue) error 
 		return ErrClientReaderAlreadyActive
 	}
 
+	// wait until there are no working connections
+	// in case that there already was a timeout
+	c.wg.Wait()
+
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
@@ -74,9 +80,10 @@ func (c *Client) registerConn(conn ClientMeta, queue helpers.ClientQueue) error 
 	if c.status == Registered {
 		return ErrClientReaderAlreadyActive
 	}
-	c.status = Registered
+
 	c.meta = newClientInternalMeta(c.meta.id, conn)
 	c.queue = queue
+	c.status = Registered
 
 	return nil
 }
@@ -93,8 +100,12 @@ func (c *Client) Run() error {
 		return ErrClientReaderAlreadyActive
 	}
 
-	// wait until there are no working connections
-	c.wg.Wait()
+	// make sure that there is no chance of this conn
+	// already being registered
+	if !c.checkRegistered() {
+		// TODO: chagne error
+		return ErrClientReaderAlreadyActive
+	}
 
 	// setup the states needed to run the client
 	// this has to run in this thread here or else
@@ -121,6 +132,20 @@ func (c *Client) Run() error {
 	}()
 
 	return nil
+}
+
+// checkOffline will check based on the
+// current client state, if the client
+// already as been set to offline.
+func (c *Client) checkRegistered() bool {
+	// this write lock is needed in the later parts
+	// of the processes
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+	// don't bother with running the function more then
+	// once
+	// unlock again here
+	return c.status == Registered
 }
 
 // checkOffline will check based on the
@@ -268,13 +293,13 @@ func (c *Client) recvData() {
 		var readData [MaxClientCommand]byte
 		readBytes, err := message.Read(readData[:])
 
-		if readBytes == 0 {
-			logger.Warn("empty package received")
+		if err != nil {
+			logger.Warnf("unexpected read error received.\n[%s]", err.Error())
 			return
 		}
 
-		if err != nil {
-			logger.Warnf("unexpected read error received.\n[%s]", err.Error())
+		if readBytes == 0 {
+			logger.Warn("empty package received")
 			return
 		}
 
@@ -347,11 +372,10 @@ func (c *Client) Shutdown(ctx context.Context) {
 
 	// Make a waiter that will (hopefully) shutdown soon.
 	go func() {
-
 		// close the connection
 		// error is irrelevant as we already send the
 		// disconnect message
-		c.meta.conn.Close()
+		_ = c.meta.conn.Close()
 
 		c.queue.Shutdown()
 

@@ -222,7 +222,9 @@ func (manager *ClientManager) RemoveClient(meta ClientMeta) error {
 		return NewErrClientDoesntExist(meta)
 	}
 
+	manager.lock.RLock()
 	val := manager.clients[id]
+	manager.lock.RUnlock()
 
 	// make sure it is shutdown, at most wait for the timeout
 	// afterwards kill it.
