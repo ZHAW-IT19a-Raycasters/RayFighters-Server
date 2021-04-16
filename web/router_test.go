@@ -1,17 +1,13 @@
 package web
 
 import (
-	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"testing"
 
 	"github.com/gorilla/mux"
-	"github.com/gorilla/websocket"
 	"github.zhaw.ch/raycasters/server/room"
-	webconfig "github.zhaw.ch/raycasters/server/web/config"
 )
 
 func TestAPIRoot(t *testing.T) {
@@ -44,35 +40,50 @@ func TestAPIRoot(t *testing.T) {
 }
 
 
+// TestWebSocketHandshake would need a cookie jar to test authorized websocket establishment
+// add it and change it to TestAuthorizedWebsocketEstablishment
+// func TestWebSocketHandshake(t *testing.T) {
+// 	// runs the server and establishes a websocket connection
 
-func TestWebSocketHandshake(t *testing.T) {
-	// runs the server and establishes a websocket connection
+// 	var conf = webconfig.WebConfig{
+// 		Ip: "localhost",
+// 		Port: 8081,
+// 	}
 
-	var conf = webconfig.WebConfig{
-		Ip: "localhost",
-		Port: 8081,
-	}
+// 	server := NewServer(&conf)
 
-	server := NewServer(&conf)
+// 	go func(){
+// 		server.Start()
+// 	}()
+// 	defer server.ServerStop(ShutdownContext())
 
-	go func(){
-		server.Start()
-	}()
-	defer server.ServerStop(ShutdownContext())
+// 	u := url.URL{Scheme: "ws", Host: conf.String(), Path: "/ws/1",}
+// 	fmt.Printf("connecting to %s\n", u.String())
 
-	u := url.URL{Scheme: "ws", Host: conf.String(), Path: "/ws/1",}
-	fmt.Printf("connecting to %s\n", u.String())
-
-	c, res, err := websocket.DefaultDialer.Dial(u.String(), nil)
-	defer c.Close()
+// 	c, res, err := websocket.DefaultDialer.Dial(u.String(), nil)
+// 	defer c.Close()
 
 
-	if err != nil {
-		fmt.Print("Error during handshake",err)
-	}
+// 	if err != nil {
+// 		fmt.Print("Error during handshake",err)
+// 	}
 
+// 	if res.StatusCode != http.StatusSwitchingProtocols {
+// 		t.Errorf("handler returned wrong status code during handshake: got %v want %v",
+// 		res.StatusCode, http.StatusSwitchingProtocols)
+// 	}
+// }
+
+func TestWSHandshake(t *testing.T) {
+	req := httptest.NewRequest("GET", "/ws/123", nil)
+	rr := httptest.NewRecorder()
+	router := mux.NewRouter()
+    router.HandleFunc("/ws/{roomID:[0-9]+}", func(rw http.ResponseWriter, r *http.Request) {serveWs([]*room.Hub{} ,rw, r)})
+	router.ServeHTTP(rr, req)
+	res := rr.Result()
+	io.ReadAll(res.Body)
 	if res.StatusCode != http.StatusSwitchingProtocols {
-		t.Errorf("handler returned wrong status code during handshake: got %v want %v",
+		t.Errorf("handler returned wrong status code for bad request: got %v want %v",
 		res.StatusCode, http.StatusSwitchingProtocols)
 	}
 }
