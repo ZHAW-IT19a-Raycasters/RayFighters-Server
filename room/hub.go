@@ -10,6 +10,13 @@ import (
 	"github.zhaw.ch/raycasters/server/utils"
 )
 
+// void is am empty struct with no memory
+// footprint, this is used for signals
+// counters.
+type void struct{}
+
+// logger responsible for all the logging
+// happening
 var logger = log.Log()
 
 // HubClientLimit is the absolute upper limit supported
@@ -34,11 +41,8 @@ type Hub struct {
 	// via the `RegisterClient` function associated
 	// with this type.
 	input chan client.ClientMeta
-	// The channel over which a connections
-	// are removed over. This
-	output chan client.ClientMeta
 	// The channel that signals the main loop to shutdown.
-	shutdown chan struct{}
+	shutdown chan void
 	// If the current hub is running or not.
 	isActive utils.AtomicBool
 }
@@ -49,9 +53,8 @@ type Hub struct {
 func NewHub(hubId int) *Hub {
 	h := &Hub{
 		input:      make(chan client.ClientMeta),
-		output:     make(chan client.ClientMeta),
 		controller: newHubController(),
-		shutdown:   make(chan struct{}),
+		shutdown:   make(chan void),
 		id:         hubId,
 		isActive:   utils.NewAtomicBool(false),
 	}
@@ -131,7 +134,7 @@ func (h *Hub) Run() {
 // With the cxt context a premature cancelation of all client
 // connections can be started.
 func (h *Hub) Shutdown(cxt context.Context) {
-	waitCompletion := make(chan struct{})
+	waitCompletion := make(chan void)
 
 	go func() {
 		h.controller.shutdown(cxt)
