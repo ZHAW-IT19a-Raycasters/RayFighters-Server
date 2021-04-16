@@ -404,6 +404,39 @@ func TestClientManagerMapping(t *testing.T) {
 	}
 }
 
+func TestClientManagerGetPlayer(t *testing.T) {
+	cm := NewClientManager()
+
+	meta, _ := getClientMeta(0)
+
+	cq, _ := helpers.NewWorkQueue()
+
+	_ = cm.AddClient(meta, cq)
+	id, _ := cm.MapId(meta)
+
+	defer cm.Shutdown(context.TODO())
+
+	player, ok := cm.GetPlayer(id)
+
+	if !ok {
+		t.Error("player should exist")
+		return
+	}
+
+	if player.Name() != meta.GetName() {
+		t.Error("Incorrect name used for player")
+	} else if player.UserId() != id {
+		t.Error("incorrect id was used for player")
+	}
+
+	cm.RemoveClient(meta)
+	_, ok = cm.GetPlayer(id)
+	if ok {
+		t.Error("there should be no player by that id")
+	}
+
+}
+
 func TestClientManagerGetPlayers(t *testing.T) {
 	cm := NewClientManager()
 

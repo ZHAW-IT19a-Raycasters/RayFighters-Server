@@ -228,6 +228,7 @@ func (manager *ClientManager) RemoveClient(meta ClientMeta) error {
 
 	// make sure it is shutdown, at most wait for the timeout
 	// afterwards kill it.
+	// TODO: change context to parameter given by caller
 	cxt, cancel := context.WithTimeout(context.Background(), ClientShutdownTime)
 
 	waiter := make(chan struct{})
@@ -258,12 +259,8 @@ func (manager *ClientManager) RemoveClient(meta ClientMeta) error {
 	cancel()
 
 	// remove client from manager
-	manager.wg.Done()
+	defer manager.wg.Done()
 
-	// lock the system and remove rest of stuff,
-	// try to keep the lock for as short as possible
-	manager.lock.Lock()
-	defer manager.lock.Unlock()
 	// free the id as the last point
 	// at the end of the process
 	// so to never have a double entry
