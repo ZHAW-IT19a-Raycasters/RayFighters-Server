@@ -134,10 +134,10 @@ func TestClientRecv(t *testing.T) {
 	}
 
 	// fill up the channel
-	buffer := []byte{pclient.DisconnectOpcode.Value()}
+	buffer := []byte{pclient.RequestOtherPlayersOpcode.Value()}
 
 	funcTransferReader <- func() (int, io.Reader, error) {
-		return 0, bytes.NewReader(buffer), nil
+		return websocket.BinaryMessage, bytes.NewReader(buffer), nil
 	}
 
 	data, err := hq.Dequeue()

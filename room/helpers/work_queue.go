@@ -76,9 +76,7 @@ func (pq packageQueue) Enqueue(data protocol.Package) error {
 // Attention use this function inside of a select, or
 // else this function will block all your executions.
 func (pq packageQueue) Dequeue() (protocol.Package, error) {
-	if !pq.isActive.Get() {
-		return nil, ErrQueueClosed
-	} else if pq.isDraining.Get() {
+	if pq.isDraining.Get() {
 		return nil, ErrQueueIsDraining
 	}
 	// check if the queue is still running and then

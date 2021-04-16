@@ -229,15 +229,9 @@ func (c *Client) recvData() {
 
 	for {
 		messageType, message, err := c.meta.conn.NextReader()
-		logger.Debugf("Received message type [%d]", messageType)
-
-		if messageType == websocket.CloseMessage {
-			logger.Infof("the client with the id [%d] closed the connection.", messageType)
-			return
-		} else if messageType != websocket.BinaryMessage {
-			logger.Warnf("a non binary message type was received type: [%d]", messageType)
-			return
-		}
+		// first check the error message as per standard
+		// as in case of an error the messageType and
+		// message will be their nulled values.
 
 		// as per definition
 		// Applications must break out of the application's read loop when this method returns
@@ -257,6 +251,16 @@ func (c *Client) recvData() {
 					"- see https://rfc-editor.org/rfc/rfc6455.html#section-11.7 for more information\n[%s]", c.meta.id, err.Error())
 			}
 			// break out of the endless loop directly to a shutdown
+			return
+		}
+
+		logger.Debugf("Received message type [%d]", messageType)
+
+		if messageType == websocket.CloseMessage {
+			logger.Infof("the client with the id [%d] closed the connection.", messageType)
+			return
+		} else if messageType != websocket.BinaryMessage {
+			logger.Warnf("a non binary message type was received type: [%d]", messageType)
 			return
 		}
 
