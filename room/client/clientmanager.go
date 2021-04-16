@@ -127,6 +127,19 @@ func (manager *ClientManager) mapToInternalId(meta ClientMeta) (uint8, bool) {
 	return id, ok
 }
 
+// GetPlayers will return the senable player configuration
+// and true if it exists, else it will return an empty
+// server.Player struct and false.
+func (manager *ClientManager) GetPlayer(id uint8) (server.Player, bool) {
+	manager.lock.RLock()
+	defer manager.lock.RUnlock()
+	client, ok := manager.clients[id]
+	if !ok {
+		return server.Player{}, ok
+	}
+	return client.meta.GetPlayer(), ok
+}
+
 // GetPlayers will retuen a slice of all the currently
 // registered players in the server.
 func (manager *ClientManager) GetPlayers() []server.Player {

@@ -29,13 +29,6 @@ type Hub struct {
 	// controller is the struct responsible for running all the client opcodes
 	// and handling all the io.
 	controller *hubController
-	// Is the player counter, this variable counts the active
-	// player connections, although that number is already available
-	// via the client map length, is would have to be accessed
-	// from behind a lock. And so creates an unneeded overhead
-	// while asynchronously adding a new client. So to avoid the given
-	// overhead an atomic implementation is here used.
-	counter utils.Semaphore
 	// The channel over which a new connection
 	// is added. This connections input can be accessed
 	// via the `RegisterClient` function associated
@@ -60,7 +53,6 @@ func NewHub(hubId int) *Hub {
 		controller: newHubController(),
 		shutdown:   make(chan struct{}),
 		id:         hubId,
-		counter:    utils.NewSemaphore(HubClientLimit),
 		isActive:   utils.NewAtomicBool(false),
 	}
 	return h
@@ -73,13 +65,13 @@ func (h *Hub) IsAlive() bool {
 
 // Size will return the current player count
 func (h *Hub) Size() int {
-	return h.counter.Value()
+	return h.controller.Size()
 }
 
 // Full will check if the hub is at it's set
 // limitation.
 func (h *Hub) Full() bool {
-	return h.counter.Full()
+	return h.controller.IsFull()
 }
 
 // RegisterClient will use the meta information given
@@ -89,11 +81,11 @@ func (h *Hub) RegisterClient(meta client.ClientMeta) error {
 	// if the client does not have an entry in the
 	// manager, then the player count has to be
 	// incremented.
-	if !h.controller.clientExists(meta) {
+	if !h.controller.ClientExists(meta) {
 		// increment the counter
 		// if the counter already is maxed out
 		// this will return an error
-		err := h.counter.Acquire()
+		err := h.controller.acquire()
 
 		if err != nil {
 			return ErrHubIsFull
@@ -104,46 +96,6 @@ func (h *Hub) RegisterClient(meta client.ClientMeta) error {
 	h.input <- meta
 
 	return nil
-}
-
-// UnregisterClient will give the hub the command to remove
-// a given client from the system.
-func (h *Hub) UnregisterClient(meta client.ClientMeta) error {
-	// Attention, this function does not actually decrement
-	// the client counter. That has to happen at the very
-	// last moment, after the client has been completely removed
-	// from the hub.
-
-	// check if the client exists.
-	if !h.controller.clientExists(meta) {
-		return client.NewErrClientDoesntExist(meta)
-	}
-
-	// client exists so give the removal command
-	h.output <- meta
-	return nil
-}
-
-// removeClient is the actuall functionality, that is
-// responsible for removing a given client from the
-// client manager and decrementing a client.
-// Attention decrementing the client may only happen
-// in a case, that there actually was a client removed.
-func (h *Hub) removeClient(meta client.ClientMeta) {
-	// TODO: Remove client from Map
-	err := h.controller.removeClient(meta)
-	// if there was an error here there was a
-	// double remove called, in the time it took to
-	// remove the specific client. This can only be
-	// in case of hight load and bad programming.
-	if err == nil {
-		// error here is impossible given that
-		// per client added to the hub, and it
-		// is previously checked that the client
-		// is only removed once, so the counter
-		// is ever ony decremented once.
-		_ = h.counter.Release()
-	}
 }
 
 // Run is the main event loop of the hub.
@@ -163,19 +115,14 @@ func (h *Hub) Run() {
 	// crash
 	defer h.isActive.SetFalse()
 
-	// TODO: move into hub controller
 	for {
 		select {
 		case <-h.shutdown:
 			logger.Infof("Shutting down hub [%d]", h.id)
 			return
-		case <-h.input:
+		case meta := <-h.input:
 			logger.Debugf("Adding a new player to hub [%d]", h.id)
-
-			//h.clientManager.addClient(meta)
-		case meta := <-h.output:
-			logger.Debugf("Removing an old player from the hub [%d]", h.id)
-			h.removeClient(meta)
+			h.controller.registerClient(meta)
 		}
 	}
 }
