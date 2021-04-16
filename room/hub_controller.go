@@ -48,6 +48,10 @@ func (hc *hubController) registerClient(meta client.ClientMeta) error {
 	// prepare the queues
 	cqueue, hqueue := helpers.NewWorkQueue()
 
+	// prepare messages without the new player information
+	sendAllPLayerKd := hc.gameState.GetPlayersKD()
+	sendAllPlayerInfo := server.NewSendAllPlayerInfo(hc.clientManager.GetPlayers())
+
 	// directly add the client to the manager and
 	// let it figure out, what to do here
 	err := hc.clientManager.AddClient(meta, cqueue)
@@ -57,19 +61,46 @@ func (hc *hubController) registerClient(meta client.ClientMeta) error {
 		return err
 	}
 
-	// get id
-	// this will return a value due to adding above without any errors
+	// get id this will return a valid value due
+	// to adding above without any errors
 	id, _ := hc.clientManager.MapId(meta)
+
+	// initialize the queues with the start up messages
+	youAreCalled := server.NewYouAreCalled(id)
+
+	// TODO: once map is finished update spawn for fitting coordinates
+	teleportPlayer := server.NewTeleportPlayer(id, 0, 0)
+
+	// send all information in the specified order
+	// Attention although the order is specified
+	// by the protocol the websocket protocol
+	// does not garantie it.
+	messages := [...]protocol.Bytefy{
+		youAreCalled,
+		sendAllPLayerKd,
+		sendAllPlayerInfo,
+		teleportPlayer,
+	}
+
+	for _, message := range messages {
+		hqueue.Enqueue(message.Bytes())
+	}
 
 	// add the queue to the controller
 	hc.lock.Lock()
-	defer hc.lock.Unlock()
-	hc.wg.Add(1)
 	hc.connections[id] = hqueue
+	hc.lock.Unlock()
 
+	hc.wg.Add(1)
 	// run the client computations
 	go func() {
-		defer hc.wg.Done()
+		var wg sync.WaitGroup
+
+		defer func() {
+			wg.Wait()
+			hc.wg.Done()
+		}()
+
 		for {
 			// if there was an error this means
 			// that we can stop running this here
@@ -78,8 +109,19 @@ func (hc *hubController) registerClient(meta client.ClientMeta) error {
 				break
 			}
 
+			wg.Add(1)
+
 			go func() {
+				defer wg.Done()
+
 				gotten := hc.handleRead(data, id)
+				// this means that the given opcode will not actually
+				// result in a direct return message, this happens
+				// with broadcast commands.
+				if gotten == nil {
+					return
+				}
+
 				hqueue.Enqueue(gotten.Bytes())
 			}()
 		}
@@ -184,10 +226,9 @@ func (hc *hubController) handleUnknownReceived(t []byte) protocol.Bytefy {
 		logger.Info(err)
 		newUnknown := server.NewUnknown()
 		return newUnknown
-	} else {
-		newUnknown := server.NewUnknown()
-		return newUnknown
 	}
+	newUnknown := server.NewUnknown()
+	return newUnknown
 }
 
 func (hc *hubController) handleDisconnect(t []byte, id uint8) protocol.Bytefy {
@@ -196,14 +237,13 @@ func (hc *hubController) handleDisconnect(t []byte, id uint8) protocol.Bytefy {
 		logger.Info(err)
 		newUnknown := server.NewUnknown()
 		return newUnknown
-	} else {
-		newDisconnect := server.NewDisconnect()
-		// We ignore the ok because this function can't be called without the user already existing
-		meta, _ := hc.clientManager.MapMeta(id)
-		// We ignore the error here, as it is impossible per definition
-		_ = hc.removeClient(meta)
-		return newDisconnect
 	}
+	newDisconnect := server.NewDisconnect()
+	// We ignore the ok because this function can't be called without the user already existing
+	meta, _ := hc.clientManager.MapMeta(id)
+	// We ignore the error here, as it is impossible per definition
+	_ = hc.removeClient(meta)
+	return newDisconnect
 }
 
 func (hc *hubController) handleUnknownSent() {
@@ -216,10 +256,9 @@ func (hc *hubController) handleWhoAmI(t []byte, id uint8) protocol.Bytefy {
 		logger.Info(err)
 		newUnknown := server.NewUnknown()
 		return newUnknown
-	} else {
-		newYouAreCalled := server.NewYouAreCalled(id)
-		return newYouAreCalled
 	}
+	newYouAreCalled := server.NewYouAreCalled(id)
+	return newYouAreCalled
 }
 
 func (hc *hubController) handleMovement(t []byte, id uint8) protocol.Bytefy {
@@ -228,23 +267,42 @@ func (hc *hubController) handleMovement(t []byte, id uint8) protocol.Bytefy {
 		logger.Info(err)
 		newUnknown := server.NewUnknown()
 		return newUnknown
-	} else {
-		newMovementPlayer := server.NewMovementPlayer(id, movement.CoorX(), movement.CoorY(), movement.AnglPl())
-		return newMovementPlayer
 	}
+	// TODO: implement movement checking and in the negative case
+	// return a teleport action.
+	newMovementPlayer := server.NewMovementPlayer(id, movement.CoorX(), movement.CoorY(), movement.AnglPl())
+	// don't send the movement information back to the actuall player
+	// to avoid unneded information
+	except := helpers.NewIdSet()
+	except.Add(id)
+	hc.broadCast(newMovementPlayer, except)
+
+	// As the movement opcode does not actually requiere
+	// an answer send nothing back.
+	return nil
 }
 
 func (hc *hubController) handleShooting(t []byte, id uint8) protocol.Bytefy {
-	_, err := pclient.NewShootingBytes(t)
+	shot, err := pclient.NewShootingBytes(t)
 	if err != nil {
 		logger.Info(err)
 		newUnknown := server.NewUnknown()
 		return newUnknown
-	} else {
-		// TODO: IMPLEMENT SHOOTING FUNCTION WITH RAYCASTING
-		newAnotherPlayerKilled := server.NewPlayerDeath(id, id)
-		return newAnotherPlayerKilled
 	}
+	// TODO: IMPLEMENT SHOOTING FUNCTION WITH RAYCASTING
+	// newAnotherPlayerKilled := server.NewPlayerDeath(id, id)
+
+	// dues to the not yet implemented raycasting feature
+	// checking, who died is not possible, so simply propagade
+	// the information.
+	aShot := server.NewShootingPlayer(id, shot.AngPl())
+
+	// broadcast the death to all players
+	except := helpers.NewIdSet()
+	except.Add(id)
+	hc.broadCast(aShot, except)
+
+	return nil
 }
 
 func (hc *hubController) handleRequestOtherPlayer(t []byte, id uint8) protocol.Bytefy {
@@ -253,10 +311,9 @@ func (hc *hubController) handleRequestOtherPlayer(t []byte, id uint8) protocol.B
 		logger.Info(err)
 		newUnknown := server.NewUnknown()
 		return newUnknown
-	} else {
-		newPlayerInfo := server.NewSendAllPlayerInfo(hc.clientManager.GetPlayers())
-		return newPlayerInfo
 	}
+	newPlayerInfo := server.NewSendAllPlayerInfo(hc.clientManager.GetPlayers())
+	return newPlayerInfo
 }
 
 func (hc *hubController) handleRequestPlayerKD(t []byte, id uint8) protocol.Bytefy {
@@ -265,8 +322,7 @@ func (hc *hubController) handleRequestPlayerKD(t []byte, id uint8) protocol.Byte
 		logger.Info(err)
 		newUnknown := server.NewUnknown()
 		return newUnknown
-	} else {
-		newPlayersKD := hc.gameState.GetPlayersKD()
-		return newPlayersKD
 	}
+	newPlayersKD := hc.gameState.GetPlayersKD()
+	return newPlayersKD
 }
