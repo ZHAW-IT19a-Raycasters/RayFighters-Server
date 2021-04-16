@@ -1,15 +1,17 @@
-package room
+package client
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"fmt"
-	"io"
 	"math"
 	"strings"
 	"testing"
 
 	"github.com/google/uuid"
-	"github.zhaw.ch/raycasters/server/protocol/server"
+	"github.zhaw.ch/raycasters/server/log"
+	"github.zhaw.ch/raycasters/server/room/helpers"
 )
 
 func getClientMeta(i int) (ClientMeta, *MockedConnection) {
@@ -17,7 +19,7 @@ func getClientMeta(i int) (ClientMeta, *MockedConnection) {
 	// if a new one is called here.
 	uuid := uuid.New()
 	name := fmt.Sprintf("id: %d", i)
-	mock := newMockedConnection()
+	mock := NewMockedConnection()
 	pmock := &mock
 	return NewClientMeta(uuid, name, pmock), pmock
 }
@@ -29,12 +31,12 @@ func compareByteSlices(expeced, gotten []byte, t *testing.T) bool {
 	}
 
 	if expeced == nil {
-		t.Error("exptected bytes are nil")
+		t.Error("expected bytes are nil")
 		return false
 	}
 
 	if len(expeced) != len(gotten) {
-		t.Errorf("incorrect byte slice lenght exp: [%d], got: [%d]", len(expeced), len(gotten))
+		t.Errorf("incorrect byte slice length exp: [%d], got: [%d]", len(expeced), len(gotten))
 		return false
 	}
 
@@ -52,25 +54,28 @@ func compareByteSlices(expeced, gotten []byte, t *testing.T) bool {
 }
 
 func TestClientManagerAddClientSigle(t *testing.T) {
-	hubMock := newMockedHubClientInteraction()
-	cm := newClientManager(&hubMock)
-	defer cm.shutdown(context.Background())
+
+	cm := NewClientManager()
+	defer cm.Shutdown(context.Background())
 
 	// make sure size starts at 0
-	if cm.size() != 0 {
+	if cm.Size() != 0 {
 		t.Error("client manager does not start at zero")
 		return
 	}
 
 	clientMeta, _ := getClientMeta(0)
-	err := cm.addClient(clientMeta)
+	clientQueue, _ := helpers.NewWorkQueue()
+
+	err := cm.AddClient(clientMeta, clientQueue)
+
 	if err != nil {
-		t.Errorf("An unexpected error occuered, while adding a new client\n[%s]", err.Error())
+		t.Errorf("An unexpected error occurred, while adding a new client\n[%s]", err.Error())
 		return
 	}
 
 	// check if the client was added
-	lenClients := len(cm.clients)
+	lenClients := cm.Size()
 	lenMapping := len(cm.mapping)
 	if lenClients != 1 {
 		t.Errorf("client size is not equals 1 -> [%d]", lenClients)
@@ -101,30 +106,33 @@ func TestClientManagerAddClientSigle(t *testing.T) {
 }
 
 func TestClientManagerAddClientTwice(t *testing.T) {
-	hubMock := newMockedHubClientInteraction()
-	cm := newClientManager(&hubMock)
-	defer cm.shutdown(context.Background())
+	cm := NewClientManager()
+	defer cm.Shutdown(context.Background())
 
 	clientMeta, _ := getClientMeta(0)
 
-	err := cm.addClient(clientMeta)
+	clientQueue, _ := helpers.NewWorkQueue()
+
+	err := cm.AddClient(clientMeta, clientQueue)
 	if err != nil {
-		t.Errorf("An unexpected error occuered, while adding a new client\n[%s]", err.Error())
+		t.Errorf("An unexpected error occurred, while adding a new client\n[%s]", err.Error())
 		return
 	}
 
 	// force the client to be in a timeout state
-	id, _ := cm.mapId(clientMeta)
+	id, _ := cm.MapId(clientMeta)
 	val := cm.clients[id]
 	val.Shutdown(context.Background())
 
 	// adding a connection, while client conn is still active
-	mock := newMockedConnection()
+	mock := NewMockedConnection()
 	clientMeta.conn = &mock
 
-	err = cm.addClient(clientMeta)
+	clientQueue, _ = helpers.NewWorkQueue()
+
+	err = cm.AddClient(clientMeta, clientQueue)
 	if err != nil {
-		t.Errorf("An unexpected error occuered, while adding a new client\n[%s]", err.Error())
+		t.Errorf("An unexpected error occurred, while adding a new client\n[%s]", err.Error())
 		return
 	}
 
@@ -141,22 +149,22 @@ func TestClientManagerAddClientTwice(t *testing.T) {
 }
 
 func TestClientManagerMaxClients(t *testing.T) {
-	hubMock := newMockedHubClientInteraction()
-	cm := newClientManager(&hubMock)
-	defer cm.shutdown(context.Background())
+	cm := NewClientManager()
+	defer cm.Shutdown(context.Background())
 
 	// no errors here
 	for i := 0; i <= math.MaxUint8; i += 1 {
+		clientQueue, _ := helpers.NewWorkQueue()
 		meta, _ := getClientMeta(i)
-		err := cm.addClient(meta)
+		err := cm.AddClient(meta, clientQueue)
 
 		if err != nil {
-			t.Errorf("Durring fill up of client manager, an error happend:\n[%s]", err.Error())
+			t.Errorf("During fill up of client manager, an error happened:\n[%s]", err.Error())
 			return
 		}
 
 		// make sure that the cm size is the same as the i counter
-		if cm.size() != (i + 1) {
+		if cm.Size() != (i + 1) {
 			t.Errorf("There was a size difference at position [%d]", i)
 			return
 		}
@@ -164,20 +172,20 @@ func TestClientManagerMaxClients(t *testing.T) {
 	}
 	// add an additional client
 	meta, _ := getClientMeta(256)
-	err := cm.addClient(meta)
+	clientQueue, _ := helpers.NewWorkQueue()
+	err := cm.AddClient(meta, clientQueue)
 	if err == nil {
-		t.Error("A client was added illigaly here.")
+		t.Error("A client was added illegally here.")
 	}
 }
 
 func TestClientManagerRemoveClients(t *testing.T) {
-	hubMock := newMockedHubClientInteraction()
-	cm := newClientManager(&hubMock)
-	defer cm.shutdown(context.Background())
+	cm := NewClientManager()
+	defer cm.Shutdown(context.Background())
 
 	meta, _ := getClientMeta(0)
 
-	err := cm.removeClient(meta)
+	err := cm.RemoveClient(meta)
 	if err == nil {
 		t.Errorf("there should not be a client in the given map.\n[%s]", err.Error())
 		return
@@ -186,20 +194,21 @@ func TestClientManagerRemoveClients(t *testing.T) {
 		return
 	}
 
-	cm.addClient(meta)
+	clientQueue, _ := helpers.NewWorkQueue()
+	cm.AddClient(meta, clientQueue)
 
-	if cm.size() != 1 {
+	if cm.Size() != 1 {
 		t.Error("size is not at 1")
 		return
 	}
 
-	err = cm.removeClient(meta)
+	err = cm.RemoveClient(meta)
 	if err != nil {
 		t.Error("there should not be an error during removing a known client.")
 		return
 	}
 
-	if cm.size() != 0 {
+	if cm.Size() != 0 {
 		t.Error("size is not at 0")
 		return
 	}
@@ -223,14 +232,28 @@ func TestClientManagerRemoveClients(t *testing.T) {
 }
 
 func TestClientManagerShutdown(t *testing.T) {
-	hubMock := newMockedHubClientInteraction()
-	cm := newClientManager(&hubMock)
+	buffer := new(bytes.Buffer)
+	// setup logger
+	builder := log.NewBuilder()
+	builder.RegisterHandler(log.NewWriterHandler(log.Debug, buffer))
+
+	err := builder.Build()
+	if err != nil {
+		t.Error("There is a test that did not clean up the global logger after it")
+		return
+	}
+	t.Cleanup(func() {
+		builder.Reset()
+	})
+
+	cm := NewClientManager()
 
 	// no errors here
 	for i := 0; i <= math.MaxUint8; i += 1 {
 		// assume this works
 		meta, _ := getClientMeta(i)
-		err := cm.addClient(meta)
+		clientQueue, _ := helpers.NewWorkQueue()
+		err := cm.AddClient(meta, clientQueue)
 		if err != nil {
 			t.Error("There was an error while adding the clients")
 			return
@@ -238,7 +261,7 @@ func TestClientManagerShutdown(t *testing.T) {
 	}
 
 	// shutdown all the "workers"
-	cm.shutdown(context.Background())
+	cm.Shutdown(context.Background())
 
 	// check that all the worker state are on shutdown
 	for _, client := range cm.clients {
@@ -251,35 +274,40 @@ func TestClientManagerShutdown(t *testing.T) {
 			return
 		}
 	}
-	// TODO: test logger output - this needs code that
-	// currently is not merged into this branch
+
+	// check buffer
+	data := buffer.Bytes()
+	strData := string(data)
+	strData = strings.TrimSpace(strData)
+	if !strings.HasSuffix(strData, "shutdown complete") {
+		t.Error("incorrect suffix")
+	}
 }
 
 func TestClientManagerIncorrectAddClient(t *testing.T) {
-	// TODO: fix this tests it hangs for ever
 
 	// test for panic on logging in after lost connection
 	// and incorrect removal of client data
-	hubMock := newMockedHubClientInteraction()
-	cm := newClientManager(&hubMock)
+	cm := NewClientManager()
 
 	defer func() {
 		r := recover()
 		if r == nil {
 			t.Error("there should have been a panic")
 		}
-		cm.shutdown(context.Background())
+		cm.Shutdown(context.Background())
 	}()
 
 	meta, _ := getClientMeta(0)
-	_ = cm.addClient(meta)
+	clientQueue, _ := helpers.NewWorkQueue()
+	_ = cm.AddClient(meta, clientQueue)
 
-	id, _ := cm.mapId(meta)
+	id, _ := cm.MapId(meta)
 	client := cm.clients[id]
 	// shutdown the client
 	client.registerTimeout()
 
-	iId, _ := cm.mapId(meta)
+	iId, _ := cm.MapId(meta)
 	// forcefully remove a client from the internal client map...
 
 	delete(cm.clients, iId)
@@ -287,26 +315,43 @@ func TestClientManagerIncorrectAddClient(t *testing.T) {
 	// or else this will hang forever
 	cm.wg.Done()
 
-	_ = cm.addClient(meta)
+	_ = cm.AddClient(meta, clientQueue)
 }
 
-func TestClientManagerIncorrectRemoveClient(t *testing.T) {
+func TestClientManagerNotExistingClientRemoved(t *testing.T) {
 	// test for panic on logging in after lost connection
 	// and incorrect removal of client data
-	hubMock := newMockedHubClientInteraction()
-	cm := newClientManager(&hubMock)
+	cm := NewClientManager()
+	defer cm.Shutdown(context.TODO())
+
+	meta, _ := getClientMeta(0)
+	err := cm.RemoveClient(meta)
+	if err == nil {
+		t.Error("There should be an error here, as the client was never added")
+	} else if !errors.Is(err, ErrClientDoesntExist{}) {
+		t.Error("Wrong error type used")
+	} else if !strings.Contains(err.Error(), "client doesn't exist") {
+		t.Error("incorrect returned string used")
+	}
+}
+
+func TestClientManagerIncorrectRemoveClientID(t *testing.T) {
+	// test for panic on logging in after lost connection
+	// and incorrect removal of client data
+	cm := NewClientManager()
 	defer func() {
 		r := recover()
 		if r == nil {
 			t.Error("there should have been a panic")
 		}
-		cm.shutdown(context.Background())
+		cm.Shutdown(context.Background())
 	}()
 
 	meta, _ := getClientMeta(0)
-	_ = cm.addClient(meta)
+	cq, _ := helpers.NewWorkQueue()
+	_ = cm.AddClient(meta, cq)
 
-	id, _ := cm.mapId(meta)
+	id, _ := cm.MapId(meta)
 	client := cm.clients[id]
 	// shutdown the client
 	client.registerTimeout()
@@ -318,91 +363,104 @@ func TestClientManagerIncorrectRemoveClient(t *testing.T) {
 		return
 	}
 
-	_ = cm.removeClient(meta)
+	_ = cm.RemoveClient(meta)
 }
 
-func TestClientManagerBroadCast(t *testing.T) {
+func TestClientManagerMapping(t *testing.T) {
 
-	// add test clients
-	const ClientCount = 10
-	clients := make([]ClientMeta, ClientCount)
-	mocks := make([]*MockedConnection, ClientCount)
+	cm := NewClientManager()
 
-	hubMock := newMockedHubClientInteraction()
-	manager := newClientManager(&hubMock)
+	meta, _ := getClientMeta(0)
 
-	for i := 0; i < ClientCount; i += 1 {
-		var tmp *MockedConnection
-		clients[i], tmp = getClientMeta(i)
-		mocks[i] = tmp
-		err := manager.addClient(clients[i])
-		if err != nil {
-			t.Errorf("error happend, while adding a new client.\n%s", err.Error())
-			return
-		}
+	cq, _ := helpers.NewWorkQueue()
+	_ = cm.AddClient(meta, cq)
+	defer cm.Shutdown(context.TODO())
+
+	// get the id
+	id, ok := cm.MapId(meta)
+
+	if !ok {
+		t.Error("the meta should be represented in the client manager")
+		return
 	}
 
-	manager.shutdown(context.Background())
+	cimeta, ok := cm.MapMeta(id)
 
-	for _, mock := range mocks {
-		mock.mwc.Reset()
-
-		// change the func in the mock to write into the mocked reader
-		tmp := mock
-		mock.funcNextWriter = func(messageType int) (io.WriteCloser, error) {
-			return tmp.mwc, nil
-		}
+	if !ok {
+		t.Error("the id should be represented in the client manager")
+		return
 	}
 
-	// broadCast this to all clients
-	// this is the case where all the clients are offline
-	opcode := server.NewDisconnect()
-	exp := opcode.Bytes()
-	manager.broadCast(opcode)
-
-	// test that the broadcast was not "send"
-	// as all the clients are fully deactivated
-	for _, mock := range mocks {
-		buff := mock.mwc.Bytes()
-		if len(buff) != 0 {
-			t.Error("should be empty")
-			return
-		}
-		mock.mwc.Reset()
+	if cimeta.GetId() != meta.GetId() {
+		t.Error("incorrect external id was returned")
 	}
 
-	// reactivate the clients for the test
-	for _, client := range manager.clients {
-		client.status = Active
+	cm.RemoveClient(meta)
+
+	_, ok = cm.MapMeta(id)
+
+	if ok {
+		t.Error("there should be no valid mapping for the given client")
+	}
+}
+
+func TestClientManagerGetPlayer(t *testing.T) {
+	cm := NewClientManager()
+
+	meta, _ := getClientMeta(0)
+
+	cq, _ := helpers.NewWorkQueue()
+
+	_ = cm.AddClient(meta, cq)
+	id, _ := cm.MapId(meta)
+
+	defer cm.Shutdown(context.TODO())
+
+	player, ok := cm.GetPlayer(id)
+
+	if !ok {
+		t.Error("player should exist")
+		return
 	}
 
-	manager.broadCast(opcode)
-
-	// test that the broadcast was not "send"
-	// as all the clients are not "isActive"
-	for _, mock := range mocks {
-		buff := mock.mwc.Bytes()
-		if len(buff) != 0 {
-			t.Error("should be empty")
-			return
-		}
-		mock.mwc.Reset()
+	if player.Name() != meta.GetName() {
+		t.Error("Incorrect name used for player")
+	} else if player.UserId() != id {
+		t.Error("incorrect id was used for player")
 	}
 
-	for _, client := range manager.clients {
-		if !client.isActive.SetTrue() {
-			t.Errorf("could not change the state of the isActive bool for [%d]", client.meta.id)
-			return
-		}
+	cm.RemoveClient(meta)
+	_, ok = cm.GetPlayer(id)
+	if ok {
+		t.Error("there should be no player by that id")
 	}
 
-	manager.broadCast(opcode)
+}
 
-	// test that the broadcast was "send"
-	for _, mock := range mocks {
-		buff := mock.mwc.Bytes()
-		if !compareByteSlices(exp, buff, t) {
-			return
-		}
+func TestClientManagerGetPlayers(t *testing.T) {
+	cm := NewClientManager()
+
+	meta, _ := getClientMeta(0)
+
+	cq, _ := helpers.NewWorkQueue()
+
+	_ = cm.AddClient(meta, cq)
+	id, _ := cm.MapId(meta)
+
+	defer cm.Shutdown(context.TODO())
+
+	pls := cm.GetPlayers()
+
+	if len(pls) != 1 {
+		t.Error("wrong slice lenght for players")
+		return
 	}
+
+	player := pls[0]
+	if player.Name() != meta.GetName() {
+		t.Error("Incorrect name used for player")
+	} else if player.UserId() != id {
+		t.Error("incorrect id was used for player")
+	}
+
 }

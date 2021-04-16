@@ -143,21 +143,20 @@ func (pd PlayerDeath) Bytes() []byte {
 	return buffer
 }
 
-
-// MovementPlayer represents a movement made by a specific player.
+// TeleportPlayer represents a movement made by a specific player.
 // It contains the user id and the respective offsets size the last
 // time the command was send.
 type TeleportPlayer struct {
-	userId                uint8
+	userId       uint8
 	coorX, coorY float64
 }
 
 // NewMovemementPlayer will construct a new player object.
 func NewTeleportPlayer(userId uint8, coorX, coorY float64) TeleportPlayer {
 	return TeleportPlayer{
-		userId:  userId,
-		coorX:   coorX,
-		coorY:   coorY,
+		userId: userId,
+		coorX:  coorX,
+		coorY:  coorY,
 	}
 }
 
@@ -176,10 +175,9 @@ func (mp TeleportPlayer) CoorY() float64 {
 	return mp.coorY
 }
 
-
 func (mp TeleportPlayer) ByteSize() int {
-	//     Op          + UserId     + CoorX + CoorY 
-	return opcodeSize + userIdSize + coordSize * 2 
+	//     Op          + UserId     + CoorX + CoorY
+	return opcodeSize + userIdSize + coordSize*2
 }
 
 // Bytes will turn the movement instance into a sendable byte stream.
@@ -201,6 +199,7 @@ func (mp TeleportPlayer) Bytes() []byte {
 
 	return buffer
 }
+
 // MovementPlayer represents a movement made by a specific player.
 // It contains the user id and the respective offsets size the last
 // time the command was send.
@@ -531,8 +530,8 @@ func (p PlayerKD) PutBytes(data []byte) {
 	_ = data[p.ByteSize()-1]
 
 	data[0] = p.id
-	binary.LittleEndian.PutUint16(data[1:3], p.kills)
-	binary.LittleEndian.PutUint16(data[3:5], p.deaths)
+	binary.LittleEndian.PutUint16(data[1:3], uint16(p.kills))
+	binary.LittleEndian.PutUint16(data[3:5], uint16(p.deaths))
 }
 
 // SendAllPlayerInfo is a request that will have to return any and

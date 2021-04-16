@@ -48,31 +48,30 @@ func TestWebSocketHandshake(t *testing.T) {
 
 	// TODO: couldn't read config via utils. do manually for now:
 	var conf = webconfig.WebConfig{
-		Ip: "localhost",
+		Ip:   "localhost",
 		Port: 8081,
 	}
 
 	server := NewServer(&conf)
 
-	go func(){
+	go func() {
 		server.Start()
 	}()
 	defer server.ServerStop(ShutdownContext())
 
-	u := url.URL{Scheme: "ws", Host: conf.String(), Path: "/ws/1",}
+	u := url.URL{Scheme: "ws", Host: conf.String(), Path: "/ws/1"}
 	fmt.Printf("connecting to %s\n", u.String())
 
 	c, res, err := websocket.DefaultDialer.Dial(u.String(), nil)
 	defer c.Close()
 
-
 	if err != nil {
-		fmt.Print("Error during handshake",err)
+		fmt.Print("Error during handshake", err)
 	}
 
 	if res.StatusCode != http.StatusSwitchingProtocols {
 		t.Errorf("handler returned wrong status code during handshake: got %v want %v",
-		res.StatusCode, http.StatusSwitchingProtocols)
+			res.StatusCode, http.StatusSwitchingProtocols)
 	}
 }
 
@@ -81,14 +80,14 @@ func TestWSBadRoomID(t *testing.T) {
 	rr := httptest.NewRecorder()
 	// Need to create a router that we can pass the request through so that the vars will be added to the context
 	router := mux.NewRouter()
-    router.HandleFunc("/ws/{roomID:[0-9]+}", func(rw http.ResponseWriter, r *http.Request) {serveWs([]*room.Hub{} ,rw, r)})
+	router.HandleFunc("/ws/{roomID:[0-9]+}", func(rw http.ResponseWriter, r *http.Request) { serveWs([]*room.Hub{}, rw, r) })
 	router.ServeHTTP(rr, req)
 	res := rr.Result()
 	body, _ := io.ReadAll(res.Body)
 	t.Log(string(body))
 	if res.StatusCode != http.StatusForbidden {
 		t.Errorf("handler returned wrong status code for bad request: got %v want %v",
-		res.StatusCode, http.StatusForbidden)
+			res.StatusCode, http.StatusForbidden)
 	}
 }
 
@@ -97,7 +96,7 @@ func TestWSBadProtocol(t *testing.T) {
 	rr := httptest.NewRecorder()
 	// Need to create a router that we can pass the request through so that the vars will be added to the context
 	router := mux.NewRouter()
-    router.HandleFunc("/ws/{roomID:[0-9]+}", func(rw http.ResponseWriter, r *http.Request) {serveWs([]*room.Hub{} ,rw, r)})
+	router.HandleFunc("/ws/{roomID:[0-9]+}", func(rw http.ResponseWriter, r *http.Request) { serveWs([]*room.Hub{}, rw, r) })
 	router.ServeHTTP(rr, req)
 
 	res := rr.Result()
@@ -105,6 +104,6 @@ func TestWSBadProtocol(t *testing.T) {
 	t.Log(string(body))
 	if res.StatusCode != http.StatusBadRequest {
 		t.Errorf("handler returned wrong status code for bad request: got %v want %v",
-		res.StatusCode, http.StatusBadRequest)
+			res.StatusCode, http.StatusBadRequest)
 	}
 }

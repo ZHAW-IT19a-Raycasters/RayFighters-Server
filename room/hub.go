@@ -5,10 +5,19 @@ import (
 	"errors"
 	"math"
 
-	"github.zhaw.ch/raycasters/server/protocol"
-	"github.zhaw.ch/raycasters/server/protocol/server"
+	"github.zhaw.ch/raycasters/server/log"
+	"github.zhaw.ch/raycasters/server/room/client"
 	"github.zhaw.ch/raycasters/server/utils"
 )
+
+// void is am empty struct with no memory
+// footprint, this is used for signals
+// counters.
+type void struct{}
+
+// logger responsible for all the logging
+// happening
+var logger = log.Log()
 
 // HubClientLimit is the absolute upper limit supported
 // by a single hub. This limitation comes from the
@@ -22,27 +31,18 @@ var ErrHubIsFull = errors.New("the hub is currently filled to capacity")
 // The hub controls the the individual connections between the
 // different modules like the map or the client manager.
 type Hub struct {
-	// The room id is used to uniquely identify the hub.
+	// id is the designated hub identifier
 	id int
-	// The manager of the different client with the different connections.
-	clientManager clientManager
-	// Is the player counter, this variable counts the active
-	// player connections, although that number is already available
-	// via the client map length, is would have to be accessed
-	// from behind a lock. And so creates an unneeded overhead
-	// while asynchronously adding a new client. So to avoid the given
-	// overhead an atomic implementation is here used.
-	counter utils.Semaphore
+	// controller is the struct responsible for running all the client opcodes
+	// and handling all the io.
+	controller *hubController
 	// The channel over which a new connection
 	// is added. This connections input can be accessed
 	// via the `RegisterClient` function associated
 	// with this type.
-	input chan ClientMeta
-	// The channel over which a connections
-	// are removed over. This
-	output chan ClientMeta
+	input chan client.ClientMeta
 	// The channel that signals the main loop to shutdown.
-	shutdown chan struct{}
+	shutdown chan void
 	// If the current hub is running or not.
 	isActive utils.AtomicBool
 }
@@ -52,31 +52,13 @@ type Hub struct {
 // the data structures.
 func NewHub(hubId int) *Hub {
 	h := &Hub{
-		input:    make(chan ClientMeta),
-		output:   make(chan ClientMeta),
-		shutdown: make(chan struct{}),
-		id:       hubId,
-		counter:  utils.NewSemaphore(HubClientLimit),
-		isActive: utils.NewAtomicBool(false),
+		input:      make(chan client.ClientMeta),
+		controller: newHubController(),
+		shutdown:   make(chan void),
+		id:         hubId,
+		isActive:   utils.NewAtomicBool(false),
 	}
-	h.clientManager = newClientManager(h)
 	return h
-}
-
-func (h *Hub) PlayerGotHit() (bool, server.Player) {
-	// TODO: implement the player got hit interface
-	// figure out if this is the correct path for
-	// comminication
-	return false, server.NewPlayer(0, "")
-}
-
-func (h *Hub) PlayersKD() []server.PlayerKD {
-	// TODO: implement this
-	// figure out if this is the correct path
-	// for communication between the client
-	// and the hub
-
-	return []server.PlayerKD{}
 }
 
 // IsAlive will check if the current hub is running or not.
@@ -84,116 +66,39 @@ func (h *Hub) IsAlive() bool {
 	return h.isActive.Get()
 }
 
-// GetAllPlayers will generate a slice
-// of send able player data.
-func (h *Hub) GetAllPlayers() []server.Player {
-	// lock the client manager, so that there is no
-	// changes during this process.
-	h.clientManager.lock.RLock()
-	defer h.clientManager.lock.RUnlock()
-
-	// pre-allocate all the players
-	players := make([]server.Player, h.clientManager.size())
-
-	i := 0 // add counter
-	for userID, client := range h.clientManager.clients {
-		players[i] = server.NewPlayer(userID, client.meta.name)
-		i += 1
-	}
-
-	return players
-}
-
 // Size will return the current player count
 func (h *Hub) Size() int {
-	return h.counter.Value()
+	return h.controller.Size()
 }
 
 // Full will check if the hub is at it's set
 // limitation.
 func (h *Hub) Full() bool {
-	return h.counter.Full()
-}
-
-// ClientExists will check if a specific client
-// has an entry in the hub or not.
-func (h *Hub) ClientExists(meta ClientMeta) bool {
-	h.clientManager.lock.RLock()
-	defer h.clientManager.lock.RUnlock()
-	_, ok := h.clientManager.mapId(meta)
-	return ok
+	return h.controller.IsFull()
 }
 
 // RegisterClient will use the meta information given
 // by the parameter to check if the player
-func (h *Hub) RegisterClient(meta ClientMeta) error {
-	// check the meta information, so that
-	// there never can be a double increment
-	// per added client.
-	h.clientManager.lock.RLock()
-	defer h.clientManager.lock.RUnlock()
+func (h *Hub) RegisterClient(meta client.ClientMeta) error {
 
 	// if the client does not have an entry in the
-	// manager, then the counter may be incremented.
-	if !h.ClientExists(meta) {
+	// manager, then the player count has to be
+	// incremented.
+	if !h.controller.ClientExists(meta) {
 		// increment the counter
 		// if the counter already is maxed out
 		// this will return an error
-		err := h.counter.Acquire()
+		err := h.controller.acquire()
+
 		if err != nil {
 			return ErrHubIsFull
 		}
 	}
 
+	// add the client to the queue to be added into the system
 	h.input <- meta
 
 	return nil
-}
-
-// UnregisterClient will give the hub the command to remove
-// a given client from the system.
-func (h *Hub) UnregisterClient(meta ClientMeta) error {
-	// Attention, this function does not actually decrement
-	// the client counter. That has to happen at the very
-	// last moment, after the client has been completely removed
-	// from the hub.
-
-	// check if the client exists.
-	if !h.ClientExists(meta) {
-		return ErrClientDoesntExist{meta}
-	}
-
-	// client exists so give the removal command
-	h.output <- meta
-	return nil
-}
-
-// BroadCast will as the name implies broadcast a given
-// byte interface to a given client.
-func (h *Hub) BroadCast(msg protocol.Bytefy) {
-	h.clientManager.broadCast(msg)
-}
-
-// removeClient is the actuall functionality, that is
-// responsible for removing a given client from the
-// client manager and decrementing a client.
-// Attention decrementing the client may only happen
-// in a case, that there actually was a client removed.
-func (h *Hub) removeClient(meta ClientMeta) {
-	// TODO: Remove client from Map
-	err := h.clientManager.removeClient(meta)
-	// if there was an error here there was a
-	// double remove called, in the time it took to
-	// remove the specific client. This can only be
-	// in case of hight load and bad programming.
-	if err == nil {
-		// error here is impossible given that
-		// per client added to the hub, and it
-		// is previously checked that the client
-		// is only removed once, so the counter
-		// is ever ony decremented once.
-		_ = h.counter.Release()
-	}
 }
 
 // Run is the main event loop of the hub.
@@ -220,10 +125,7 @@ func (h *Hub) Run() {
 			return
 		case meta := <-h.input:
 			logger.Debugf("Adding a new player to hub [%d]", h.id)
-			h.clientManager.addClient(meta)
-		case meta := <-h.output:
-			logger.Debugf("Removing an old player from the hub [%d]", h.id)
-			h.removeClient(meta)
+			h.controller.registerClient(meta)
 		}
 	}
 }
@@ -232,13 +134,14 @@ func (h *Hub) Run() {
 // With the cxt context a premature cancelation of all client
 // connections can be started.
 func (h *Hub) Shutdown(cxt context.Context) {
-	waitCompletion := make(chan struct{})
+	waitCompletion := make(chan void)
 
 	go func() {
-		h.clientManager.shutdown(cxt)
-		close(waitCompletion)
+		h.controller.shutdown(cxt)
 		// make sure that the main thread is closed
 		close(h.shutdown)
+		// close blocker
+		close(waitCompletion)
 	}()
 
 	select {
