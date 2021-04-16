@@ -147,6 +147,7 @@ func (c *Client) checkOffline() bool {
 func (c *Client) sendData() {
 	const defaultMessageType = websocket.BinaryMessage
 	const shutdownMessageType = websocket.CloseMessage
+
 	defer c.shutdownHandler()
 
 	checkErr := func(err error) bool {
@@ -160,7 +161,12 @@ func (c *Client) sendData() {
 		return true
 	}
 
-	process := func(message []byte, messageType int) bool {
+	process := func(message []byte) bool {
+		messageType := defaultMessageType
+		// if there is a disconnect here
+		if message[0] == server.DisconnectOpcode.Value() {
+			messageType = shutdownMessageType
+		}
 
 		cw, err := c.meta.conn.NextWriter(messageType)
 
@@ -177,7 +183,7 @@ func (c *Client) sendData() {
 		// flush the message to the network
 		err = cw.Close()
 
-		return !checkErr(err)
+		return !checkErr(err) && messageType == defaultMessageType
 	}
 
 	drainProcess := func() {
@@ -188,7 +194,7 @@ func (c *Client) sendData() {
 		// queue worker or drainer
 		messages, _ := c.queue.DequeueDrain()
 		for _, message := range messages {
-			if !process(message, defaultMessageType) {
+			if !process(message) {
 				return
 			}
 		}
@@ -201,19 +207,14 @@ func (c *Client) sendData() {
 		message, err := c.queue.Dequeue()
 
 		if err != nil {
-			// the receiver has shutdown
-
+			// the queue has shutdown => server is
+			// shutting down
 			// try to drain and send the values
 			drainProcess()
 			return
 		}
-		// if there is a disconnect here
-		if message[0] == server.DisconnectOpcode.Value() {
-			process(message, shutdownMessageType)
-			return
-		}
 
-		if !process(message, defaultMessageType) {
+		if !process(message) {
 			return
 		}
 	}
@@ -224,12 +225,19 @@ func (c *Client) sendData() {
 // Attention this function is a blocking call, so be careful, while
 // reading form it.
 func (c *Client) recvData() {
-	// TODO: refactor out of this function
-
 	defer c.shutdownHandler()
 
 	for {
-		_, message, err := c.meta.conn.NextReader()
+		messageType, message, err := c.meta.conn.NextReader()
+		logger.Debugf("Received message type [%d]", messageType)
+
+		if messageType == websocket.CloseMessage {
+			logger.Infof("the client with the id [%d] closed the connection.", messageType)
+			return
+		} else if messageType != websocket.BinaryMessage {
+			logger.Warnf("a non binary message type was received type: [%d]", messageType)
+			return
+		}
 
 		// as per definition
 		// Applications must break out of the application's read loop when this method returns
@@ -237,23 +245,17 @@ func (c *Client) recvData() {
 		// method returns a non-nil error, all subsequent calls to this method return the same
 		// error
 		if err != nil {
-
-			if websocket.IsCloseError(err, websocket.CloseAbnormalClosure) {
+			if websocket.IsCloseError(err, websocket.CloseNormalClosure) {
+				logger.Infof("Connection to client [%d] was shutdown by client", c.meta.id)
+			} else if websocket.IsCloseError(err, websocket.CloseAbnormalClosure) {
 				logger.Warnf("Client [%d] lost connection, setting to timeout", c.meta.id)
-			} else if websocket.IsCloseError(err,
-				websocket.CloseProtocolError, websocket.CloseNoStatusReceived,
-				websocket.CloseInvalidFramePayloadData,
-			) {
+				// if there was an unexpected close error
+				// then the client has to be set to timeout
+				c.registerTimeout()
+			} else {
 				logger.Warnf("unexpected web socket closure error received for client [%d] "+
 					"- see https://rfc-editor.org/rfc/rfc6455.html#section-11.7 for more information\n[%s]", c.meta.id, err.Error())
-			} else {
-				logger.Warnf("unexpected error happened\n%s", err.Error())
 			}
-
-			// if there was an unexpected close error
-			// then the client has to be set to timeout
-			c.registerTimeout()
-
 			// break out of the endless loop directly to a shutdown
 			return
 		}
@@ -269,6 +271,7 @@ func (c *Client) recvData() {
 
 		if err != nil {
 			logger.Warnf("unexpected read error received.\n[%s]", err.Error())
+			return
 		}
 
 		// handle the gotten data on an other go thread

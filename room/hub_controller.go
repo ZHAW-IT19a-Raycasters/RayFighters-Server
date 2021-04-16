@@ -63,9 +63,9 @@ func newHubController() *hubController {
 	return &hubController{
 		clientManager: client.NewClientManager(),
 		connections:   make(map[uint8]helpers.HubQueue),
+		gameState:     NewGameState(),
 		wg:            sync.WaitGroup{},
 		lock:          sync.RWMutex{},
-		gameState:     NewGameState(),
 	}
 }
 
@@ -83,6 +83,8 @@ func (hc *hubController) ClientExists(meta client.ClientMeta) bool {
 
 // registerClient will add the client to the controller
 func (hc *hubController) registerClient(meta client.ClientMeta) error {
+	// TODO: register in the game state (if it is a new connection)
+
 	// prepare the queues
 	cqueue, hqueue := helpers.NewWorkQueue()
 
@@ -146,6 +148,8 @@ func (hc *hubController) registerClient(meta client.ClientMeta) error {
 	hc.broadCast(playerJoined, except)
 
 	// TODO: once map is finished update spawn for fitting coordinates
+	// TODO: send last valid coordinates registered in case of
+	// reconnecting to the server
 	teleportPlayer := server.NewTeleportPlayer(id, 0, 0)
 	hc.broadCast(teleportPlayer, helpers.NewIdSet())
 
@@ -191,31 +195,31 @@ func (hc *hubController) runClientConnection(hqueue helpers.HubQueue, id uint8) 
 // Attention decrementing the client may only happen
 // in a case, that there actually was a client removed.
 func (hc *hubController) removeClient(meta client.ClientMeta) error {
-	// TODO: add implementation
 	if !hc.ClientExists(meta) {
 		return client.NewErrClientDoesntExist(meta)
 	}
 
-	// client exists so lock everything down to remove him
-
 	// error is not needed as per definition the client has to exists
 	// at this point
 	id, _ := hc.clientManager.MapId(meta)
-	_ = hc.clientManager.RemoveClient(meta)
 
 	// close queue
+	// and initiate a shutdown of the client
+	// side.
 	q := hc.connections[id]
 	q.Shutdown()
 
 	// only lock here as the remove client function is a blocking call
-	hc.lock.RLock()
-	defer hc.lock.RUnlock()
+	hc.lock.Lock()
+	// remove queue
+	delete(hc.connections, id)
+	hc.lock.Unlock()
 
 	// TODO: remove from map
 	_ = hc.gameState.RemoveClient(id)
 
-	// remove queue
-	delete(hc.connections, id)
+	// client exists so lock everything down to remove him
+	_ = hc.clientManager.RemoveClient(meta)
 
 	// decrement the counter
 	// error here is imposible due to the checks above
@@ -227,11 +231,11 @@ func (hc *hubController) removeClient(meta client.ClientMeta) error {
 // BroadCast will as the name implies broadcast a given
 // byte interface to a given client.
 func (hc *hubController) broadCast(msg protocol.Bytefy, except helpers.IdSet) {
-	// TODO: implement
-	hc.lock.RLock()
-	defer hc.lock.RUnlock()
 	// get the bytes first
 	data := msg.Bytes()
+
+	hc.lock.RLock()
+	defer hc.lock.RUnlock()
 
 	for id, clientQueue := range hc.connections {
 		if except.Has(id) {
