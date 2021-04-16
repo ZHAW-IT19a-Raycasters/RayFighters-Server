@@ -4,8 +4,11 @@ import (
 	"crypto/rsa"
 	"encoding/json"
 	"fmt"
+	"html"
+	"io"
 	"net/http"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"github.com/lestrrat-go/jwx/jwa"
@@ -13,7 +16,7 @@ import (
 )
 
 const (
-	JWTCOOKIENAME = "jwt"
+	JWTCOOKIENAME = "token"
 )
 
 // Create a struct to read the username and password from the request body
@@ -24,21 +27,18 @@ type Credentials struct {
 // ServeAuthWithKey creates a closure with the given key and
 // returns a route handler that
 // creates a JWT, signs it with the provided key
-// and adds it to the Response Header
+// and adds it to the Response Header via Set-Cookie
 func ServeAuthWithKey(privKey *rsa.PrivateKey) (HandleFunc func(w http.ResponseWriter, r *http.Request)) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// parse client's desired username from json body
+		
 		var creds Credentials
-		err := json.NewDecoder(r.Body).Decode(&creds)
+		err := parseToCredentialsFromJSON(&creds, r.Body)
 		if err != nil {
 			// If the structure of the body is wrong, return an HTTP error
-			w.WriteHeader(http.StatusBadRequest)
-			fmt.Printf("failed to decode json: %s", err)
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			logger.Warnf("failed to decode json from request body: %s", err)
 			return
 		}
-
-		// #TODO: check if username is already taken?
-		fmt.Printf("%s has requested a JWT",creds.Username)
 
 		// create new client
 		uuidStr,_ := uuid.New().MarshalText()
@@ -59,31 +59,20 @@ func ServeAuthWithKey(privKey *rsa.PrivateKey) (HandleFunc func(w http.ResponseW
 			return
 		}
 
-		// Finally, we set the client cookie for "token" as the JWT we just generated
-		// we also set an expiry time which is the same as the token itself
+		// Finally, we request to set the client cookie to the JWT we just generated
+		// #TODO expiry time?
 		http.SetCookie(w, &http.Cookie{
 			Name:    JWTCOOKIENAME,
 			Value:   string(signed[:]),
 		})
-		
-
-		// enable HttpOnly
-		// #TODO: frontend team will not be able to access it via clientside scripts! (security measure)
-		// wait with enabling until we can make sure it works without clientside interaction
 
 	}
 }
 
-// Middleware
-		// parse and verify
-		// 
-
 type authenticationMiddleware struct {
 	privateKey *rsa.PrivateKey
-	// #TODO: later hold client manager to check if already logged in via uuid
 }
-// Middleware function, which will be called for each request
-// checks if user is authenticated via valid token
+// Middleware checks if user is authenticated via valid token
 // not authorized users requests get redirected to /auth
 func (amw *authenticationMiddleware) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -95,9 +84,8 @@ func (amw *authenticationMiddleware) Middleware(next http.Handler) http.Handler 
 			http.Error(w, "no JWT found in Cookies", http.StatusUnauthorized)
 		}
 
-		fmt.Printf("JWT found in cookies, %s", jwtCookie.Name)
+		fmt.Printf("%s found in cookies\n", jwtCookie.Name)
 
-		// #CONTINUE: Parse from cookie not from header. 2 different versions of tokes in "Authentication" and cookie
 		token, err := jwt.ParseString(jwtCookie.Value,jwt.WithVerify(jwa.RS512, amw.privateKey.PublicKey))
 		if err != nil {
 			fmt.Printf("unauthenticated request")
@@ -106,7 +94,30 @@ func (amw *authenticationMiddleware) Middleware(next http.Handler) http.Handler 
 			if user, ok := token.Get(`username`); ok {
 				fmt.Printf("Authenticated user %s\n", user)
 			}
+			if uuid, ok := token.Get(`uuid`); ok {
+				fmt.Printf("with uuid %s\n", uuid)
+			}
 			next.ServeHTTP(w, r)
 		}
 	})
+}
+
+// runs various validity checks against a received username
+func validUsername(str string) (string, error){
+	// in utf-8 runes
+	const maxUsernameLength = 255
+	if !utf8.ValidString(str){
+		return "", fmt.Errorf("invalid utf-8 runes in username %s", str)
+	}
+	escaped := html.EscapeString(str)
+	if  utf8.RuneCountInString(escaped)>maxUsernameLength {
+		return "", fmt.Errorf("username contains too many runes %d, %s",utf8.RuneCountInString(str), escaped)
+	}
+	return escaped, nil
+}
+
+func parseToCredentialsFromJSON(creds *Credentials, r io.Reader) error{
+	// parse client's desired username from json body
+	err := json.NewDecoder(r).Decode(&creds)
+	return err
 }

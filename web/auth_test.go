@@ -110,3 +110,10 @@ func TestAuthTokenResponseVaild(t *testing.T) {
 		t.Errorf("did not receive JWT via Set-Cookie")
 	}
 }
+
+func TestValidUsername(t* testing.T){
+	username := "<SCRIPT SRC=http://xss.rocks/xss.js></SCRIPT>"
+	escaped, _ := validUsername(username)
+	logger.Debugf("escaped username %s", escaped)
+	logger.
+}
