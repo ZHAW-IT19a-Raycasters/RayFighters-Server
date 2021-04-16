@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/gorilla/mux"
@@ -111,9 +112,11 @@ func TestAuthTokenResponseVaild(t *testing.T) {
 	}
 }
 
-func TestValidUsername(t* testing.T){
+func TestValidUsernameHtmlEscape(t* testing.T){
 	username := "<SCRIPT SRC=http://xss.rocks/xss.js></SCRIPT>"
 	escaped, _ := validUsername(username)
-	logger.Debugf("escaped username %s", escaped)
-	logger.
+	expected := "&lt;SCRIPT SRC=http://xss.rocks/xss.js&gt;&lt;/SCRIPT&gt;"
+	if strings.Compare(escaped,expected)!=0 {
+		t.Errorf("expected %s, got %s",expected,escaped)
+	}
 }

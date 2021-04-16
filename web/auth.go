@@ -40,7 +40,7 @@ func ServeAuthWithKey(privKey *rsa.PrivateKey) (HandleFunc func(w http.ResponseW
 			return
 		}
 
-		// create new client
+		// create new client uuid
 		uuidStr,_ := uuid.New().MarshalText()
 	
 		// create JWT
@@ -50,11 +50,11 @@ func ServeAuthWithKey(privKey *rsa.PrivateKey) (HandleFunc func(w http.ResponseW
 		t.Set(`uuid`, uuidStr)
 
 		// Signing the token (using raw rsa.PrivateKey)
-		// also marshalls to json
+		// also marshalls to JSON
 		signed, err := jwt.Sign(t, jwa.RS512, privKey)
 		if err != nil {
 			// also wraps a json marshalling error
-			fmt.Printf("failed to sign token: %s", err)
+			logger.Warnf("failed to sign token: %s", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
@@ -72,37 +72,35 @@ func ServeAuthWithKey(privKey *rsa.PrivateKey) (HandleFunc func(w http.ResponseW
 type authenticationMiddleware struct {
 	privateKey *rsa.PrivateKey
 }
+
 // Middleware checks if user is authenticated via valid token
-// not authorized users requests get redirected to /auth
 func (amw *authenticationMiddleware) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
 		// get cookie from request
 		jwtCookie, err := r.Cookie(JWTCOOKIENAME)
 		if err != nil{
-			fmt.Printf("no JWT found in Cookies")
 			http.Error(w, "no JWT found in Cookies", http.StatusUnauthorized)
+			return
 		}
-
-		fmt.Printf("%s found in cookies\n", jwtCookie.Name)
 
 		token, err := jwt.ParseString(jwtCookie.Value,jwt.WithVerify(jwa.RS512, amw.privateKey.PublicKey))
 		if err != nil {
-			fmt.Printf("unauthenticated request")
-			http.Error(w, "Forbidden", http.StatusUnauthorized)
-		} else {
-			if user, ok := token.Get(`username`); ok {
-				fmt.Printf("Authenticated user %s\n", user)
-			}
-			if uuid, ok := token.Get(`uuid`); ok {
-				fmt.Printf("with uuid %s\n", uuid)
-			}
-			next.ServeHTTP(w, r)
+			logger.Warnf("unauthenticated request %s", err)
+			http.Error(w, err.Error(), http.StatusUnauthorized)
+			return
 		}
+		
+		user, userOk := token.Get(`username`)
+		uuid, uuidOk := token.Get(`uuid`)
+		if (userOk && uuidOk) {
+			logger.Infof("user %s with uuid %s authenticated. proceeding to %s", user, uuid, r.URL)
+		}
+		next.ServeHTTP(w, r)
 	})
 }
 
-// runs various validity checks against a received username
+// runs validity checks against a received username
 func validUsername(str string) (string, error){
 	// in utf-8 runes
 	const maxUsernameLength = 255
@@ -116,8 +114,8 @@ func validUsername(str string) (string, error){
 	return escaped, nil
 }
 
+// parse client's desired username from json body
 func parseToCredentialsFromJSON(creds *Credentials, r io.Reader) error{
-	// parse client's desired username from json body
 	err := json.NewDecoder(r).Decode(&creds)
 	return err
 }

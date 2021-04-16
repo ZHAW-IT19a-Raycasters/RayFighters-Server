@@ -24,7 +24,6 @@ var logger = log.Log()
 // Server holds all endpoints for a server
 type Server struct {
 	endpoint *http.Server
-	privateKey *rsa.PrivateKey
 }
 
 // NewServer registers routes for all exposed endpoints
@@ -62,7 +61,7 @@ func NewServer(conf *webconfig.WebConfig) *Server {
 
 	httpServer := &http.Server{Handler: router, Addr: conf.String(), WriteTimeout: 15 * time.Second, ReadTimeout: 15 * time.Second}
 	
-	server := &Server{endpoint: httpServer, privateKey: privKey}
+	server := &Server{endpoint: httpServer}
 	return server
 }
 
