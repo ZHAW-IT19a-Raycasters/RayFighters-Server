@@ -1,13 +1,23 @@
 package web
 
 import (
+	"bytes"
+	"crypto/rand"
+	"crypto/rsa"
+	"encoding/json"
+	"fmt"
 	"io"
+	"log"
 	"net/http"
+	"net/http/cookiejar"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 
 	"github.com/gorilla/mux"
+	"github.com/gorilla/websocket"
 	"github.zhaw.ch/raycasters/server/room"
+	"golang.org/x/net/publicsuffix"
 )
 
 func TestAPIRoot(t *testing.T) {
@@ -40,50 +50,67 @@ func TestAPIRoot(t *testing.T) {
 }
 
 
-// TestWebSocketHandshake would need a cookie jar to test authorized websocket establishment
-// add it and change it to TestAuthorizedWebsocketEstablishment
-// func TestWebSocketHandshake(t *testing.T) {
-// 	// runs the server and establishes a websocket connection
-
-// 	var conf = webconfig.WebConfig{
-// 		Ip: "localhost",
-// 		Port: 8081,
-// 	}
-
-// 	server := NewServer(&conf)
-
-// 	go func(){
-// 		server.Start()
-// 	}()
-// 	defer server.ServerStop(ShutdownContext())
-
-// 	u := url.URL{Scheme: "ws", Host: conf.String(), Path: "/ws/1",}
-// 	fmt.Printf("connecting to %s\n", u.String())
-
-// 	c, res, err := websocket.DefaultDialer.Dial(u.String(), nil)
-// 	defer c.Close()
-
-
-// 	if err != nil {
-// 		fmt.Print("Error during handshake",err)
-// 	}
-
-// 	if res.StatusCode != http.StatusSwitchingProtocols {
-// 		t.Errorf("handler returned wrong status code during handshake: got %v want %v",
-// 		res.StatusCode, http.StatusSwitchingProtocols)
-// 	}
-// }
-
-func TestWSHandshake(t *testing.T) {
-	req := httptest.NewRequest("GET", "/ws/123", nil)
-	rr := httptest.NewRecorder()
+// TestAuthorizedWebsocketEstablishment is the whole shebang in one test!
+func TestAuthorizedWebsocketEstablishment(t *testing.T) {
+	privKey, _ := rsa.GenerateKey(rand.Reader, 2048)
+	// set up a router for auth and ws
 	router := mux.NewRouter()
-    router.HandleFunc("/ws/{roomID:[0-9]+}", func(rw http.ResponseWriter, r *http.Request) {serveWs([]*room.Hub{} ,rw, r)})
-	router.ServeHTTP(rr, req)
-	res := rr.Result()
-	io.ReadAll(res.Body)
+	router.HandleFunc("/auth",ServeAuthWithKey(privKey))
+	router.HandleFunc("/ws/{roomID:[0-9]+}", func(rw http.ResponseWriter, r *http.Request) {serveWs([]*room.Hub{} ,rw, r)})
+
+	// Start our server
+	ts := httptest.NewServer(router)
+	defer ts.Close()
+
+	u, err := url.Parse(ts.URL)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// All users of cookiejar should import "golang.org/x/net/publicsuffix"
+	jar, err := cookiejar.New(&cookiejar.Options{PublicSuffixList: publicsuffix.List})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// create a client with our jar
+	client := &http.Client{
+		Jar: jar,
+	}
+
+	postBody, _ := json.Marshal(map[string]string{
+		"username":  "Phil",
+	})
+
+	// 
+	if _, err = client.Post(u.String()+"/auth","application/json",bytes.NewBuffer(postBody)); err != nil {
+		log.Fatal(err)
+	}
+
+	// we should have the auth token as cookie in the jar, mmmmmhhh cookies :)
+	fmt.Println("After 1st request:")
+	for _, cookie := range jar.Cookies(u) {
+		fmt.Printf("  %s: %s\n", cookie.Name, cookie.Value)
+	}
+
+	// add our jar to the default dialer
+	websocket.DefaultDialer.Jar = jar
+
+	// change url to ws endpoint for same host
+	u.Scheme = "ws"
+	u.Path = "/ws/1"
+	fmt.Printf("connecting to %s\n", u.String())
+
+	c, res, err := websocket.DefaultDialer.Dial(u.String(), nil)
+	defer c.Close()
+
+
+	if err != nil {
+		fmt.Print("Error during handshake",err)
+	}
+
 	if res.StatusCode != http.StatusSwitchingProtocols {
-		t.Errorf("handler returned wrong status code for bad request: got %v want %v",
+		t.Errorf("handler returned wrong status code during handshake: got %v want %v",
 		res.StatusCode, http.StatusSwitchingProtocols)
 	}
 }
