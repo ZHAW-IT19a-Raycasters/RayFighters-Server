@@ -41,7 +41,7 @@ func ServeAuthWithKey(privKey *rsa.PrivateKey) (HandleFunc func(w http.ResponseW
 		}
 
 		// create new client uuid
-		uuidStr,_ := uuid.New().MarshalText()
+		uuidStr := uuid.New().String()
 	
 		// create JWT
 		t := jwt.New()
