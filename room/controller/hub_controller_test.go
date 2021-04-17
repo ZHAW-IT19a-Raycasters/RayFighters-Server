@@ -1,4 +1,4 @@
-package room
+package controller
 
 import (
 	"fmt"
@@ -39,7 +39,7 @@ func compareByteArrays(expectedData, gottenData []byte, t *testing.T) bool {
 }
 
 func TestHandleReadWhoAmI(t *testing.T) {
-	hub := newHubController()
+	hub := NewHubController()
 	request := []byte{
 		client.WhoAmIOpcode.Value(),
 	}
@@ -54,7 +54,7 @@ func TestHandleReadWhoAmI(t *testing.T) {
 }
 
 func TestHandleReadMovement(t *testing.T) {
-	hub := newHubController()
+	hub := NewHubController()
 	cQueue, hQueue := helpers.NewWorkQueue()
 	const otherId uint8 = 2
 	hub.connections[otherId] = hQueue
@@ -96,24 +96,24 @@ func TestHandleReadMovement(t *testing.T) {
 }
 
 func TestHandleUnknownReceived(t *testing.T) {
-	hub := newHubController()
+	hub := NewHubController()
 
 	magic := hub.handleUnknownReceived([]byte{client.UnknownOpcode.Value()})
 	t.Log(magic)
 }
 
 func TestHandleDisconnect(t *testing.T) {
-	hub := newHubController()
+	hub := NewHubController()
 	meta, _ := getClientMeta(1)
 
-	hub.registerClient(meta)
+	hub.RegisterClient(meta)
 	// hub.clientManager.GetClients()
 	magic := hub.handleDisconnect([]byte{client.DisconnectOpcode.Value()}, 0)
 	t.Log(magic)
 }
 
 func TestHandleWhoAmI(t *testing.T) {
-	hub := newHubController()
+	hub := NewHubController()
 	request := []byte{
 		client.WhoAmIOpcode.Value(),
 	}
@@ -128,19 +128,19 @@ func TestHandleWhoAmI(t *testing.T) {
 }
 
 func TestHandleShooting(t *testing.T) {
-	hub := newHubController()
+	hub := NewHubController()
 	magic := hub.handleShooting([]byte{client.ShootingOpcode.Value()}, 1)
 	t.Log(magic)
 }
 
 func TestHandleRequestOtherPlayer(t *testing.T) {
-	hub := newHubController()
+	hub := NewHubController()
 	magic := hub.handleRequestOtherPlayer([]byte{client.RequestOtherPlayersOpcode.Value()}, 1)
 	t.Log(magic)
 }
 
 func TestHandleRequestPlayerKD(t *testing.T) {
-	hub := newHubController()
+	hub := NewHubController()
 	magic := hub.handleRequestPlayerKD([]byte{client.RequestPlayerKDOpcode.Value()}, 1)
 	t.Log(magic)
 }

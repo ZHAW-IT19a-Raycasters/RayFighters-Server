@@ -1,4 +1,4 @@
-package room
+package controller
 
 import (
 	"context"
@@ -13,7 +13,19 @@ import (
 	"github.zhaw.ch/raycasters/server/room/helpers"
 )
 
-type hubController struct {
+// NewHubController will create a new controller
+func NewHubController() *HubController {
+	// TODO: add map implementation
+	return &HubController{
+		clientManager: client.NewClientManager(),
+		connections:   make(map[uint8]helpers.HubQueue),
+		gameState:     NewGameState(),
+		wg:            sync.WaitGroup{},
+		lock:          sync.RWMutex{},
+	}
+}
+
+type HubController struct {
 	// The manager of the different client with the different connections.
 	clientManager client.ClientManager
 	// connections stores the hub queues the soley conneciton
@@ -37,41 +49,29 @@ type hubController struct {
 	lock sync.RWMutex
 }
 
-// acquire will increment the counted value for the semaphore
-func (hc *hubController) acquire() error {
+// Acquire will increment the counted value for the semaphore
+func (hc *HubController) Acquire() error {
 	return hc.semaphore.Acquire()
 }
 
-// release will decrement the counterd value for the semaphore
-func (hc *hubController) release() error {
+// Release will decrement the counterd value for the semaphore
+func (hc *HubController) Release() error {
 	return hc.semaphore.Release()
 }
 
 // Size will return the current client count
-func (hc *hubController) Size() int {
+func (hc *HubController) Size() int {
 	return hc.semaphore.Value()
 }
 
 // IsFull will check if there is still space for a new player
-func (hc *hubController) IsFull() bool {
+func (hc *HubController) IsFull() bool {
 	return hc.semaphore.Full()
-}
-
-// newHubController will create a new controller
-func newHubController() *hubController {
-	// TODO: add map implementation
-	return &hubController{
-		clientManager: client.NewClientManager(),
-		connections:   make(map[uint8]helpers.HubQueue),
-		gameState:     NewGameState(),
-		wg:            sync.WaitGroup{},
-		lock:          sync.RWMutex{},
-	}
 }
 
 // ClientExists checks if the client has a place on the map or
 // not.
-func (hc *hubController) ClientExists(meta client.ClientMeta) bool {
+func (hc *HubController) ClientExists(meta client.ClientMeta) bool {
 	// check the meta information, so that
 	// there never can be a double increment
 	// per added client.
@@ -81,8 +81,8 @@ func (hc *hubController) ClientExists(meta client.ClientMeta) bool {
 	return ok
 }
 
-// registerClient will add the client to the controller
-func (hc *hubController) registerClient(meta client.ClientMeta) error {
+// RegisterClient will add the client to the controller
+func (hc *HubController) RegisterClient(meta client.ClientMeta) error {
 	// TODO: register in the game state (if it is a new connection)
 
 	// prepare the queues
@@ -157,7 +157,7 @@ func (hc *hubController) registerClient(meta client.ClientMeta) error {
 }
 
 // runClientConnection
-func (hc *hubController) runClientConnection(hqueue helpers.HubQueue, id uint8) {
+func (hc *HubController) runClientConnection(hqueue helpers.HubQueue, id uint8) {
 	var wg sync.WaitGroup
 	defer wg.Wait()
 
@@ -194,7 +194,7 @@ func (hc *hubController) runClientConnection(hqueue helpers.HubQueue, id uint8) 
 // has send a disconnection message.
 // Attention decrementing the client may only happen
 // in a case, that there actually was a client removed.
-func (hc *hubController) removeClient(meta client.ClientMeta) error {
+func (hc *HubController) removeClient(meta client.ClientMeta) error {
 	if !hc.ClientExists(meta) {
 		return client.NewErrClientDoesntExist(meta)
 	}
@@ -223,14 +223,14 @@ func (hc *hubController) removeClient(meta client.ClientMeta) error {
 
 	// decrement the counter
 	// error here is imposible due to the checks above
-	_ = hc.release()
+	_ = hc.Release()
 
 	return nil
 }
 
 // BroadCast will as the name implies broadcast a given
 // byte interface to a given client.
-func (hc *hubController) broadCast(msg protocol.Bytefy, except helpers.IdSet) {
+func (hc *HubController) broadCast(msg protocol.Bytefy, except helpers.IdSet) {
 	// get the bytes first
 	data := msg.Bytes()
 
@@ -245,8 +245,8 @@ func (hc *hubController) broadCast(msg protocol.Bytefy, except helpers.IdSet) {
 	}
 }
 
-// shutdown will shutdown the controller
-func (hc *hubController) shutdown(cxt context.Context) {
+// Shutdown will Shutdown the controller
+func (hc *HubController) Shutdown(cxt context.Context) {
 	// send shutdown message to all the clients
 	hc.broadCast(server.NewDisconnect(), helpers.NewIdSet())
 
@@ -254,7 +254,7 @@ func (hc *hubController) shutdown(cxt context.Context) {
 	hc.clientManager.Shutdown(cxt)
 }
 
-func (hc *hubController) handleRead(data []byte, id uint8) protocol.Bytefy {
+func (hc *HubController) handleRead(data []byte, id uint8) protocol.Bytefy {
 	switch pclient.Detect(data[0]) {
 	case pclient.DisconnectOpcode:
 		// Received a Disconnect request from client
@@ -284,7 +284,7 @@ func (hc *hubController) handleRead(data []byte, id uint8) protocol.Bytefy {
 	return nil
 }
 
-func (hc *hubController) handleUnknownReceived(t []byte) protocol.Bytefy {
+func (hc *HubController) handleUnknownReceived(t []byte) protocol.Bytefy {
 	_, err := pclient.NewUnknownByte(t)
 	if err != nil {
 		logger.Info(err)
@@ -295,7 +295,7 @@ func (hc *hubController) handleUnknownReceived(t []byte) protocol.Bytefy {
 	return newUnknown
 }
 
-func (hc *hubController) handleDisconnect(t []byte, id uint8) protocol.Bytefy {
+func (hc *HubController) handleDisconnect(t []byte, id uint8) protocol.Bytefy {
 	_, err := pclient.NewDisconnectByte(t)
 	if err != nil {
 		logger.Info(err)
@@ -310,11 +310,11 @@ func (hc *hubController) handleDisconnect(t []byte, id uint8) protocol.Bytefy {
 	return newDisconnect
 }
 
-func (hc *hubController) handleUnknownSent() {
+func (hc *HubController) handleUnknownSent() {
 	logger.Error("Unknown Opcode was sent")
 }
 
-func (hc *hubController) handleWhoAmI(t []byte, id uint8) protocol.Bytefy {
+func (hc *HubController) handleWhoAmI(t []byte, id uint8) protocol.Bytefy {
 	_, err := pclient.NewWhoAmIByte(t)
 	if err != nil {
 		logger.Info(err)
@@ -325,7 +325,7 @@ func (hc *hubController) handleWhoAmI(t []byte, id uint8) protocol.Bytefy {
 	return newYouAreCalled
 }
 
-func (hc *hubController) handleMovement(t []byte, id uint8) protocol.Bytefy {
+func (hc *HubController) handleMovement(t []byte, id uint8) protocol.Bytefy {
 	movement, err := pclient.NewMovementByte(t)
 	if err != nil {
 		logger.Info(err)
@@ -346,7 +346,7 @@ func (hc *hubController) handleMovement(t []byte, id uint8) protocol.Bytefy {
 	return nil
 }
 
-func (hc *hubController) handleShooting(t []byte, id uint8) protocol.Bytefy {
+func (hc *HubController) handleShooting(t []byte, id uint8) protocol.Bytefy {
 	shot, err := pclient.NewShootingBytes(t)
 	if err != nil {
 		logger.Info(err)
@@ -369,7 +369,7 @@ func (hc *hubController) handleShooting(t []byte, id uint8) protocol.Bytefy {
 	return nil
 }
 
-func (hc *hubController) handleRequestOtherPlayer(t []byte, id uint8) protocol.Bytefy {
+func (hc *HubController) handleRequestOtherPlayer(t []byte, id uint8) protocol.Bytefy {
 	_, err := pclient.NewRequestOtherPlayersBytes(t)
 	if err != nil {
 		logger.Info(err)
@@ -380,7 +380,7 @@ func (hc *hubController) handleRequestOtherPlayer(t []byte, id uint8) protocol.B
 	return newPlayerInfo
 }
 
-func (hc *hubController) handleRequestPlayerKD(t []byte, id uint8) protocol.Bytefy {
+func (hc *HubController) handleRequestPlayerKD(t []byte, id uint8) protocol.Bytefy {
 	_, err := pclient.NewRequestPlayerKDByte(t)
 	if err != nil {
 		logger.Info(err)
