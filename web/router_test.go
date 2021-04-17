@@ -50,6 +50,7 @@ func TestAPIRoot(t *testing.T) {
 }
 
 
+
 // TestAuthorizedWebsocketEstablishment is the whole shebang in one test!
 func TestAuthorizedWebsocketEstablishment(t *testing.T) {
 	privKey, _ := rsa.GenerateKey(rand.Reader, 2048)
@@ -65,6 +66,7 @@ func TestAuthorizedWebsocketEstablishment(t *testing.T) {
 	u, err := url.Parse(ts.URL)
 	if err != nil {
 		log.Fatal(err)
+
 	}
 
 	// All users of cookiejar should import "golang.org/x/net/publicsuffix"
@@ -77,6 +79,7 @@ func TestAuthorizedWebsocketEstablishment(t *testing.T) {
 	client := &http.Client{
 		Jar: jar,
 	}
+
 
 	postBody, _ := json.Marshal(map[string]string{
 		"username":  "Phil",
@@ -99,19 +102,19 @@ func TestAuthorizedWebsocketEstablishment(t *testing.T) {
 	// change url to ws endpoint for same host
 	u.Scheme = "ws"
 	u.Path = "/ws/1"
+
 	fmt.Printf("connecting to %s\n", u.String())
 
 	c, res, err := websocket.DefaultDialer.Dial(u.String(), nil)
 	defer c.Close()
 
-
 	if err != nil {
-		fmt.Print("Error during handshake",err)
+		fmt.Print("Error during handshake", err)
 	}
 
 	if res.StatusCode != http.StatusSwitchingProtocols {
 		t.Errorf("handler returned wrong status code during handshake: got %v want %v",
-		res.StatusCode, http.StatusSwitchingProtocols)
+			res.StatusCode, http.StatusSwitchingProtocols)
 	}
 }
 
@@ -120,7 +123,7 @@ func TestWSBadRoomID(t *testing.T) {
 	rr := httptest.NewRecorder()
 	// Need to create a router that we can pass the request through so that the vars will be added to the context
 	router := mux.NewRouter()
-    router.HandleFunc("/ws/{roomID:[0-9]+}", func(rw http.ResponseWriter, r *http.Request) {serveWs([]*room.Hub{} ,rw, r)})
+	router.HandleFunc("/ws/{roomID:[0-9]+}", func(rw http.ResponseWriter, r *http.Request) { serveWs([]*room.Hub{}, rw, r) })
 	router.ServeHTTP(rr, req)
 	res := rr.Result()
 	io.ReadAll(res.Body)
@@ -135,7 +138,7 @@ func TestWSBadProtocol(t *testing.T) {
 	rr := httptest.NewRecorder()
 	// Need to create a router that we can pass the request through so that the vars will be added to the context
 	router := mux.NewRouter()
-    router.HandleFunc("/ws/{roomID:[0-9]+}", func(rw http.ResponseWriter, r *http.Request) {serveWs([]*room.Hub{} ,rw, r)})
+	router.HandleFunc("/ws/{roomID:[0-9]+}", func(rw http.ResponseWriter, r *http.Request) { serveWs([]*room.Hub{}, rw, r) })
 	router.ServeHTTP(rr, req)
 
 	res := rr.Result()
@@ -143,6 +146,6 @@ func TestWSBadProtocol(t *testing.T) {
 	t.Log(string(body))
 	if res.StatusCode != http.StatusBadRequest {
 		t.Errorf("handler returned wrong status code for bad request: got %v want %v",
-		res.StatusCode, http.StatusBadRequest)
+			res.StatusCode, http.StatusBadRequest)
 	}
 }
