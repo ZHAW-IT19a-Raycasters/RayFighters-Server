@@ -167,6 +167,9 @@ func (hc *HubController) runClientConnection(hqueue helpers.HubQueue, id uint8) 
 		data, err := hqueue.Dequeue()
 		if err != nil {
 			break
+		} else if len(data) == 0 {
+			logger.Error("Received no Data to Process")
+			break
 		}
 
 		wg.Add(1)
@@ -261,7 +264,7 @@ func (hc *HubController) handleRead(data []byte, id uint8) protocol.Bytefy {
 		return hc.handleDisconnect(data, id)
 	case pclient.UnknownOpcode:
 		// hubController received Unknown request from Server
-		hc.handleUnknownSent()
+		return hc.handleUnknownReceived(data)
 	case pclient.WhoAmIOpcode:
 		// Received a WhoAmI request from client
 		return hc.handleWhoAmI(data, id)
@@ -273,26 +276,18 @@ func (hc *HubController) handleRead(data []byte, id uint8) protocol.Bytefy {
 		return hc.handleShooting(data, id)
 	case pclient.RequestOtherPlayersOpcode:
 		// Received a RequestOtherPlayers request from client
-		return hc.handleRequestOtherPlayer(data, id)
+		return hc.handleRequestOtherPlayer(data)
 	case pclient.RequestPlayerKDOpcode:
 		// Received a RequestOtherPlayers request from client
-		return hc.handleRequestOtherPlayer(data, id)
+		return hc.handleRequestOtherPlayer(data)
 	default:
 		// Received Unknown Code from client
-		return hc.handleUnknownReceived(data)
+		return hc.handleUnknownSent()
 	}
-	return nil
 }
 
 func (hc *HubController) handleUnknownReceived(t []byte) protocol.Bytefy {
-	_, err := pclient.NewUnknownByte(t)
-	if err != nil {
-		logger.Info(err)
-		newUnknown := server.NewUnknown()
-		return newUnknown
-	}
-	newUnknown := server.NewUnknown()
-	return newUnknown
+	return server.NewUnknown()
 }
 
 func (hc *HubController) handleDisconnect(t []byte, id uint8) protocol.Bytefy {
@@ -310,8 +305,9 @@ func (hc *HubController) handleDisconnect(t []byte, id uint8) protocol.Bytefy {
 	return newDisconnect
 }
 
-func (hc *HubController) handleUnknownSent() {
+func (hc *HubController) handleUnknownSent() protocol.Bytefy {
 	logger.Error("Unknown Opcode was sent")
+	return nil
 }
 
 func (hc *HubController) handleWhoAmI(t []byte, id uint8) protocol.Bytefy {
@@ -369,7 +365,7 @@ func (hc *HubController) handleShooting(t []byte, id uint8) protocol.Bytefy {
 	return nil
 }
 
-func (hc *HubController) handleRequestOtherPlayer(t []byte, id uint8) protocol.Bytefy {
+func (hc *HubController) handleRequestOtherPlayer(t []byte) protocol.Bytefy {
 	_, err := pclient.NewRequestOtherPlayersBytes(t)
 	if err != nil {
 		logger.Info(err)
@@ -380,7 +376,7 @@ func (hc *HubController) handleRequestOtherPlayer(t []byte, id uint8) protocol.B
 	return newPlayerInfo
 }
 
-func (hc *HubController) handleRequestPlayerKD(t []byte, id uint8) protocol.Bytefy {
+func (hc *HubController) handleRequestPlayerKD(t []byte) protocol.Bytefy {
 	_, err := pclient.NewRequestPlayerKDByte(t)
 	if err != nil {
 		logger.Info(err)
