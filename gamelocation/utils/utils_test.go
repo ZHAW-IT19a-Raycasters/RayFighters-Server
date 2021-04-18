@@ -13,7 +13,7 @@ func Test1DMapElementSlicesSameDimesionSameElements(t *testing.T) {
 	expected := true
 	actual := utils.Compare1DMapElementSlices(slice1, slice2)
 	if expected != actual {
-		t.Errorf("Result (Expected: %t; Actual: %t).", expected, !actual)
+		t.Errorf("false result: (expected: %t; actual: %t)", expected, actual)
 	}
 }
 
@@ -24,7 +24,7 @@ func Test1DMapElementSlicesEmptySlices(t *testing.T) {
 	expected := true
 	actual := utils.Compare1DMapElementSlices(slice1, slice2)
 	if expected != actual {
-		t.Errorf("Result (Expected: %t; Actual: %t).", expected, !actual)
+		t.Errorf("false result: (expected: %t; actual: %t)", expected, actual)
 	}
 }
 
@@ -35,7 +35,7 @@ func Test1DMapElementSlicesNilSlices(t *testing.T) {
 	expected := true
 	actual := utils.Compare1DMapElementSlices(slice1, slice2)
 	if expected != actual {
-		t.Errorf("Result (Expected: %t; Actual: %t).", expected, !actual)
+		t.Errorf("false result: (expected: %t; actual: %t)", expected, actual)
 	}
 }
 
@@ -46,7 +46,7 @@ func Test1DMapElementSlicesDifferentElementsSameDimensions(t *testing.T) {
 	expected := false
 	actual := utils.Compare1DMapElementSlices(slice1, slice2)
 	if expected != actual {
-		t.Errorf("Result (Expected: %t; Actual: %t).", expected, actual)
+		t.Errorf("false result: (expected: %t; actual: %t)", expected, actual)
 	}
 }
 
@@ -57,7 +57,7 @@ func Test1DMapElementSlicesDifferentDimensionsSameElments(t *testing.T) {
 	expected := false
 	actual := utils.Compare1DMapElementSlices(slice1, slice2)
 	if expected != actual {
-		t.Errorf("Result (Expected: %t; Actual: %t).", expected, actual)
+		t.Errorf("false result: (expected: %t; actual: %t)", expected, actual)
 	}
 }
 
@@ -68,7 +68,7 @@ func Test1DMapElementSlicesDifferentDimensionsDifferentElments(t *testing.T) {
 	expected := false
 	actual := utils.Compare1DMapElementSlices(slice1, slice2)
 	if expected != actual {
-		t.Errorf("Result (Expected: %t; Actual: %t).", expected, actual)
+		t.Errorf("false result: (expected: %t; actual: %t)", expected, actual)
 	}
 }
 
@@ -79,7 +79,7 @@ func Test2DMapElementSlicesSameDimesionSameElements(t *testing.T) {
 	expected := true
 	actual := utils.Compare2DMapElementSlices(slice1, slice2)
 	if expected != actual {
-		t.Errorf("Result (Expected: %t; Actual: %t).", expected, !actual)
+		t.Errorf("false result: (expected: %t; actual: %t)", expected, actual)
 	}
 }
 
@@ -90,7 +90,7 @@ func Test2DMapElementSlicesEmptySlices(t *testing.T) {
 	expected := true
 	actual := utils.Compare2DMapElementSlices(slice1, slice2)
 	if expected != actual {
-		t.Errorf("Result (Expected: %t; Actual: %t).", expected, !actual)
+		t.Errorf("false result: (expected: %t; actual: %t)", expected, actual)
 	}
 }
 
@@ -101,7 +101,7 @@ func Test2DMapElementSlicesNilSlices(t *testing.T) {
 	expected := true
 	actual := utils.Compare2DMapElementSlices(slice1, slice2)
 	if expected != actual {
-		t.Errorf("Result (Expected: %t; Actual: %t).", expected, !actual)
+		t.Errorf("false result: (expected: %t; actual: %t)", expected, actual)
 	}
 }
 
@@ -112,7 +112,7 @@ func Test2DMapElementSlicesDifferentElementsSameDimensions(t *testing.T) {
 	expected := false
 	actual := utils.Compare2DMapElementSlices(slice1, slice2)
 	if expected != actual {
-		t.Errorf("Result (Expected: %t; Actual: %t).", expected, actual)
+		t.Errorf("false result: (expected: %t; actual: %t)", expected, actual)
 	}
 }
 
@@ -123,7 +123,7 @@ func Test2DMapElementSlicesDifferentDimensionsSameElments(t *testing.T) {
 	expected := false
 	actual := utils.Compare2DMapElementSlices(slice1, slice2)
 	if expected != actual {
-		t.Errorf("Result (Expected: %t; Actual: %t).", expected, actual)
+		t.Errorf("false result: (expected: %t; actual: %t)", expected, actual)
 	}
 }
 
@@ -134,7 +134,7 @@ func Test2DMapElementSlicesDifferentDimensionsDifferentElments(t *testing.T) {
 	expected := false
 	actual := utils.Compare2DMapElementSlices(slice1, slice2)
 	if expected != actual {
-		t.Errorf("Result (Expected: %t; Actual: %t).", expected, actual)
+		t.Errorf("false result: (expected: %t; actual: %t)", expected, actual)
 	}
 }
 
@@ -142,17 +142,17 @@ func TestGetLocationElementValidSymbol(t *testing.T) {
 	expected := utils.Floor
 	actual, err := utils.GetLocationElement(rune('0'))
 	if err != nil {
-		t.Errorf("Error was thrown: %s", err.Error())
+		t.Errorf("unexpected error: %s", err.Error())
 	}
 	if expected != actual {
-		t.Errorf("Result (Expected: %v; Actual: %v).", expected, actual)
+		t.Errorf("false result: (expected: %v; actual: %v)", expected, actual)
 	}
 }
 
 func TestGetLocationElementInvalidSymbol(t *testing.T) {
 	_, err := utils.GetLocationElement(rune('/'))
 	if err == nil {
-		t.Error("No error was thrown.")
+		t.Error("no error was thrown.")
 	}
 }
 
@@ -160,9 +160,9 @@ func TestGetLocationElementValidWallSymbol(t *testing.T) {
 	expected := utils.Floor
 	actual, err := utils.GetLocationElement(rune('0'))
 	if err != nil {
-		t.Errorf("Error was thrown: %s", err.Error())
+		t.Errorf("unexpected error: %s", err.Error())
 	}
 	if expected != actual || err != nil {
-		t.Errorf("Result (Expected: %v; Actual: %v).", expected, actual)
+		t.Errorf("false result: (expected: %v; actual: %v)", expected, actual)
 	}
 }
