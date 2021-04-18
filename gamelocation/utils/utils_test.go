@@ -44,9 +44,9 @@ func Test1DMapElementSlicesDifferentElementsSameDimensions(t *testing.T) {
 	slice1 := []utils.LocationElement{utils.Floor, utils.Floor}
 	slice2 := []utils.LocationElement{utils.Floor, utils.Wall}
 	expected := false
-	result := utils.Compare1DMapElementSlices(slice1, slice2)
-	if expected != result {
-		t.Errorf("Result (Expected: %t; Actual: %t).", expected, result)
+	actual := utils.Compare1DMapElementSlices(slice1, slice2)
+	if expected != actual {
+		t.Errorf("Result (Expected: %t; Actual: %t).", expected, actual)
 	}
 }
 
@@ -55,9 +55,9 @@ func Test1DMapElementSlicesDifferentDimensionsSameElments(t *testing.T) {
 	slice1 := []utils.LocationElement{utils.Floor, utils.Floor}
 	slice2 := []utils.LocationElement{utils.Floor, utils.Floor, utils.Floor}
 	expected := false
-	result := utils.Compare1DMapElementSlices(slice1, slice2)
-	if expected != result {
-		t.Errorf("Result (Expected: %t; Actual: %t).", expected, result)
+	actual := utils.Compare1DMapElementSlices(slice1, slice2)
+	if expected != actual {
+		t.Errorf("Result (Expected: %t; Actual: %t).", expected, actual)
 	}
 }
 
@@ -66,9 +66,9 @@ func Test1DMapElementSlicesDifferentDimensionsDifferentElments(t *testing.T) {
 	slice1 := []utils.LocationElement{utils.Floor, utils.Floor}
 	slice2 := []utils.LocationElement{utils.Wall, utils.Floor, utils.Floor}
 	expected := false
-	result := utils.Compare1DMapElementSlices(slice1, slice2)
-	if expected != result {
-		t.Errorf("Result (Expected: %t; Actual: %t).", expected, result)
+	actual := utils.Compare1DMapElementSlices(slice1, slice2)
+	if expected != actual {
+		t.Errorf("Result (Expected: %t; Actual: %t).", expected, actual)
 	}
 }
 
@@ -110,9 +110,9 @@ func Test2DMapElementSlicesDifferentElementsSameDimensions(t *testing.T) {
 	slice1 := [][]utils.LocationElement{{utils.Floor, utils.Floor}, {utils.Floor, utils.Floor}}
 	slice2 := [][]utils.LocationElement{{utils.Floor, utils.Floor}, {utils.Floor, utils.Wall}}
 	expected := false
-	result := utils.Compare2DMapElementSlices(slice1, slice2)
-	if expected != result {
-		t.Errorf("Result (Expected: %t; Actual: %t).", expected, result)
+	actual := utils.Compare2DMapElementSlices(slice1, slice2)
+	if expected != actual {
+		t.Errorf("Result (Expected: %t; Actual: %t).", expected, actual)
 	}
 }
 
@@ -121,9 +121,9 @@ func Test2DMapElementSlicesDifferentDimensionsSameElments(t *testing.T) {
 	slice1 := [][]utils.LocationElement{{utils.Floor, utils.Floor}, {utils.Floor, utils.Floor}}
 	slice2 := [][]utils.LocationElement{{utils.Floor, utils.Floor}, {utils.Floor, utils.Floor, utils.Floor}}
 	expected := false
-	result := utils.Compare2DMapElementSlices(slice1, slice2)
-	if expected != result {
-		t.Errorf("Result (Expected: %t; Actual: %t).", expected, result)
+	actual := utils.Compare2DMapElementSlices(slice1, slice2)
+	if expected != actual {
+		t.Errorf("Result (Expected: %t; Actual: %t).", expected, actual)
 	}
 }
 
@@ -132,8 +132,37 @@ func Test2DMapElementSlicesDifferentDimensionsDifferentElments(t *testing.T) {
 	slice1 := [][]utils.LocationElement{{utils.Floor, utils.Floor}, {utils.Floor, utils.Wall}}
 	slice2 := [][]utils.LocationElement{{utils.Floor, utils.Wall}, {utils.Floor, utils.Floor, utils.Floor}}
 	expected := false
-	result := utils.Compare2DMapElementSlices(slice1, slice2)
-	if expected != result {
-		t.Errorf("Result (Expected: %t; Actual: %t).", expected, result)
+	actual := utils.Compare2DMapElementSlices(slice1, slice2)
+	if expected != actual {
+		t.Errorf("Result (Expected: %t; Actual: %t).", expected, actual)
+	}
+}
+
+func TestGetLocationElementValidSymbol(t *testing.T) {
+	expected := utils.Floor
+	actual, err := utils.GetLocationElement(rune('0'))
+	if err != nil {
+		t.Errorf("Error was thrown: %s", err.Error())
+	}
+	if expected != actual {
+		t.Errorf("Result (Expected: %v; Actual: %v).", expected, actual)
+	}
+}
+
+func TestGetLocationElementInvalidSymbol(t *testing.T) {
+	_, err := utils.GetLocationElement(rune('/'))
+	if err == nil {
+		t.Error("No error was thrown.")
+	}
+}
+
+func TestGetLocationElementValidWallSymbol(t *testing.T) {
+	expected := utils.Floor
+	actual, err := utils.GetLocationElement(rune('0'))
+	if err != nil {
+		t.Errorf("Error was thrown: %s", err.Error())
+	}
+	if expected != actual || err != nil {
+		t.Errorf("Result (Expected: %v; Actual: %v).", expected, actual)
 	}
 }
