@@ -1,0 +1,13 @@
+
+
+
+
+8
+00123456
+789abcde
+fghjklmn
+opqrstuv
+wxyzABCD
+EFGHIJKL
+MNOPQRST
+UVWXYZ+*
