@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -12,6 +11,8 @@ import (
 	"github.com/gorilla/websocket"
 	"github.zhaw.ch/raycasters/server/log"
 	"github.zhaw.ch/raycasters/server/room"
+	"github.zhaw.ch/raycasters/server/room/client"
+	"github.zhaw.ch/raycasters/server/web/helpers"
 
 	webconfig "github.zhaw.ch/raycasters/server/web/config"
 )
@@ -26,44 +27,24 @@ type Server struct {
 }
 
 // NewServer registers routes for all exposed endpoints
-// and attaches the appropriate handler functions
+// and attaches the appropriate routehandler functions
 func NewServer(conf *webconfig.WebConfig) *Server {
-	// instantiate multiple hubs
-	var hub [hubsCount]*(room.Hub)
+	// instantiate hubs
+	var hubs [hubsCount]*room.Hub
 	var i int = 0
 	for ; i < hubsCount; i++ {
-		hub[i] = room.NewHub(i)
-		go hub[i].Run()
+		hubs[i] = room.NewHub(i)
+		go hubs[i].Run()
 	}
 
 	router := mux.NewRouter()
-	router.HandleFunc("/", handleRoot)
-	router.HandleFunc("/auth", serveAuth).Methods("POST")
-
-	router.HandleFunc("/ws/{trash:[^0-9]+}{roomID:[0-9]+}", func(w http.ResponseWriter, r *http.Request) {
-		// note: variables are strings
-		vars := mux.Vars(r)
-
-		if len(vars["trash"]) > 0 {
-			logger.Errorf("invalid URL: expected room-ID as int got some trash: ", vars["trash"])
-			return
-		}
-		// parse roomID from URL
-		roomIDStr := vars["roomID"]
-		roomID, err := strconv.Atoi(roomIDStr)
-		if err != nil {
-			logger.Errorf("couldn't parse roomID from URL: %v\n", err)
-			return
-		}
-		if roomID >= hubsCount {
-			logger.Errorf("request to join room with illegal room-ID \"%d\"", roomID)
-			return
-		}
-
-		logger.Infof("%s request to join room %d", r.RemoteAddr, roomID)
-		serveWs(hub[roomID], w, r)
+	router.HandleFunc("/", serveRoot)
+	// router.HandleFunc("/auth", serveAuth).Methods("POST")
+	router.HandleFunc("/ws/{roomID:[0-9]+}", func(w http.ResponseWriter, r *http.Request) {
+		// TODO: get a hub reference from handler function via HubManager
+		// handle with a wrapper lambda for now
+		serveWs(hubs[:], w, r)
 	})
-	router.HandleFunc("/chat", serveChat)
 
 	httpServer := &http.Server{Handler: router, Addr: conf.String(), WriteTimeout: 15 * time.Second, ReadTimeout: 15 * time.Second}
 
@@ -86,50 +67,55 @@ func ShutdownContext() context.Context {
 
 // ServerStop will initialize a graceful shutdown of the server.
 func (p *Server) ServerStop(ctx context.Context) error {
-	// TODO: Gracful shutdown
 	return p.endpoint.Shutdown(ctx)
 }
 
-// handleRoot is the handler of "<server listening on>/".
-func handleRoot(writer http.ResponseWriter, request *http.Request) {
+// serveRoot serves a simple landing page.
+func serveRoot(writer http.ResponseWriter, request *http.Request) {
 	//ResponseWriter implements io.Writer
 	//server answer to a client
-	fmt.Print(request.URL)
-	fmt.Fprintf(writer, "Hello from RayCasters!\n")
-	fmt.Fprintf(writer, "Don't try \"/chat\".")
+	fmt.Fprintf(writer, "Hello from RayCasters!")
 }
 
-// serveChat is the handler of <server listening on>/chat.
-// Used for testing puposes.
-func serveChat(w http.ResponseWriter, r *http.Request) {
-	logger.Infof("%s requested", r.URL)
-	if r.Method != "GET" {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+// serveWs upgrades HTTP request to WebSocket connection
+// parses desired roomID from the request URL
+// and registers the client to the hub
+func serveWs(hubs []*room.Hub, w http.ResponseWriter, r *http.Request) {
+
+	roomID, err := helpers.ParseRoomID(r)
+	if err != nil {
+		logger.Error(err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	http.ServeFile(w, r, "web/chat.html")
-}
+	if roomID < 0 || roomID >= hubsCount {
+		err := fmt.Errorf("no room with id %d available", roomID)
+		logger.Error(err)
+		http.Error(w, err.Error(), http.StatusForbidden)
+		return
+	}
 
-// serveWs handles websocket requests from the peer.
-func serveWs(hub *room.Hub, w http.ResponseWriter, r *http.Request) {
 	var upgrader = websocket.Upgrader{
 		ReadBufferSize:  1024,
 		WriteBufferSize: 1024,
 	}
 
+	// upgrade HTTP to Websocket connection
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		logger.Error(err)
 		return
 	}
 
-	// create client meta
-	uuid := uuid.New()
-	cm := room.NewClientMeta(uuid, "john dude", conn)
+	logger.Infof("%s request to join room %d", r.RemoteAddr, roomID)
 
-	hub.RegisterClient(cm)
+	// create and register client
+	uuid := uuid.New()
+	cm := client.NewClientMeta(uuid, "john dude", conn)
+
+	hubs[roomID].RegisterClient(cm)
 }
 
-func serveAuth(w http.ResponseWriter, r *http.Request) {}
+// func serveAuth(w http.ResponseWriter, r *http.Request) {}
 
 // create JWT and uuid here

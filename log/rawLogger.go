@@ -6,28 +6,33 @@ import (
 	"log"
 )
 
-type internalLogger struct {
+type rawLogger struct {
 	ilogger *log.Logger
 	level   Level
 }
 
-// newInternalLogger will create the actual internal logger instance,
+// newRawLogger will create the actual internal logger instance,
 // used for all logging.
-func newInternalLogger(level Level, out io.Writer) *internalLogger {
-	return &internalLogger{
+func newRawLogger(level Level, out io.Writer) *rawLogger {
+	return &rawLogger{
 		ilogger: log.New(out, "", log.Ldate|log.Ltime|log.Lshortfile),
 		level:   level,
 	}
 }
 
+// Level will return the level used by the raw logger
+func (log rawLogger) Level() Level {
+	return log.level
+}
+
 // checkLevel is the function that checks if the requested level
 // is allowed to be used per configuration.
-func (log internalLogger) checkLevel(level Level) bool {
-	return level >= log.level
+func (log rawLogger) checkLevel(level Level) bool {
+	return level >= log.Level()
 }
 
 // Log logs all the levels requested.
-func (log internalLogger) log(level Level, v ...interface{}) {
+func (log rawLogger) log(level Level, v ...interface{}) {
 
 	// check if logged level is lower of higher then the set version
 	if !log.checkLevel(level) {
@@ -41,16 +46,11 @@ func (log internalLogger) log(level Level, v ...interface{}) {
 }
 
 // Logf logs all the levels and formats the interfaces values.
-func (log internalLogger) logf(level Level, format string, v ...interface{}) {
+func (log rawLogger) logf(level Level, format string, v ...interface{}) {
 	// check if logged level is lower of higher then the set version
 	if !log.checkLevel(level) {
 		return
 	}
 
 	log.ilogger.Printf(fmt.Sprintf("%s %s", level.String(), format), v...)
-}
-
-// panicf will log the line then panic the system.
-func (log internalLogger) panicf(format string, v ...interface{}) {
-	log.ilogger.Panicf(format, v...)
 }

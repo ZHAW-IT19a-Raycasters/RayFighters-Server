@@ -24,7 +24,7 @@ func comparePlayers(got, exp server.Player, t *testing.T) bool {
 func compareByteArrays(expectedData, gottenData []byte, t *testing.T) bool {
 
 	if len(expectedData) != len(gottenData) {
-		t.Errorf("Different lenght of results [%d] - [%d]", len(expectedData), len(gottenData))
+		t.Errorf("Different lenght of results exp: [%d] - got: [%d]", len(expectedData), len(gottenData))
 		return false
 	}
 
@@ -32,8 +32,7 @@ func compareByteArrays(expectedData, gottenData []byte, t *testing.T) bool {
 		exp := expectedData[i]
 		got := gottenData[i]
 		if exp != got {
-
-			t.Errorf("Bytes at position [%d] are different [%d] - [%d]", i, exp, got)
+			t.Errorf("Bytes at position [%d] are different exp: [%d] - got: [%d]", i, exp, got)
 			return false
 		}
 	}
@@ -156,9 +155,14 @@ func TestMovementPlayerBytes(t *testing.T) {
 	// 1.00000000000000005551115123126E-1
 	// 0x3FB999999999999A
 	var coorX float64 = 0.1
+
 	// 0x3FC999999999999A
 	// 2.00000000000000011102230246252E-1
 	var coorY float64 = 0.2
+
+	// 0x4072C40000000000
+	// 3.0025E2
+	var anglePl float64 = 300.25
 
 	expectedData := [...]byte{
 		server.MovementPlayerOpcode.Value(),
@@ -167,8 +171,11 @@ func TestMovementPlayerBytes(t *testing.T) {
 		0x9A, 0x99, 0x99, 0x99, 0x99, 0x99, 0xB9, 0x3F,
 		// 0x3F 0xC9 0x99 0x99 0x99 0x99 0x99 0x9A
 		0x9A, 0x99, 0x99, 0x99, 0x99, 0x99, 0xC9, 0x3F,
+		// 0x40 0x72 0xC4 0x00 0x00 0x00 0x00 0x00
+		0x00, 0x00, 0x00, 0x00, 0x00, 0xC4, 0x72, 0x40,
 	}
-	mp := server.NewMovementPlayer(userId, coorX, coorY)
+
+	mp := server.NewMovementPlayer(userId, coorX, coorY, anglePl)
 	gottenData := mp.Bytes()
 
 	compareByteArrays(expectedData[:], gottenData, t)
@@ -181,7 +188,76 @@ func TestMovementPlayerBytes(t *testing.T) {
 		t.Error("CoorX has been wrongly set")
 	} else if coorY != mp.CoorY() {
 		t.Error("CoorY has been wrongly set")
+	} else if anglePl != mp.AnglePl() {
+		t.Error("AngePL has been wrongly set")
 	}
+}
+
+func TestTeleportPlayer(t *testing.T) {
+	// used https://www.binaryconvert.com/result_double.html?
+	// for manual convertion
+
+	// writing out the values to make sure the
+	// compiler will use the correct size.
+	var userId uint8 = 0x44
+
+	// 1.00000000000000005551115123126E-1
+	// 0x3FB999999999999A
+	var coorX float64 = 0.1
+
+	// 0x3FC999999999999A
+	// 2.00000000000000011102230246252E-1
+	var coorY float64 = 0.2
+
+	expectedData := [...]byte{
+		server.MovementPlayerOpcode.Value(),
+		userId,
+		// 0x3F 0xB9 0x99 0x99 0x99 0x99 0x99 0x9A
+		0x9A, 0x99, 0x99, 0x99, 0x99, 0x99, 0xB9, 0x3F,
+		// 0x3F 0xC9 0x99 0x99 0x99 0x99 0x99 0x9A
+		0x9A, 0x99, 0x99, 0x99, 0x99, 0x99, 0xC9, 0x3F,
+	}
+
+	mp := server.NewTeleportPlayer(userId, coorX, coorY)
+	gottenData := mp.Bytes()
+
+	compareByteArrays(expectedData[:], gottenData, t)
+
+	// make sure the values are correctly set
+	// basically testing getters
+	if userId != mp.UserId() {
+		t.Error("UserId has been wrongly set")
+	} else if coorX != mp.CoorX() {
+		t.Error("CoorX has been wrongly set")
+	} else if coorY != mp.CoorY() {
+		t.Error("CoorY has been wrongly set")
+	} 
+}
+
+func TestShootingPlayer(t *testing.T) {
+	// used https://www.binaryconvert.com/result_double.html?
+	// for manual convertion
+
+	// writing out the values to make sure the
+	// compiler will use the correct size.
+
+	var userId uint8 = 0x44
+	// 0x4072C40000000000
+	// 3.0025E2
+	var anglePl float64 = 300.25
+
+	expectedData := [...]byte{
+		server.ShootingPlayerOpcode.Value(),
+		userId,
+		// 0x40 0x72 0xC4 0x00 0x00 0x00 0x00 0x00
+		0x00, 0x00, 0x00, 0x00, 0x00, 0xC4, 0x72, 0x40,
+	}
+
+	sp := server.NewShootingPlayer(userId, anglePl)
+
+	data := sp.Bytes()
+
+	compareByteArrays(expectedData[:], data, t)
 }
 
 func TestPlayerLeft(t *testing.T) {
@@ -208,7 +284,7 @@ func TestNewPlayerJoined(t *testing.T) {
 		userId,
 		byte(len(name)),
 		0,
-		// ATotalyRandomName🤬 -> converted with https://onlineutf8tools.com/convert-utf8-to-bytes
+		// ATotallyRandomName🤬 -> converted with https://onlineutf8tools.com/convert-utf8-to-bytes
 		0x41, 0x54, 0x6f, 0x74, 0x61, 0x6c, 0x79, 0x52, 0x61, 0x6e, 0x64, 0x6f, 0x6d, 0x4e, 0x61, 0x6d, 0x65, 0xf0, 0x9f, 0xa4, 0xac,
 	}
 
@@ -217,31 +293,29 @@ func TestNewPlayerJoined(t *testing.T) {
 	compareByteArrays(expected[:], gotten, t)
 }
 
-func TestPlayerHasBeenKilled(t *testing.T) {
-	exp := []byte{
-		server.PlayerHimSelfKilledOpcode.Value(),
-	}
-	got := server.NewPlayerHimSelfKilled().Bytes()
-
-	compareByteArrays(exp, got, t)
-}
-
-func TestAnOtherPlayerKilled(t *testing.T) {
-	var userId byte = 0x0A
+func TestPlayerDeath(t *testing.T) {
+	var killedId byte = 0x0B
+	var killerId byte = 0x0A
 
 	exp := [...]byte{
-		server.AnOtherPlayerKilledOpcode.Value(),
-		userId,
+		server.PlayerDeathOpcode.Value(),
+		killedId,
+		killerId,
 	}
 
-	pk := server.NewAnotherPlayerKilled(userId)
-	got := pk.Bytes()
+	pd := server.NewPlayerDeath(killedId, killerId)
+	got := pd.Bytes()
 
 	compareByteArrays(exp[:], got, t)
 
 	// testing getters (for coverage)
-	if userId != pk.UserId() {
-		t.Error("UserId was set wrongly")
+	if killedId != pd.KilledId() {
+		t.Error("killedId was set wrongly")
+		return
+	}
+
+	if killerId != pd.KillerId() {
+		t.Error("killerId was set wrongly")
 	}
 }
 
@@ -265,17 +339,7 @@ func TestDisconnect(t *testing.T) {
 
 func TestDetect(t *testing.T) {
 	// test given values
-	opcodes := [...]server.ServerOpcode{
-		server.DisconnectOpcode,
-		server.DisconnectOpcode,
-		server.UnknownOpcode,
-		server.MovementPlayerOpcode,
-		server.AnOtherPlayerKilledOpcode,
-		server.PlayerHimSelfKilledOpcode,
-		server.PlayerJoinedOpcode,
-		server.PlayerLeftOpcode,
-		server.SendAllPlayerInfoOpcode,
-	}
+	opcodes := server.Overview
 
 	for _, val := range opcodes {
 		got := server.Detect(val.Value())
@@ -285,9 +349,101 @@ func TestDetect(t *testing.T) {
 		}
 	}
 
-	// test incorrecto value
+	// test incorrect value
 	// using 10 here as it is a client send opcode
 	if server.UnknownOpcode != server.Detect(10) {
 		t.Error("Wrong return value on fake opcode")
 	}
+}
+
+func TestYouAreCalled(t *testing.T) {
+	var userId byte = 0x0A
+
+	exp := [...]byte{
+		server.YouAreCalledOpcode.Value(),
+		userId,
+	}
+
+	yac := server.NewYouAreCalled(userId)
+	got := yac.Bytes()
+
+	compareByteArrays(exp[:], got, t)
+
+	// testing getters (for coverage)
+	if userId != yac.UserId() {
+		t.Error("UserId was set wrongly")
+	}
+}
+
+func TestPlayerKD(t *testing.T) {
+	var userId byte = 0x0A
+	var kills uint16 = 0xFFFF
+	var deaths uint16 = 0x0001
+	exp := [...]byte{
+		userId,
+		0xFF, 0xFF,
+		0x01, 0x00,
+	}
+
+	pkd := server.NewPlayerKD(userId, kills, deaths)
+	data := make([]byte, pkd.ByteSize())
+	pkd.PutBytes(data)
+
+	compareByteArrays(exp[:], data, t)
+
+	// testing getters (for coverage)
+	if userId != pkd.UserId() {
+		t.Error("UserId was set wrongly")
+		return
+	}
+	if kills != pkd.Kills() {
+		t.Error("Kills was set wrongly")
+		return
+	}
+	if deaths != pkd.Deaths() {
+		t.Error("Death was set wrongly")
+	}
+}
+
+func TestPlayersKD(t *testing.T) {
+	// Player 1
+	var userId1 byte = 0x0A
+	var kills1 uint16 = 0xFFFF
+	var deaths1 uint16 = 0x0001
+
+	// Player 2
+	var userId2 byte = 0x0B
+	var kills2 uint16 = 0x002F
+	var deaths2 uint16 = 0x0100
+
+	// Player 3
+	var userId3 byte = 0x0C
+	var kills3 uint16 = 0x1010
+	var deaths3 uint16 = 0x0101
+
+	pkd1 := server.NewPlayerKD(userId1, kills1, deaths1)
+	pkd2 := server.NewPlayerKD(userId2, kills2, deaths2)
+	pkd3 := server.NewPlayerKD(userId3, kills3, deaths3)
+
+	data := [...]byte{
+		server.SendAllPlayerKDOpcode.Value(),
+		3,
+		// Player 1
+		userId1,
+		0xFF, 0xFF,
+		0x01, 0x00,
+		// Player 2
+		userId2,
+		0x2F, 0x00,
+		0x00, 0x01,
+		// Player 3
+		userId3,
+		0x10, 0x10,
+		0x01, 0x01,
+	}
+
+	apkd := server.NewPlayersKD([]server.PlayerKD{pkd1, pkd2, pkd3})
+	got := apkd.Bytes()
+
+	compareByteArrays(data[:], got, t)
 }

@@ -30,9 +30,11 @@ func TestOpcodeString(t *testing.T) {
 	exp := [...]string{
 		"Disconnect",
 		"Unknown",
+		"WhoAmI",
 		"Movement",
 		"Shooting",
 		"RequestOtherPlayers",
+		"RequestPlayerKD",
 	}
 	for i, val := range client.Overview {
 		if val.String() != exp[i] {
@@ -141,12 +143,18 @@ func TestMovement(t *testing.T) {
 	// 0x40 0x8F 0x3F 0xFD 0xF3 0xB6 0x45 0xA2
 	coorY := 999.999
 
+	// 6.90000000000000035527136788005E0
+	// 0x40 0x1B 0x99 0x99 0x99 0x99 0x99 0x9A
+	angl := 6.9
+
 	data := [...]byte{
 		client.MovementOpcode.Value(),
 		// 0x40 0x84 0xD0 0x00 0x00 0x00 0x00 0x00
 		0x00, 0x00, 0x00, 0x00, 0x00, 0xD0, 0x84, 0x40,
 		// 0x40 0x8F 0x3F 0xFD 0xF3 0xB6 0x45 0xA2
 		0xA2, 0x45, 0xB6, 0xF3, 0xFD, 0x3F, 0x8F, 0x40,
+		// 0x40 0x1B 0x99 0x99 0x99 0x99 0x99 0x9A
+		0x9A, 0x99, 0x99, 0x99, 0x99, 0x99, 0x1B, 0x40,
 	}
 
 	val, err := client.NewMovementByte(data[:])
@@ -158,10 +166,16 @@ func TestMovement(t *testing.T) {
 
 	if val.CoorX() != coorX {
 		t.Error("incorrect coordinate X")
+		return
 	}
 
 	if val.CoorY() != coorY {
 		t.Error("incorrect coordinate Y")
+		return
+	}
+
+	if val.AnglPl() != angl {
+		t.Error("incorrect angle")
 	}
 }
 
@@ -172,6 +186,8 @@ func TestMovementError(t *testing.T) {
 	// coorX := 666.0
 	// 0x40 0x8F 0x3F 0xFD 0xF3 0xB6 0x45 0xA2
 	// coorY := 999.999
+	// 0x40 0x1B 0x99 0x99 0x99 0x99 0x99 0x9A
+	// angl := 6.9
 
 	data := [...]byte{
 		client.MovementOpcode.Value(),
@@ -179,6 +195,8 @@ func TestMovementError(t *testing.T) {
 		0x00, 0x00, 0x00, 0x00, 0x00, 0xD0, 0x84, 0x40,
 		// 0x40 0x8F 0x3F 0xFD 0xF3 0xB6 0x45 0xA2
 		0xA2, 0x45, 0xB6, 0xF3, 0xFD, 0x3F, 0x8F, 0x40,
+		// 0x40 0x1B 0x99 0x99 0x99 0x99 0x99 0x9A
+		0x9A, 0x99, 0x99, 0x99, 0x99, 0x99, 0x1B,
 	}
 
 	_, err := client.NewMovementByte(data[:len(data)-1])
@@ -186,7 +204,7 @@ func TestMovementError(t *testing.T) {
 	if err == nil {
 		t.Error("Incorrect bytesize was accepted as correct")
 		return
-	} else if !strings.HasSuffix(err.Error(), "[must be only [17] bytes long is [16]]") {
+	} else if !strings.HasSuffix(err.Error(), "[must be only [25] bytes long is [23]]") {
 		t.Error("Incorrect suffix has been used")
 		return
 	}
@@ -230,12 +248,66 @@ func TestDisconnect(t *testing.T) {
 
 }
 
-func TestDiconnectError(t *testing.T) {
+func TestDisconnectError(t *testing.T) {
 
 	data := []byte{
 		client.DisconnectOpcode.Value(), 44,
 	}
 	_, err := client.NewDisconnectByte(data)
+	if err == nil {
+		t.Error("Incorrect bytesize was accepted as correct")
+		return
+	} else if !strings.HasSuffix(err.Error(), "[must be only [1] bytes long is [2]]") {
+		t.Error("Incorrect suffix has been used")
+		return
+	}
+}
+
+func TestWhoAmI(t *testing.T) {
+	// correct version
+	data := []byte{
+		client.WhoAmIOpcode.Value(),
+	}
+	_, err := client.NewWhoAmIByte(data)
+	if err != nil {
+		t.Errorf("Correct version was flaged here\n%s", err)
+		return
+	}
+}
+
+func TestWhoAmIError(t *testing.T) {
+
+	data := []byte{
+		client.WhoAmIOpcode.Value(), 44,
+	}
+	_, err := client.NewWhoAmIByte(data)
+	if err == nil {
+		t.Error("Incorrect bytesize was accepted as correct")
+		return
+	} else if !strings.HasSuffix(err.Error(), "[must be only [1] bytes long is [2]]") {
+		t.Error("Incorrect suffix has been used")
+		return
+	}
+}
+
+func TestRequestPlayerKD(t *testing.T) {
+	// correct version
+	data := []byte{
+		client.RequestPlayerKDOpcode.Value(),
+	}
+	_, err := client.NewRequestPlayerKDByte(data)
+	if err != nil {
+		t.Errorf("Correct version was flaged here\n%s", err)
+		return
+	}
+}
+
+func TestRequestPlayerKDError(t *testing.T) {
+
+	data := []byte{
+		client.RequestPlayerKDOpcode.Value(), 44,
+	}
+	_, err := client.NewRequestPlayerKDByte(data)
 	if err == nil {
 		t.Error("Incorrect bytesize was accepted as correct")
 		return
