@@ -372,8 +372,11 @@ func (hc *HubController) handleRequestOtherPlayer(t []byte) protocol.Bytefy {
 		newUnknown := server.NewUnknown()
 		return newUnknown
 	}
+
 	newPlayerInfo := server.NewSendAllPlayerInfo(hc.clientManager.GetPlayers())
-	return newPlayerInfo
+	hc.broadCast(newPlayerInfo, helpers.NewIdSet())
+
+	return nil
 }
 
 func (hc *HubController) handleRequestPlayerKD(t []byte) protocol.Bytefy {
