@@ -62,12 +62,10 @@ func (gamelocation *Location) GetMapDimension() int {
 	return gamelocation.dimension
 }
 
-/*
 // Compare two locations
-func (this Location) CompareTo(other Location) bool {
+func (this Location) Compare(other Location) bool {
 	if this.GetMapDimension() != other.dimension { // NOTE: because in the same package dimesion of "other" can be accessed
 		return false
 	}
 	return utils.Compare2DMapElementSlices(this.locationMap, other.locationMap)
 }
-*/
