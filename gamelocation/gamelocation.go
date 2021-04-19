@@ -3,8 +3,12 @@ package gamelocation
 import (
 	"fmt"
 
+	"github.zhaw.ch/raycasters/server/gamelocation/maploader"
 	"github.zhaw.ch/raycasters/server/gamelocation/utils"
+	"github.zhaw.ch/raycasters/server/log"
 )
+
+var logger = log.Log()
 
 // Location is abstraction for game location.
 type Location struct {
@@ -12,21 +16,23 @@ type Location struct {
 	locationMap [][]utils.LocationElement
 }
 
+/*
 const (
 	minMapDimesion  = 1
 	maxMapDimension = 999
 )
-
-/*
-func GetGameLocation(filePath string) Location {
-	dim := 6
-	m, err := maploader.LoadMap(filePath)
-	if err != nil {
-		panic(err)
-	}
-	return newLocation(dim, m)
-}
 */
+// Loads map from under given path and wraps it into "Location",
+func GetGameLocation(filePath string) (Location, error) {
+	locationMap, err := maploader.LoadMap(filePath)
+	if err != nil {
+		logger.Errorf("unexpected error: %s", err.Error())
+		return Location{}, fmt.Errorf("unexpected error: %s", err.Error())
+	}
+
+	return getNewLocation(len(*locationMap), *locationMap)
+}
+
 // Create new location, havin map with dimesion mapDimension^2.
 // Throws errors if:
 // - given mapDimension is not the same as given locationMap has
@@ -42,26 +48,21 @@ func getNewLocation(mapDimension int, locationMap [][]utils.LocationElement) (Lo
 	return Location{dimension: mapDimension, locationMap: locationMap}, nil
 }
 
-/*
-func SetMapElemenent(x int, y int) {
-	//TODO
-}
 // Return map element for given coordinates x and y.
-// NOTE: Location is passed by value > copy
-func (gamelocation Location) GetLocationElement(x int, y int) (utils.LocationElement, error) {
+func (gamelocation *Location) GetLocationElement(x int, y int) (utils.LocationElement, error) {
 	dim := gamelocation.dimension
 	if x >= dim || y >= dim {
-		return 0, fmt.Errorf("GAMEMAP ERROR: index out of bound.")
+		return 0, fmt.Errorf("index out of bound")
 	}
 	return gamelocation.locationMap[x][y], nil
 }
 
 // Return map dimension
-// NOTE: Location is passed by value > copy
-func (gamelocation Location) GetMapDimension() int {
+func (gamelocation *Location) GetMapDimension() int {
 	return gamelocation.dimension
 }
 
+/*
 // Compare two locations
 func (this Location) CompareTo(other Location) bool {
 	if this.GetMapDimension() != other.dimension { // NOTE: because in the same package dimesion of "other" can be accessed
