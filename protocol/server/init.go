@@ -16,25 +16,40 @@ import (
 type ServerOpcode uint8
 
 const (
-	DisconnectOpcode          ServerOpcode = 0x64
-	UnknownOpcode             ServerOpcode = 0x65
-	MovementPlayerOpcode      ServerOpcode = 0x6E
-	AnOtherPlayerKilledOpcode ServerOpcode = 0x78
-	PlayerHimSelfKilledOpcode ServerOpcode = 0x79
-	PlayerJoinedOpcode        ServerOpcode = 0x7A
-	PlayerLeftOpcode          ServerOpcode = 0x7B
-	SendAllPlayerInfoOpcode   ServerOpcode = 0x82
+	coordSize       = 8
+	angleSize       = 8
+	playerCoutnSize = 1
+	stringCountSize = 2
+	opcodeSize      = 1
+	userIdSize      = 1
+)
+
+const (
+	DisconnectOpcode        ServerOpcode = 0x64
+	UnknownOpcode           ServerOpcode = 0x65
+	MovementPlayerOpcode    ServerOpcode = 0x6E
+	TeleportPlayerOpcode    ServerOpcode = 0x6F
+	ShootingPlayerOpcode    ServerOpcode = 0x70
+	PlayerDeathOpcode       ServerOpcode = 0x78
+	PlayerJoinedOpcode      ServerOpcode = 0x7A
+	PlayerLeftOpcode        ServerOpcode = 0x7B
+	YouAreCalledOpcode      ServerOpcode = 0x7C
+	SendAllPlayerInfoOpcode ServerOpcode = 0x82
+	SendAllPlayerKDOpcode   ServerOpcode = 0x83
 )
 
 var Overview = [...]ServerOpcode{
 	DisconnectOpcode,
 	UnknownOpcode,
 	MovementPlayerOpcode,
-	AnOtherPlayerKilledOpcode,
-	PlayerHimSelfKilledOpcode,
+	TeleportPlayerOpcode,
+	ShootingPlayerOpcode,
+	PlayerDeathOpcode,
 	PlayerJoinedOpcode,
 	PlayerLeftOpcode,
+	YouAreCalledOpcode,
 	SendAllPlayerInfoOpcode,
+	SendAllPlayerKDOpcode,
 }
 
 // Value returns the internal value representation as a uint8.
@@ -90,20 +105,116 @@ func (u Unknown) Bytes() []byte {
 	return []byte{UnknownOpcode.Value()}
 }
 
-// MovementPlayer represents a movement made by a specific player.
+// Disconnect represents a server shutdown.
+type PlayerDeath struct {
+	killedId uint8
+	killerId uint8
+}
+
+func (pd PlayerDeath) KilledId() uint8 {
+	return pd.killedId
+}
+
+func (pd PlayerDeath) KillerId() uint8 {
+	return pd.killerId
+}
+
+// NewDisconnect creates a new disconnect instance.
+func NewPlayerDeath(killedId uint8, killerId uint8) PlayerDeath {
+	return PlayerDeath{
+		killedId: killedId,
+		killerId: killerId,
+	}
+}
+
+func (pq PlayerDeath) ByteSize() uint {
+	return opcodeSize + userIdSize + userIdSize
+}
+
+// Bytes will turn the disconnect instance into a sendable byte stream.
+func (pd PlayerDeath) Bytes() []byte {
+	// using the buffer write interface for simplisity
+	buffer := make([]byte, pd.ByteSize())
+
+	buffer[0] = PlayerDeathOpcode.Value()
+	buffer[1] = pd.killedId
+	buffer[2] = pd.killerId
+
+	return buffer
+}
+
+// TeleportPlayer represents a movement made by a specific player.
 // It contains the user id and the respective offsets size the last
 // time the command was send.
-type MovementPlayer struct {
+type TeleportPlayer struct {
 	userId       uint8
 	coorX, coorY float64
 }
 
 // NewMovemementPlayer will construct a new player object.
-func NewMovementPlayer(userId uint8, coorX, coorY float64) MovementPlayer {
-	return MovementPlayer{
+func NewTeleportPlayer(userId uint8, coorX, coorY float64) TeleportPlayer {
+	return TeleportPlayer{
 		userId: userId,
 		coorX:  coorX,
 		coorY:  coorY,
+	}
+}
+
+// UserId will return the user whom has made the given movement.
+func (mp TeleportPlayer) UserId() uint8 {
+	return mp.userId
+}
+
+// CoorX is the offset on the x axis done by the player.
+func (mp TeleportPlayer) CoorX() float64 {
+	return mp.coorX
+}
+
+// CoorY is the offset on the y axis done by the player.
+func (mp TeleportPlayer) CoorY() float64 {
+	return mp.coorY
+}
+
+func (mp TeleportPlayer) ByteSize() int {
+	//     Op          + UserId     + CoorX + CoorY
+	return opcodeSize + userIdSize + coordSize*2
+}
+
+// Bytes will turn the movement instance into a sendable byte stream.
+func (mp TeleportPlayer) Bytes() []byte {
+
+	// using the buffer write interface for simplisity
+	buffer := make([]byte, mp.ByteSize())
+
+	buffer[0] = MovementPlayerOpcode.Value()
+	buffer[1] = mp.UserId()
+
+	// write floats into the bytes buffer
+	data := [...]float64{mp.CoorX(), mp.CoorY()}
+	for i, val := range data {
+		offset := 2 + i*coordSize
+		offsetEnd := offset + coordSize
+		utils.FloatToBinary(val, buffer[offset:offsetEnd])
+	}
+
+	return buffer
+}
+
+// MovementPlayer represents a movement made by a specific player.
+// It contains the user id and the respective offsets size the last
+// time the command was send.
+type MovementPlayer struct {
+	userId                uint8
+	coorX, coorY, anglePl float64
+}
+
+// NewMovemementPlayer will construct a new player object.
+func NewMovementPlayer(userId uint8, coorX, coorY, anglePl float64) MovementPlayer {
+	return MovementPlayer{
+		userId:  userId,
+		coorX:   coorX,
+		coorY:   coorY,
+		anglePl: anglePl,
 	}
 }
 
@@ -122,70 +233,66 @@ func (mp MovementPlayer) CoorY() float64 {
 	return mp.coorY
 }
 
+func (mp MovementPlayer) AnglePl() float64 {
+	return mp.anglePl
+}
+
+func (mp MovementPlayer) ByteSize() int {
+	//     Op          + UserId     + CoorX + CoorY + AnglePl
+	return opcodeSize + userIdSize + coordSize*2 + angleSize
+}
+
 // Bytes will turn the movement instance into a sendable byte stream.
 func (mp MovementPlayer) Bytes() []byte {
-	size := 1
-	size += 1
-	size += 8
-	size += 8
 
 	// using the buffer write interface for simplisity
-	buffer := make([]byte, size)
+	buffer := make([]byte, mp.ByteSize())
 
 	buffer[0] = MovementPlayerOpcode.Value()
-	buffer[1] = mp.userId
+	buffer[1] = mp.UserId()
 
 	// write floats into the bytes buffer
-	utils.FloatToBinary(mp.coorX, buffer[2:10])
-	utils.FloatToBinary(mp.coorY, buffer[10:18])
+	data := [...]float64{mp.CoorX(), mp.CoorY(), mp.AnglePl()}
+	for i, val := range data {
+		offset := 2 + i*coordSize
+		offsetEnd := offset + coordSize
+		utils.FloatToBinary(val, buffer[offset:offsetEnd])
+	}
 
 	return buffer
 }
 
-// AnOtherPlayerKilled is the counter part to PlayerHimSelfKilledOpcode
-// it is send to any other active clients in the room.
-type AnOtherPlayerKilled struct {
+type ShootingPlayer struct {
 	userId uint8
+	anglPl float64
 }
 
-// NewAnotherPlayerKilled will initialize the instantiation of
-// NewAnotherPlayerKilled.
-func NewAnotherPlayerKilled(other byte) AnOtherPlayerKilled {
-	return AnOtherPlayerKilled{
-		userId: other,
+func NewShootingPlayer(id uint8, angPl float64) ShootingPlayer {
+	return ShootingPlayer{
+		userId: id,
+		anglPl: angPl,
 	}
 }
 
-// UserId will return the userId of the player that gotten killed.
-func (pk AnOtherPlayerKilled) UserId() uint8 {
-	return pk.userId
+func (sp ShootingPlayer) UserId() uint8 {
+	return sp.userId
 }
 
-// Bytes will turn the AnOtherPlayerKilled instance into a sendable
-// byte stream.
-func (pk AnOtherPlayerKilled) Bytes() []byte {
-	return []byte{
-		AnOtherPlayerKilledOpcode.Value(),
-		pk.userId,
-	}
+func (sp ShootingPlayer) AnglePl() float64 {
+	return sp.anglPl
 }
 
-// PlayerHimSelfKilled is the counterpart to AnOtherPlayerKilled
-// as it deactivates the players abilities to move or shoot.
-type PlayerHimSelfKilled struct{}
-
-// NewPlayerHimSelfKilled will create the corresponding
-// instance.
-func NewPlayerHimSelfKilled() PlayerHimSelfKilled {
-	return PlayerHimSelfKilled{}
+func (sp ShootingPlayer) ByteSize() int {
+	return opcodeSize + userIdSize + angleSize
 }
 
-// Bytes will turn the AnOtherPlayerKilled instance into a sendable
-// byte stream.
-func (p PlayerHimSelfKilled) Bytes() []byte {
-	return []byte{
-		PlayerHimSelfKilledOpcode.Value(),
-	}
+func (sp ShootingPlayer) Bytes() []byte {
+	data := make([]byte, sp.ByteSize())
+
+	data[0] = ShootingPlayerOpcode.Value()
+	data[1] = sp.UserId()
+	utils.FloatToBinary(sp.AnglePl(), data[2:])
+	return data
 }
 
 // Player is an internally used representation of the
@@ -231,7 +338,7 @@ func NewPlayer(userId uint8, name string) Player {
 func NewPlayerBytes(info []byte) (Player, int) {
 	userId := info[0]
 	lenName := binary.LittleEndian.Uint16(info[1:3])
-	size := 1 + 2 + lenName
+	size := opcodeSize + stringCountSize + lenName
 	name := string(info[3 : 3+lenName])
 	return NewPlayer(userId, name), int(size)
 }
@@ -249,7 +356,7 @@ func (p Player) Name() string {
 // ByteSize is a helper that will return a players size,
 // so that a correctly sized buffer can be preallocated.
 func (p Player) ByteSize() int {
-	return 1 + 2 + len(p.name)
+	return opcodeSize + stringCountSize + len(p.name)
 }
 
 // Bytes is wrapper function for PutBytes, where the byte
@@ -296,13 +403,14 @@ func (p PlayerJoined) Player() Player {
 	return p.p
 }
 
+func (p PlayerJoined) ByteSize() int {
+	return opcodeSize + p.Player().ByteSize()
+}
+
 // Bytes will return the information needed to write the player
 // information back.
 func (p PlayerJoined) Bytes() []byte {
-	size := 1                     // opcode
-	size += p.Player().ByteSize() // Player Size
-
-	data := make([]byte, size)
+	data := make([]byte, p.ByteSize())
 
 	data[0] = PlayerJoinedOpcode.Value()
 	p.p.PutBytes(data[1:])
@@ -336,6 +444,94 @@ func (p PlayerLeft) Bytes() []byte {
 		PlayerLeftOpcode.Value(),
 		p.userId,
 	}
+}
+
+type YouAreCalled struct {
+	userId uint8
+}
+
+// UserId of the player leaving is returned.
+func (yac YouAreCalled) UserId() uint8 {
+	return yac.userId
+}
+
+func NewYouAreCalled(userId uint8) YouAreCalled {
+	return YouAreCalled{
+		userId: userId,
+	}
+}
+
+func (yac YouAreCalled) Bytes() []byte {
+	return []byte{
+		YouAreCalledOpcode.Value(),
+		yac.userId,
+	}
+}
+
+type PlayerKD struct {
+	id     uint8
+	kills  uint16
+	deaths uint16
+}
+
+type PlayersKD struct {
+	playersKD []PlayerKD
+}
+
+func (pkd PlayerKD) UserId() uint8 {
+	return pkd.id
+}
+
+func (pkd PlayerKD) Kills() uint16 {
+	return pkd.kills
+}
+
+func (pkd PlayerKD) Deaths() uint16 {
+	return pkd.deaths
+}
+
+func NewPlayerKD(id uint8, kills, deaths uint16) PlayerKD {
+	return PlayerKD{
+		id:     id,
+		kills:  kills,
+		deaths: deaths,
+	}
+}
+
+func (p PlayersKD) ByteSize() int {
+	return opcodeSize + playerCoutnSize + len(p.playersKD)*PlayerKD{}.ByteSize()
+}
+
+func (p PlayersKD) Bytes() []byte {
+	b := make([]byte, p.ByteSize())
+	b[0] = SendAllPlayerKDOpcode.Value()
+	b[1] = byte(len(p.playersKD))
+
+	for index, playerKD := range p.playersKD {
+		playerKD.PutBytes(b[index*playerKD.ByteSize()+2:])
+	}
+	return b
+}
+
+func NewPlayersKD(players []PlayerKD) PlayersKD {
+	return PlayersKD{
+		playersKD: players,
+	}
+}
+
+func (p PlayerKD) ByteSize() int {
+	return 1 + 2 + 2
+}
+
+func (p PlayerKD) PutBytes(data []byte) {
+	// this eliminates the bound check below
+	// see https://go101.org/article/bounds-check-elimination.html
+	// for more information on the topic.
+	_ = data[p.ByteSize()-1]
+
+	data[0] = p.id
+	binary.LittleEndian.PutUint16(data[1:3], uint16(p.kills))
+	binary.LittleEndian.PutUint16(data[3:5], uint16(p.deaths))
 }
 
 // SendAllPlayerInfo is a request that will have to return any and

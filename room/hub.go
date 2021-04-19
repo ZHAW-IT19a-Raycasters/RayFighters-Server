@@ -5,106 +5,143 @@ import (
 	"errors"
 	"math"
 
-	"github.zhaw.ch/raycasters/server/protocol/server"
-	"github.zhaw.ch/raycasters/server/room/helpers"
+	"github.zhaw.ch/raycasters/server/log"
+	"github.zhaw.ch/raycasters/server/room/client"
+	"github.zhaw.ch/raycasters/server/utils"
 )
 
+// void is am empty struct with no memory
+// footprint, this is used for signals
+// counters.
+type void struct{}
+
+// logger responsible for all the logging
+// happening
+var logger = log.Log()
+
+// HubClientLimit is the absolute upper limit supported
+// by a single hub. This limitation comes from the
+// decision to only support a player id of size uint8.
 const HubClientLimit = math.MaxUint8
 
 // ErrHubIsFull is the error that is returned on an RegisterClient error.
 var ErrHubIsFull = errors.New("the hub is currently filled to capacity")
 
 // Hub represents a single room.
+// The hub controls the the individual connections between the
+// different modules like the map or the client manager.
 type Hub struct {
-	// The channel over which a new connection
-	// comes into.
-	conn chan ClientMeta
-	// The room id is used to uniquely id the room
+	// id is the designated hub identifier
 	id int
-	// The manager of the different client with the different connections.
-	clientManager clientManager
+	// controller is the struct responsible for running all the client opcodes
+	// and handling all the io.
+	controller *hubController
+	// The channel over which a new connection
+	// is added. This connections input can be accessed
+	// via the `RegisterClient` function associated
+	// with this type.
+	input chan client.ClientMeta
 	// The channel that signals the main loop to shutdown.
-	running chan struct{}
-	// Is the player counter, this variable counts the active
-	// player connections, although that number is already availble
-	// via the client map length, is would have to be accessed
-	// from behind a lock. So to avoid the given overhead an
-	// atomic implementation is used here.
-	counter helpers.AtomicUint32
+	shutdown chan void
+	// If the current hub is running or not.
+	isActive utils.AtomicBool
 }
 
+// NewHub will initiate a new hub struct.
+// The hubId needs to be unique over all
+// the data structures.
 func NewHub(hubId int) *Hub {
-	return &Hub{
-		conn:    make(chan ClientMeta),
-		id:      hubId,
-		running: make(chan struct{}),
-		counter: helpers.NewAtomicUint32(HubClientLimit),
+	h := &Hub{
+		input:      make(chan client.ClientMeta),
+		controller: newHubController(),
+		shutdown:   make(chan void),
+		id:         hubId,
+		isActive:   utils.NewAtomicBool(false),
 	}
+	return h
 }
 
-func (h *Hub) Size() uint32 {
-	return h.counter.Value()
+// IsAlive will check if the current hub is running or not.
+func (h *Hub) IsAlive() bool {
+	return h.isActive.Get()
 }
 
+// Size will return the current player count
+func (h *Hub) Size() int {
+	return h.controller.Size()
+}
+
+// Full will check if the hub is at it's set
+// limitation.
 func (h *Hub) Full() bool {
-	return h.counter.AtLimit()
+	return h.controller.IsFull()
 }
 
-func (h *Hub) RegisterClient(meta ClientMeta) error {
-	// increment the counter
-	err := h.counter.Inc()
+// RegisterClient will use the meta information given
+// by the parameter to check if the player
+func (h *Hub) RegisterClient(meta client.ClientMeta) error {
 
-	if err != nil {
-		return err
+	// if the client does not have an entry in the
+	// manager, then the player count has to be
+	// incremented.
+	if !h.controller.ClientExists(meta) {
+		// increment the counter
+		// if the counter already is maxed out
+		// this will return an error
+		err := h.controller.acquire()
+
+		if err != nil {
+			return ErrHubIsFull
+		}
 	}
 
-	h.conn <- meta
+	// add the client to the queue to be added into the system
+	h.input <- meta
 
 	return nil
-}
-
-func (h *Hub) UnregisterClient(meta ClientMeta) error {
-
-	err := h.counter.Dec()
-
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// TODO: Add broadcast function that can be called from the clients
-// TODO: figure out if this is the right path to take
-func (h *Hub) BroadCast(msg server.ServerOpcode) {
-	h.clientManager.broadCast(msg, []byte{})
 }
 
 // Run is the main event loop of the hub.
+// It handles all the clients added and removed
+// from the hub instance.
+// Attention this is a blocking function, so
+// run this in a gorutine.
 func (h *Hub) Run() {
+	// check if the hub is active
+	if !h.isActive.SetTrue() {
+		// do not restart the hub, if it's already running
+		logger.Warnf("Hub [%d] is already running", h.id)
+		return
+	}
+	// set alive bool
+	// reset the state of is active, on shutdown or
+	// crash
+	defer h.isActive.SetFalse()
+
 	for {
 		select {
-		case <-h.running:
+		case <-h.shutdown:
 			logger.Infof("Shutting down hub [%d]", h.id)
 			return
-		case data := <-h.conn:
-			logger.Debug("Adding a new player to hub [%d]", h.id)
-			h.clientManager.addClient(data)
+		case meta := <-h.input:
+			logger.Debugf("Adding a new player to hub [%d]", h.id)
+			h.controller.registerClient(meta)
 		}
 	}
 }
 
-// Shutdown will intialize a complete shutdown of any and all clients.
+// Shutdown will initialize a complete shutdown of any and all clients.
 // With the cxt context a premature cancelation of all client
 // connections can be started.
 func (h *Hub) Shutdown(cxt context.Context) {
-	waitCompletion := make(chan struct{})
+	waitCompletion := make(chan void)
 
 	go func() {
-		h.clientManager.shutdown(cxt)
-		close(waitCompletion)
+		h.controller.shutdown(cxt)
 		// make sure that the main thread is closed
-		close(h.running)
+		close(h.shutdown)
+		// close blocker
+		close(waitCompletion)
 	}()
 
 	select {
