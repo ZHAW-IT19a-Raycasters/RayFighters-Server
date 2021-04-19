@@ -1,12 +1,15 @@
 package gamelocation
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
+	"github.zhaw.ch/raycasters/server/gamelocation/maploader"
 	"github.zhaw.ch/raycasters/server/gamelocation/utils"
 )
 
-// Test if having correct parameters no errors will be thrown.
+// Test if passing correct parameters, will raise no erros.
 func TestGetNewLocationValid(t *testing.T) {
 	const dim int = 2
 	expectedMap := [][]utils.LocationElement{{utils.Floor, utils.Floor}, {utils.Floor, utils.Floor}}
@@ -34,5 +37,62 @@ func TestGetNewLocationInvalidMapDimesion(t *testing.T) {
 	_, err := getNewLocation(dim, expectedMap)
 	if err == nil {
 		t.Errorf("no error was thrown")
+	}
+}
+
+//Check if reading bigger map will not raise an error.
+func TestGetGameLocationValid(t *testing.T) {
+
+	path, err := os.Getwd()
+	if err != nil {
+		t.Errorf("unexpected error: %s", err.Error())
+		return
+	}
+	path = filepath.Join(path, "maploader/test/testmaps/testmap_07_valid_big.txt")
+	file, err := os.Open(path)
+	if err != nil {
+		t.Errorf("unexpected error: %s", err.Error())
+		return
+	}
+	defer file.Close()
+	_, err = maploader.LoadMap(path)
+	if err != nil {
+		t.Errorf("unexpected error: %s", err.Error())
+		return
+	}
+}
+
+func TestGetMapDimension(t *testing.T) {
+	const expected int = 2
+	locationMap := [][]utils.LocationElement{{utils.Floor, utils.Wall}, {utils.Floor, utils.Floor}}
+	loc, err := getNewLocation(expected, locationMap)
+	if err != nil {
+		t.Errorf("unexpected error: %s", err.Error())
+		return
+	}
+	actual := loc.GetMapDimension()
+	if actual != expected {
+		t.Errorf("wrong dimesion: (expected: %d; actual: %d)", expected, loc.dimension)
+		return
+	}
+}
+
+func TestGetLocationElement(t *testing.T) {
+	const dim int = 2
+	locationMap := [][]utils.LocationElement{{utils.Floor, utils.Wall}, {utils.Floor, utils.Floor}}
+	loc, err := getNewLocation(dim, locationMap)
+	if err != nil {
+		t.Errorf("unexpected error: %s", err.Error())
+		return
+	}
+	expected := utils.Wall
+	actual, err := loc.GetLocationElement(0, 1)
+	if err != nil {
+		t.Errorf("unexpected error: %s", err.Error())
+		return
+	}
+	if actual != expected {
+		t.Errorf("wrong map element: (expected: %v; actual: %v)", expected, actual)
+		return
 	}
 }
