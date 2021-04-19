@@ -1,10 +1,8 @@
 package gamelocation
 
-/*
 import (
 	"fmt"
 
-	"github.zhaw.ch/raycasters/server/gamelocation/maploader"
 	"github.zhaw.ch/raycasters/server/gamelocation/utils"
 )
 
@@ -19,6 +17,7 @@ const (
 	maxMapDimension = 999
 )
 
+/*
 func GetGameLocation(filePath string) Location {
 	dim := 6
 	m, err := maploader.LoadMap(filePath)
@@ -27,19 +26,26 @@ func GetGameLocation(filePath string) Location {
 	}
 	return newLocation(dim, m)
 }
-
-// Create new "mapDimension x mapDimension" location.
-func newLocation(mapDimension int, loc [][]Location) Location {
-	var locationMap = make([][]utils.LocationElement, 0, mapDimension)
-	for rowIndex := 0; rowIndex < mapDimension; rowIndex += 1 {
-		locationMap[rowIndex] = make([]utils.LocationElement, 0, mapDimension)
+*/
+// Create new location, havin map with dimesion mapDimension^2.
+// Throws errors if:
+// - given mapDimension is not the same as given locationMap has
+func getNewLocation(mapDimension int, locationMap [][]utils.LocationElement) (Location, error) {
+	if len(locationMap) != mapDimension {
+		return Location{}, fmt.Errorf("invalid map-column dimesion")
 	}
-	return Location{dimension: mapDimension, locationMap: locationMap}
+	for rowIndex := 0; rowIndex < mapDimension; rowIndex += 1 {
+		if len(locationMap[rowIndex][:]) != mapDimension {
+			return Location{}, fmt.Errorf("invalid map-row dimesion")
+		}
+	}
+	return Location{dimension: mapDimension, locationMap: locationMap}, nil
 }
+
+/*
 func SetMapElemenent(x int, y int) {
 	//TODO
 }
-
 // Return map element for given coordinates x and y.
 // NOTE: Location is passed by value > copy
 func (gamelocation Location) GetLocationElement(x int, y int) (utils.LocationElement, error) {
