@@ -22,6 +22,8 @@ const (
 */
 
 // Loads file from given path.
+// NOTE 1: will only read number of lines, read by ReadMapDimesion(). The rest will be ignored.
+// NOTE 2: reading rows doesn't check if there length is ok.
 // Throws error if:
 // - could open or read file under given path
 // - SkipLines() fails
@@ -36,7 +38,7 @@ func LoadMap(filePath string) (*[][]utils.LocationElement, error) {
 	defer file.Close()
 
 	scanner := bufio.NewScanner(file)
-	err = SkipLines(scanner, mapHeaderLength)
+	err = SkipLines(scanner, mapHeaderLength-1)
 	if err != nil {
 		logger.Errorf("unexpected error: %s", err.Error())
 		return &[][]utils.LocationElement{{}}, fmt.Errorf("unexpected error: %s", err.Error())
@@ -50,7 +52,7 @@ func LoadMap(filePath string) (*[][]utils.LocationElement, error) {
 	// go row by row read symbols to the gamemap
 	locationMap := make([][]utils.LocationElement, mapDimesion)
 	for rowIndex := 0; rowIndex < mapDimesion; rowIndex += 1 {
-		if scanner.Scan() {
+		if !scanner.Scan() {
 			logger.Errorf("unexpected file end. expected length: %d, actual length:", mapDimesion, rowIndex)
 			return &[][]utils.LocationElement{{}}, fmt.Errorf("unexpected file end. expected length: %d, actual length:%d", mapDimesion, rowIndex)
 		}
@@ -100,7 +102,7 @@ func ReadMapDimension(sc *bufio.Scanner) (int, error) {
 
 // Converts string into slice of LocationElement.
 // Throws error if:
-// - utils.LocationElment() fails
+// - utils.LocationEelment() fails
 func ParseLine(line string) (*([]utils.LocationElement), error) {
 	slice := make([]utils.LocationElement, len(line))
 	for rowIndex, c := range line {

@@ -2,6 +2,7 @@ package maploader_test
 
 import (
 	"bufio"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -10,79 +11,91 @@ import (
 	"github.zhaw.ch/raycasters/server/gamelocation/utils"
 )
 
-/*
-var expected_map = [][]gamelocation.Location{
-	{gamelocation.Floor, gamelocation.Floor},
-	{gamelocation.Floor, gamelocation.Floor},
-}
+var testFolderPath string = "test/testmaps/"
 
-var testFolderPath string = "maploader/test"
-
-func TestValidMap(t *testing.T) {
-	actual_map, err := loadFile("testmap_01_small_valid.txt")
+// Test reading correct map, having valid symbol, will be loaded correctly.
+func TestLoadMapValidMapOneSymbol(t *testing.T) {
+	expectedMap := [][]utils.LocationElement{
+		{utils.Floor, utils.Floor},
+		{utils.Floor, utils.Floor},
+	}
+	actualMap, err := loadTestFile("testmap_01_valid_one_symbol.txt")
 	if err != nil {
-		t.Errorf("Error: %s", err.Error())
+		t.Errorf("unexpected error: %s", err.Error())
 		return
 	}
-	if status, err := compare2DSlices(expected_map, actual_map.GMap); !status {
-		t.Errorf(err.Error())
+	expected := true
+	actual := utils.Compare2DMapElementSlices(expectedMap, *actualMap)
+	if expected != actual {
+		t.Errorf("false result: (expected: %v; actual: %v)", expected, actual)
 		return
 	}
 }
-func TestMapWrongColumnDimension(t *testing.T) {
-	actual_map, err := loadFile("testmap_02_small_invalid_dimension_column.txt")
+
+// Test reading correct map, having multiple valid symbols, will not throw an error.
+func TestLoadMapValidMapMultipleSymbols(t *testing.T) {
+	_, err := loadTestFile("testmap_03_valid_multiple_symbols.txt")
 	if err != nil {
-		t.Errorf("Error: %s", err.Error())
-		return
-	}
-
-	if status, _ := compare2DSlices(expected_map, actual_map.GMap); status {
-		t.Error("Expected: Column number missmatch.")
+		t.Errorf("unexpected error: %s", err.Error())
 		return
 	}
 }
-func TestMapWrongRowDimension(t *testing.T) {
-	actual_map, err := loadFile("testmap_03_small_invalid_dimension_row.txt")
+
+// Test if reading the map in the file, having less columns as given dimension, will throw an error.
+func TestLoadMapWrongLessColumnsThanDimension(t *testing.T) {
+	_, err := loadTestFile("testmap_02_wrong_cdimension.txt")
+	if err == nil {
+		t.Errorf("no error was thrown")
+		return
+	}
+}
+
+// Test if map in the given file, having more columns than given dimesion, will not throw an error.
+func TestLoadMapLessRowsThanDimension(t *testing.T) {
+	expectedMap := [][]utils.LocationElement{
+		{utils.Floor, utils.Floor, utils.Floor},
+		{utils.Floor, utils.Floor},
+	}
+	actualMap, err := loadTestFile("testmap_04_wrong_rdimension.txt")
 	if err != nil {
-		t.Errorf("Error: %s", err.Error())
+		t.Errorf("unexpected error: %s", err.Error())
 		return
 	}
-
-	if status, _ := compare2DSlices(expected_map, actual_map.GMap); status {
-		t.Error("Expected: Row length missmatch.")
-		return
-	}
-}
-
-func TestWrongMapDimensionShortMap(t *testing.T) {
-	actual_map, err := loadFile("testmap_04_invalid_dimension_rows_shorter.txt")
-	if err != nil {
-		t.Errorf("Error: %s", err.Error())
-		return
-	}
-
-	if status, _ := compare2DSlices(expected_map, actual_map.GMap); status {
-		t.Error("Expected: Row length missmatch.")
+	expected := true
+	actual := utils.Compare2DMapElementSlices(expectedMap, *actualMap)
+	if expected != actual {
+		t.Errorf("false result: (expected: %v; actual: %v)", expected, actual)
 		return
 	}
 }
 
-//TODO test get Map elemente
+// Test if reading map-file, having illegal dimesion-number, will throw an error.
+func TestLoadMapIllegalDimension(t *testing.T) {
+	_, err := loadTestFile("testmap_06_wrong_neg_dimension.txt")
+	if err == nil {
+		t.Errorf("no error was thrown")
+		return
+	}
+}
 
-func loadFile(fileName string) (GameMap, error) {
-
+// Loads testfile.
+// Throws error if:
+// - can not build file path
+// - maploader.LoadMap() fails
+func loadTestFile(fileName string) (*[][]utils.LocationElement, error) {
 	path, err := os.Getwd()
 	if err != nil {
-		return GameMap{}, fmt.Errorf("Error while getting the working directory:\n[%s]", err.Error())
+
+		return &([][]utils.LocationElement{}), fmt.Errorf("unexpected error: %s", err.Error())
 	}
 	path = filepath.Join(path, testFolderPath, fileName)
-	actual_map, err := LoadMap(path)
+	actualMap, err := maploader.LoadMap(path)
 	if err != nil {
-		return GameMap{}, fmt.Errorf("Error: %s", err.Error())
+		return &([][]utils.LocationElement{}), fmt.Errorf("unexpected error: %s", err.Error())
 	}
-	return actual_map, nil
+	return actualMap, nil
 }
-*/
+
 func TestSkipLines(t *testing.T) {
 	path, err := os.Getwd()
 	if err != nil {
