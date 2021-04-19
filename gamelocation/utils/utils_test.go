@@ -152,7 +152,7 @@ func TestGetLocationElementValidSymbol(t *testing.T) {
 func TestGetLocationElementInvalidSymbol(t *testing.T) {
 	_, err := utils.GetLocationElement(rune('/'))
 	if err == nil {
-		t.Error("no error was thrown.")
+		t.Error("no error was thrown")
 	}
 }
 

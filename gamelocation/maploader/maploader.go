@@ -83,7 +83,7 @@ func ReadMapDimension(sc *bufio.Scanner) (int, error) {
 
 // Converts string into slice of LocationElement.
 func ParseLine(line string) (*([]utils.LocationElement), error) {
-	slice := make([]utils.LocationElement, 0, len(line))
+	slice := make([]utils.LocationElement, len(line))
 	for rowIndex, c := range line {
 		element, err := utils.GetLocationElement(c)
 		if err != nil {

@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.zhaw.ch/raycasters/server/gamelocation/maploader"
+	"github.zhaw.ch/raycasters/server/gamelocation/utils"
 )
 
 /*
@@ -153,7 +154,7 @@ func TestReadMapDimension(t *testing.T) {
 	}
 }
 
-func TestReadMapDimensionNegative(t *testing.T) {
+func TestReadMapDimensionNegativeNumber(t *testing.T) {
 	path, err := os.Getwd()
 	if err != nil {
 		t.Errorf("unexpected error: %s", err.Error())
@@ -172,5 +173,43 @@ func TestReadMapDimensionNegative(t *testing.T) {
 	if err == nil {
 		t.Errorf("no error was thrown")
 		return
+	}
+}
+
+func TestParseLine(t *testing.T) {
+	someRune := rune('0')
+	someElement, err := utils.GetLocationElement(someRune)
+	if err != nil {
+		t.Errorf("unexpected error: %s", err.Error())
+		return
+	}
+	expectedSlice := []utils.LocationElement{someElement, someElement, someElement}
+	str := string(someRune)
+	str += str + str
+	actualSlice, err := maploader.ParseLine(str)
+	if err != nil {
+		t.Errorf("unexpected error: %s", err.Error())
+		return
+	}
+	expected := true
+	actual := utils.Compare1DMapElementSlices(expectedSlice, *actualSlice)
+	if expected != actual {
+		t.Errorf("false result: (expected: %v; actual: %v)", expected, actual)
+	}
+}
+
+// Feeding empty string should return empty slice.
+func TestParseLineEmptyLine(t *testing.T) {
+	expectedSlice := []utils.LocationElement{}
+	str := ""
+	actualSlice, err := maploader.ParseLine(str)
+	if err != nil {
+		t.Errorf("unexpected error: %s", err.Error())
+		return
+	}
+	expected := true
+	actual := utils.Compare1DMapElementSlices(expectedSlice, *actualSlice)
+	if expected != actual {
+		t.Errorf("false result: (expected: %v; actual: %v)", expected, actual)
 	}
 }
