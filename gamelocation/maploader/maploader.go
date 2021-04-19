@@ -3,12 +3,16 @@ package maploader
 import (
 	"bufio"
 	"fmt"
+	"os"
 	"strconv"
 
 	"github.zhaw.ch/raycasters/server/gamelocation/utils"
+	"github.zhaw.ch/raycasters/server/log"
 )
 
-//var logger = log.Log()
+var mapHeaderLength int = 5
+var logger = log.Log()
+
 /*
 const (
 	// Define map-header length
@@ -16,46 +20,55 @@ const (
 	maxMapDimesion  int = 999
 )
 */
-/*
+
 // Loads file from given path.
-// *PathError, if there were any problems while opening and reading the file at the given location.
-func LoadMap(filePath string) ([][]utils.LocationElement, error) {
+// Throws error if:
+// - could open or read file under given path
+// - SkipLines() fails
+// - ReadDimesion() fails
+// - file length was shorter than expected
+// - ParseLine() fails
+func LoadMap(filePath string) (*[][]utils.LocationElement, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
-		return [][]utils.LocationElement{{}}, err
+		return &[][]utils.LocationElement{{}}, err
 	}
 	defer file.Close()
 
 	scanner := bufio.NewScanner(file)
-	SkipLines(scanner, mapHeaderLength)
-	mapDimesion, _ := ReadMapDimension(scanner)
-	// check correctness of dimensions
-	if mapDimesion < 0 {
-		logger.Errorf("MAPLOADER ERROR: negative dimesion.")
-		return [][]utils.LocationElement{{}}, fmt.Errorf("MAPLOADER ERROR: negative dimesion.")
+	err = SkipLines(scanner, mapHeaderLength)
+	if err != nil {
+		logger.Errorf("unexpected error: %s", err.Error())
+		return &[][]utils.LocationElement{{}}, fmt.Errorf("unexpected error: %s", err.Error())
 	}
+	mapDimesion, err := ReadMapDimension(scanner)
+	if err != nil {
+		logger.Errorf("unexpected error: %s", err.Error())
+		return &[][]utils.LocationElement{{}}, fmt.Errorf("unexpected error: %s", err.Error())
+	}
+
 	// go row by row read symbols to the gamemap
+	locationMap := make([][]utils.LocationElement, mapDimesion)
 	for rowIndex := 0; rowIndex < mapDimesion; rowIndex += 1 {
-		gameMap := append(gameMap.GMap, make([]MapElement, 0, mapDimesion))
-
 		if scanner.Scan() {
-			logger.Errorf("MAPLOADER ERROR: unexpected file end")
-			return [][]utils.LocationElement{{}}, fmt.Errorf("ERROR: unexpected end of file")
+			logger.Errorf("unexpected file end. expected length: %d, actual length:", mapDimesion, rowIndex)
+			return &[][]utils.LocationElement{{}}, fmt.Errorf("unexpected file end. expected length: %d, actual length:%d", mapDimesion, rowIndex)
 		}
-
-		line := scanner.Text()
-		parseLine(line, &gameMap.GMap[rowIndex])
-		if len(line) != mapDimesion {
-			logger.Errorf("MAPLOADER ERROR: unexpected file end. #lines(Act.: %d, Exp: %d)", mapDimesion, rowIndex+1)
-			return [][]utils.LocationElement{{}}, fmt.Errorf("ERROR: unexpected end of file")
+		res, err := ParseLine(scanner.Text())
+		locationMap[rowIndex] = *res
+		if err != nil {
+			logger.Errorf("unexpected error: %s", err.Error())
+			return &[][]utils.LocationElement{{}}, fmt.Errorf("unexpected error: %s", err.Error())
 		}
 	}
-	location := gamelocation.NewLocation(mapDimesion)
 
-	return location, nil
-}*/
-// Skips n lines.
-// To get content of the line n+1: use sc.Scan() first.
+	return &locationMap, nil
+}
+
+// Skips "lineCount" lines.
+// NOTE: To get content of the line n+1: use sc.Scan() first.
+// Throws error if:
+// - file is too short for given "lineCount"
 func SkipLines(sc *bufio.Scanner, linesCount int) error {
 	for i := 0; i < linesCount; i += 1 {
 		if !sc.Scan() {
@@ -66,7 +79,11 @@ func SkipLines(sc *bufio.Scanner, linesCount int) error {
 }
 
 // Reads dimension from the next line
-// Throws error if dimension <0
+// Return integer.
+// Throws error if:
+// - there no lines to read
+// - no element could be converted into integer
+// - dimension <0
 func ReadMapDimension(sc *bufio.Scanner) (int, error) {
 	if !sc.Scan() {
 		return 0, fmt.Errorf("unexpected end of file")
@@ -82,6 +99,8 @@ func ReadMapDimension(sc *bufio.Scanner) (int, error) {
 }
 
 // Converts string into slice of LocationElement.
+// Throws error if:
+// - utils.LocationElment() fails
 func ParseLine(line string) (*([]utils.LocationElement), error) {
 	slice := make([]utils.LocationElement, len(line))
 	for rowIndex, c := range line {
