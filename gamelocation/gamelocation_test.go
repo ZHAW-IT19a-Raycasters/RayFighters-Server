@@ -62,6 +62,7 @@ func TestGetGameLocationValid(t *testing.T) {
 	}
 }
 
+//Check if getter returns expected dimension.
 func TestGetMapDimension(t *testing.T) {
 	const expected int = 2
 	locationMap := [][]utils.LocationElement{{utils.Floor, utils.Wall}, {utils.Floor, utils.Floor}}
@@ -77,6 +78,7 @@ func TestGetMapDimension(t *testing.T) {
 	}
 }
 
+//Check if getter returns expected map elment.
 func TestGetLocationElement(t *testing.T) {
 	const dim int = 2
 	locationMap := [][]utils.LocationElement{{utils.Floor, utils.Wall}, {utils.Floor, utils.Floor}}
@@ -94,5 +96,48 @@ func TestGetLocationElement(t *testing.T) {
 	if actual != expected {
 		t.Errorf("wrong map element: (expected: %v; actual: %v)", expected, actual)
 		return
+	}
+}
+
+// Test if comparing two equal locations is correct.
+func TestCompareSameLocations(t *testing.T) {
+	const dim int = 2
+	locationMap := [][]utils.LocationElement{{utils.Floor, utils.Wall}, {utils.Floor, utils.Floor}}
+	loc1, err := getNewLocation(dim, locationMap)
+	if err != nil {
+		t.Errorf("unexpected error: %s", err.Error())
+		return
+	}
+	loc2, err := getNewLocation(dim, locationMap)
+	if err != nil {
+		t.Errorf("unexpected error: %s", err.Error())
+		return
+	}
+	expected := true
+	actual := loc1.Compare(loc2)
+	if expected != actual {
+		t.Errorf("wrong resulst: (expected: %t; actual: %t)", expected, actual)
+	}
+}
+
+// Test if comparing two distinct locations is correct.
+func TestCompareDifferentLocations(t *testing.T) {
+	const dim int = 2
+	locationMap1 := [][]utils.LocationElement{{utils.Floor, utils.Wall}, {utils.Floor, utils.Floor}}
+	loc1, err := getNewLocation(dim, locationMap1)
+	if err != nil {
+		t.Errorf("unexpected error: %s", err.Error())
+		return
+	}
+	locationMap2 := [][]utils.LocationElement{{utils.Wall, utils.Wall}, {utils.Floor, utils.Floor}}
+	loc2, err := getNewLocation(dim, locationMap2)
+	if err != nil {
+		t.Errorf("unexpected error: %s", err.Error())
+		return
+	}
+	expected := false
+	actual := loc1.Compare(loc2)
+	if expected != actual {
+		t.Errorf("wrong resulst: (expected: %t; actual: %t)", expected, actual)
 	}
 }
