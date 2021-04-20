@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -29,6 +30,9 @@ type Server struct {
 	endpoint *http.Server
 }
 
+// ErrRoomIdUnavailable can be thrown when a room is requested that cannot currently be accessed.
+var ErrRoomIdUnavailable = errors.New("No Room available for the given ID")
+
 // NewServer registers routes for all exposed endpoints
 // and attaches the appropriate routehandler functions
 func NewServer(conf *webconfig.WebConfig) *Server {
@@ -43,7 +47,7 @@ func NewServer(conf *webconfig.WebConfig) *Server {
 	// generate private key
 	privKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
-		fmt.Printf("failed to generate private key: %s\n", err)
+		logger.Warnf("failed to generate private key: %s", err)
 	}
 
 	// init global jwt decoding
@@ -108,9 +112,8 @@ func serveWs(hubs []*room.Hub, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if roomID < 0 || roomID >= hubsCount {
-		err := fmt.Errorf("no room with id %d available", roomID)
-		logger.Error(err)
-		http.Error(w, err.Error(), http.StatusConflict)
+		logger.Error(ErrRoomIdUnavailable)
+		http.Error(w, ErrRoomIdUnavailable.Error(), http.StatusConflict)
 		return
 	}
 
@@ -138,10 +141,11 @@ func serveWs(hubs []*room.Hub, w http.ResponseWriter, r *http.Request) {
 	token, err := jwt.ParseString(jwtCookie.Value)
 	usernameI, userOk := token.Get(`username`)
 	uuidI, uuidOk := token.Get(`uuid`)
+
 	if (userOk && uuidOk) {
 		uuid := uuidI.(uuid.UUID)
 		username := fmt.Sprintf("%v", usernameI)
-		cm := room.NewClientMeta(uuid, username, conn)
+		cm := client.NewClientMeta(uuid, username, conn)
 		hubs[roomID].RegisterClient(cm)
 		logger.Infof("user %s with uuid %s joined room %d", username, uuid,roomID)
 	}

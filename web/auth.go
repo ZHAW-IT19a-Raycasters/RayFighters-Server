@@ -69,6 +69,7 @@ func ServeAuthWithKey(privKey *rsa.PrivateKey) (HandleFunc func(w http.ResponseW
 	}
 }
 
+// holds information needed for validating provided authentication
 type authenticationMiddleware struct {
 	privateKey *rsa.PrivateKey
 }
@@ -81,6 +82,7 @@ func (amw *authenticationMiddleware) Middleware(next http.Handler) http.Handler 
 		jwtCookie, err := r.Cookie(JWTCOOKIENAME)
 		if err != nil{
 			http.Error(w, "no JWT found in Cookies", http.StatusUnauthorized)
+			logger.Warnf("no JWT found in request Cookies %s", err)
 			return
 		}
 
