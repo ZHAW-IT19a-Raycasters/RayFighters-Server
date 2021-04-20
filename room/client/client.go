@@ -3,6 +3,8 @@ package client
 import (
 	"context"
 	"errors"
+	"fmt"
+	"io"
 	"sync"
 
 	"github.zhaw.ch/raycasters/server/protocol/server"
@@ -13,17 +15,47 @@ import (
 	"github.zhaw.ch/raycasters/server/log"
 )
 
+const (
+	// MaxClientCommand is the prepared length of the opcode data slice
+	// Attention this value has to be changed once the protocol changes.
+	MaxClientCommand    = 17
+	defaultMessageType  = websocket.BinaryMessage
+	shutdownMessageType = websocket.CloseMessage
+)
+
 // logger is responsible for logging to the system logger.
 var logger = log.Log()
 
-// ErrClientReaderAlreadyActive is the error that as the name implies
-// tries to show to the caller that the respective client already
-// has a running send and receiver pump thread.
-var ErrClientReaderAlreadyActive = errors.New("the client worker is already active")
+var (
+	// ErrClientReaderAlreadyActive is the error that as the name implies
+	// tries to show to the caller that the respective client already
+	// has a running send and receiver pump thread.
+	ErrClientReaderAlreadyActive = errors.New("the client worker is already active")
 
-// MaxClientCommand is the prepared length of the opcode data slice
-// Attention this value has to be changed once the protocol changes.
-const MaxClientCommand = 17
+	// ErrNoBytesRead is the error returned in case that the received
+	// byte count it zero.
+	ErrNoBytesRead = errors.New("empty packge received")
+
+	// ErrClosedConnection is the error returned in case of
+	// that the connections is closed by the client.
+	ErrClosedConnection = errors.New("the client closed the connection")
+)
+
+// ErrNonBinaryMessage is the error returned when a non binary error happens
+type ErrNonBinaryMessage struct {
+	id int
+}
+
+// Error satisies the error interface
+func (err ErrNonBinaryMessage) Error() string {
+	return fmt.Sprintf("Non binary message type was received type : [%d]", err.id)
+}
+
+// Is satisfie the errors.Is definition
+func (err ErrNonBinaryMessage) Is(target error) bool {
+	_, ok := target.(ErrNonBinaryMessage)
+	return ok
+}
 
 // Client represents a client in it's full configuration.
 // This struct stores all the information about a single
@@ -42,6 +74,7 @@ func NewClient(id uint8, meta ClientMeta, queue helpers.ClientQueue) *Client {
 	c := Client{
 		queue:    queue,
 		status:   Offline,
+		meta: 	  newClientInternalMeta(id, meta),
 		isActive: utils.NewAtomicBool(false),
 		wg:       sync.WaitGroup{},
 		lock:     sync.RWMutex{},
@@ -103,7 +136,7 @@ func (c *Client) Run() error {
 	// make sure that there is no chance of this conn
 	// already being registered
 	if !c.checkRegistered() {
-		// TODO: chagne error
+		// TODO: change error
 		return ErrClientReaderAlreadyActive
 	}
 
@@ -170,60 +203,7 @@ func (c *Client) checkOffline() bool {
 // condition this function will only ever be called a single time
 // per run.
 func (c *Client) sendData() {
-	const defaultMessageType = websocket.BinaryMessage
-	const shutdownMessageType = websocket.CloseMessage
-
 	defer c.shutdownHandler()
-
-	checkErr := func(err error) bool {
-		if err != nil {
-			// try to register a timeout
-			c.registerTimeout()
-
-			// break out of the endless loop to a shutdown
-			return false
-		}
-		return true
-	}
-
-	process := func(message []byte) bool {
-		messageType := defaultMessageType
-		// if there is a disconnect here
-		if message[0] == server.DisconnectOpcode.Value() {
-			messageType = shutdownMessageType
-		}
-
-		cw, err := c.meta.conn.NextWriter(messageType)
-
-		if !checkErr(err) {
-			return false
-		}
-
-		_, err = cw.Write(message)
-
-		if !checkErr(err) {
-			return false
-		}
-
-		// flush the message to the network
-		err = cw.Close()
-
-		return !checkErr(err) && messageType == defaultMessageType
-	}
-
-	drainProcess := func() {
-		// this means that we have to shutdown the system
-
-		// due to how the client works this error can
-		// be ignored as it would imply an other
-		// queue worker or drainer
-		messages, _ := c.queue.DequeueDrain()
-		for _, message := range messages {
-			if !process(message) {
-				return
-			}
-		}
-	}
 
 	// No checks for activation are needed
 	// due to that this function will only
@@ -234,15 +214,99 @@ func (c *Client) sendData() {
 		if err != nil {
 			// the queue has shutdown => server is
 			// shutting down
-			// try to drain and send the values
-			drainProcess()
+
+			// due to how the client works this error can
+			// be ignored as it would imply an other
+			// queue worker or drainer
+			messages, _ := c.queue.DequeueDrain()
+			for _, message := range messages {
+				// if there was a false returned here
+				// then this means the shutdown message
+				// has been send
+				if !c.sendDataHelper(message) {
+					break
+				}
+			}
 			return
 		}
 
-		if !process(message) {
+		if !c.sendDataHelper(message) {
 			return
 		}
 	}
+}
+
+// sendDataHelper is the actuall function used to send data packages
+// it checks for the type of message send and handles errors.
+func (c *Client) sendDataHelper(message []byte) bool {
+	// checkSendDataErr is a helper function responsible
+	// for dealing with checking for any kind of errors
+	// of the send data variety.
+	checkErr := func(err error) bool {
+		if err != nil {
+			// try to register a timeout
+			c.registerTimeout()
+
+			// break out of the endless loop to a shutdown
+			return false
+		}
+		return true
+	}
+	messageType := defaultMessageType
+	// if there is a disconnect here
+	if message[0] == server.DisconnectOpcode.Value() {
+		messageType = shutdownMessageType
+	}
+
+	cw, err := c.meta.conn.NextWriter(messageType)
+
+	if !checkErr(err) {
+		return false
+	}
+
+	_, err = cw.Write(message)
+
+	if !checkErr(err) {
+		return false
+	}
+
+	// flush the message to the network
+	err = cw.Close()
+
+	return !checkErr(err) && messageType == defaultMessageType
+}
+
+func (c *Client) recvDataHandler(messageType int, message io.Reader) error {
+
+	logger.Debugf("Received message type [%d]", messageType)
+
+	if messageType == websocket.CloseMessage {
+		logger.Infof("the client with the id [%d] closed the connection.", messageType)
+		return ErrClosedConnection
+	} else if messageType != websocket.BinaryMessage {
+		err := ErrNonBinaryMessage{
+			id: messageType,
+		}
+		logger.Error(err.Error())
+		return err
+	}
+
+	// prepare a zero sized array of size 17
+	var readData [MaxClientCommand]byte
+	readBytes, err := message.Read(readData[:])
+
+	if err != nil {
+		logger.Warnf("unexpected read error received.\n[%s]", err.Error())
+		return err
+	}
+
+	if readBytes == 0 {
+		return ErrNoBytesRead
+	}
+
+	// handle the gotten data on an other go thread
+	// as to not block the next readers
+	return c.queue.Enqueue(readData[:readBytes])
 }
 
 // recvData is the actual function used to run the client read loop
@@ -279,33 +343,7 @@ func (c *Client) recvData() {
 			return
 		}
 
-		logger.Debugf("Received message type [%d]", messageType)
-
-		if messageType == websocket.CloseMessage {
-			logger.Infof("the client with the id [%d] closed the connection.", messageType)
-			return
-		} else if messageType != websocket.BinaryMessage {
-			logger.Warnf("a non binary message type was received type: [%d]", messageType)
-			return
-		}
-
-		// prepare a zero sized array of size 17
-		var readData [MaxClientCommand]byte
-		readBytes, err := message.Read(readData[:])
-
-		if err != nil {
-			logger.Warnf("unexpected read error received.\n[%s]", err.Error())
-			return
-		}
-
-		if readBytes == 0 {
-			logger.Warn("empty package received")
-			return
-		}
-
-		// handle the gotten data on an other go thread
-		// as to not block the next readers
-		err = c.queue.Enqueue(readData[:readBytes])
+		err = c.recvDataHandler(messageType, message)
 		if err != nil {
 			return
 		}
