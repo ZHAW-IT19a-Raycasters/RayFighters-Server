@@ -38,16 +38,22 @@ func compareByteArrays(expectedData, gottenData []byte, t *testing.T) bool {
 	return true
 }
 
-func TestHandleReadUnknownReceived(t *testing.T) {
+func TestHandleReadUnknown(t *testing.T) {
 	hub := NewHubController()
 	request := []byte{
 		client.UnknownOpcode.Value(),
 	}
 	actual := hub.handleRead(request, 1)
-	expected := []byte{
-		server.UnknownOpcode.Value(),
+	if actual != nil {
+		t.Errorf("Happend in ReadUnknownReveived")
 	}
-	if !compareByteArrays(expected, actual.Bytes(), t) {
+}
+
+func TestHandleReadUnknownEmpty(t *testing.T) {
+	hub := NewHubController()
+	request := []byte{}
+	actual := hub.handleRead(request, 1)
+	if actual != nil {
 		t.Errorf("Happend in ReadUnknownReveived")
 	}
 }
@@ -145,15 +151,81 @@ func TestHandleReadMovementError(t *testing.T) {
 	}
 }
 
-// TODO: THIS TEST
+
 func TestHandleReadDisconnect(t *testing.T) {
+	hub := NewHubController()
+
+	cQueue, hQueue := helpers.NewWorkQueue()
+	const otherId uint8 = 2
+	hub.connections[otherId] = hQueue
+
+	client2Meta, _ := getClientMeta(2)
+
+	hub.RegisterClient(client2Meta)
+
+	_, hQueue = helpers.NewWorkQueue()
+	const userId uint8 = 1
+	hub.connections[userId] = hQueue
+
+	client1Meta, _ := getClientMeta(1)
+
+	hub.RegisterClient(client1Meta)
+
+	request := []byte {
+		client.DisconnectOpcode.Value(),
+	}
+
+	actual := hub.handleRead(request, 0)
+
+	expected := []byte {
+		server.DisconnectOpcode.Value(),
+	}
+	bytes := actual.Bytes()
+	if !compareByteArrays(expected, bytes, t) {
+		t.Error("Error in HandleDisconnect")
+	}
+
+	cQueue.Dequeue()
+	cQueue.Dequeue()
+	cQueue.Dequeue()
+	cQueue.Dequeue()
+	gotten, err := cQueue.Dequeue()
+
+	gottenExp := []byte{
+		server.PlayerLeftOpcode.Value(),
+		0x00,
+	}
+
+	if err != nil {
+		t.Errorf("An unexepected error happend\n[%s]", err.Error())
+		return
+	}
+
+	if !compareByteArrays(gottenExp, gotten, t) {
+		t.Errorf("Happend in Disconnect")
+	}
+}
+
+func TestHandleReadDisconnectError(t *testing.T) {
 	hub := NewHubController()
 	meta, _ := getClientMeta(1)
 
 	hub.RegisterClient(meta)
 	// hub.clientManager.GetClients()
-	magic := hub.handleDisconnect([]byte{client.DisconnectOpcode.Value()}, 0)
-	t.Log(magic)
+
+	request := []byte{
+		client.DisconnectOpcode.Value(),
+		0x01,
+	}
+
+	actual := hub.handleRead(request, 0)
+	expected := []byte{
+		server.UnknownOpcode.Value(),
+	}
+
+	if !compareByteArrays(expected, actual.Bytes(), t) {
+		t.Errorf("Happend in Request Disconnect")
+	}
 }
 
 func TestHandleReadShooting(t *testing.T) {
@@ -219,20 +291,15 @@ func TestHandleReadShootingError(t *testing.T) {
 
 func TestHandleReadRequestOtherPlayer(t *testing.T) {
 	hub := NewHubController()
-	cQueue, hQueue := helpers.NewWorkQueue()
-	const otherId uint8 = 2
 	client2Meta, _ := getClientMeta(2)
 
 	hub.RegisterClient(client2Meta)
-	hub.connections[otherId] = hQueue
 
-	_, hQueue = helpers.NewWorkQueue()
 	const userId uint8 = 1
 
 	client1Meta, _ := getClientMeta(1)
 
 	hub.RegisterClient(client1Meta)
-	hub.connections[userId] = hQueue
 
 	request := []byte{
 		client.RequestOtherPlayersOpcode.Value(),
@@ -257,27 +324,110 @@ func TestHandleReadRequestOtherPlayer(t *testing.T) {
 	expected = append(expected, 0)
 	expected = append(expected, []byte(client1Meta.GetName())...)
 
-	if actual != nil {
-		t.Error("there should not be a returned value on movement player")
+	if actual == nil {
+		t.Error("there should be a returned value on movement player")
 		return
 	}
 
-	gotten, err := cQueue.Dequeue()
-	gotten, err = cQueue.Dequeue()
-	gotten, err = cQueue.Dequeue()
-
-	if err != nil {
-		t.Errorf("An unexepected error happend\n[%s]", err.Error())
-		return
-	}
-
-	if !compareByteArrays(expected, gotten, t) {
+	if !compareByteArrays(expected, actual.Bytes(), t) {
 		t.Errorf("Happend in Request other Players")
+	}
+}
+
+func TestHandleReadRequestOtherPlayerError(t *testing.T) {
+	hub := NewHubController()
+
+	const userId uint8 = 1
+
+	request := []byte{
+		client.RequestOtherPlayersOpcode.Value(),
+		0x01,
+	}
+	actual := hub.handleRead(request, userId)
+	expected := []byte{
+		server.UnknownOpcode.Value(),
+	}
+
+	if actual == nil {
+		t.Error("there should be a returned value on movement player")
+		return
+	}
+
+	if !compareByteArrays(expected, actual.Bytes(), t) {
+		t.Errorf("Happend in Request other Players Error")
 	}
 }
 
 func TestHandleReadRequestPlayerKD(t *testing.T) {
 	hub := NewHubController()
-	magic := hub.handleRequestPlayerKD([]byte{client.RequestPlayerKDOpcode.Value()})
-	t.Log(magic)
+	client2Meta, _ := getClientMeta(2)
+
+	hub.RegisterClient(client2Meta)
+	hub.gameState.AddClient(2)
+
+	const userId uint8 = 1
+
+	client1Meta, _ := getClientMeta(1)
+
+	hub.RegisterClient(client1Meta)
+	hub.gameState.AddClient(1)
+
+	hub.gameState.IncKill(1)
+	hub.gameState.IncKill(1)
+	hub.gameState.IncDeaths(1)
+
+	hub.gameState.IncKill(2)
+	hub.gameState.IncDeaths(2)
+	hub.gameState.IncDeaths(2)
+
+	request := []byte{
+		client.RequestPlayerKDOpcode.Value(),
+	}
+	actual := hub.handleRead(request, userId)
+	expected := []byte{
+		server.SendAllPlayerKDOpcode.Value(),
+		0x02,
+		0x02, 0x01, 0x00, 0x02, 0x00,
+		0x01, 0x02, 0x00, 0x01, 0x00,
+	}
+
+	if actual == nil {
+		t.Error("there should be a returned value on Send All PlayersKD request")
+		return
+	}
+
+	if !compareByteArrays(expected, actual.Bytes(), t) {
+		t.Errorf("Happend in Request other Players KD")
+	}
+}
+
+func TestHandleReadRequestPlayerKDError(t *testing.T) {
+	hub := NewHubController()
+	client2Meta, _ := getClientMeta(2)
+
+	hub.RegisterClient(client2Meta)
+
+	const userId uint8 = 1
+
+	client1Meta, _ := getClientMeta(1)
+
+	hub.RegisterClient(client1Meta)
+
+	request := []byte{
+		client.RequestPlayerKDOpcode.Value(),
+		0x01,
+	}
+	actual := hub.handleRead(request, userId)
+	expected := []byte{
+		server.UnknownOpcode.Value(),
+	}
+
+	if actual == nil {
+		t.Error("there should be a returned value on Send All PlayersKD request")
+		return
+	}
+
+	if !compareByteArrays(expected, actual.Bytes(), t) {
+		t.Errorf("Happend in Request other Players KD Error")
+	}
 }

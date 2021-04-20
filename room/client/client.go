@@ -74,6 +74,7 @@ func NewClient(id uint8, meta ClientMeta, queue helpers.ClientQueue) *Client {
 	c := Client{
 		queue:    queue,
 		status:   Offline,
+		meta: 	  newClientInternalMeta(id, meta),
 		isActive: utils.NewAtomicBool(false),
 		wg:       sync.WaitGroup{},
 		lock:     sync.RWMutex{},

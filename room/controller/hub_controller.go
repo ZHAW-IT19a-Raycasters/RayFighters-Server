@@ -178,14 +178,22 @@ func (hc *HubController) runClientConnection(hqueue helpers.HubQueue, id uint8) 
 			defer wg.Done()
 
 			gotten := hc.handleRead(data, id)
+			toSend := gotten.Bytes()
 			// this means that the given opcode will not actually
 			// result in a direct return message, this happens
 			// with broadcast commands.
 			if gotten == nil {
 				return
 			}
+			hqueue.Enqueue(toSend)
 
-			hqueue.Enqueue(gotten.Bytes())
+			if toSend[0] == server.UnknownOpcode.Value() {
+				// We ignore the ok because this function can't be called without the user already existing
+				meta, _ := hc.clientManager.MapMeta(id)
+				// We ignore the error here, as it is impossible per definition
+				_ = hc.removeClient(meta)
+				return
+			}
 		}()
 	}
 }
@@ -224,8 +232,10 @@ func (hc *HubController) removeClient(meta client.ClientMeta) error {
 	// client exists so lock everything down to remove him
 	_ = hc.clientManager.RemoveClient(meta)
 
+	hc.broadCast(server.NewPlayerLeft(id), helpers.NewIdSet())
+
 	// decrement the counter
-	// error here is imposible due to the checks above
+	// error here is impossible due to the checks above
 	_ = hc.Release()
 
 	return nil
@@ -258,13 +268,13 @@ func (hc *HubController) Shutdown(cxt context.Context) {
 }
 
 func (hc *HubController) handleRead(data []byte, id uint8) protocol.Bytefy {
+	if data == nil || len(data) == 0 {
+		return hc.handleUnknown(id)
+	}
 	switch pclient.Detect(data[0]) {
 	case pclient.DisconnectOpcode:
 		// Received a Disconnect request from client
 		return hc.handleDisconnect(data, id)
-	case pclient.UnknownOpcode:
-		// hubController received Unknown request from Server
-		return hc.handleUnknownReceived(data)
 	case pclient.WhoAmIOpcode:
 		// Received a WhoAmI request from client
 		return hc.handleWhoAmI(data, id)
@@ -279,15 +289,16 @@ func (hc *HubController) handleRead(data []byte, id uint8) protocol.Bytefy {
 		return hc.handleRequestOtherPlayer(data)
 	case pclient.RequestPlayerKDOpcode:
 		// Received a RequestOtherPlayers request from client
-		return hc.handleRequestOtherPlayer(data)
+		return hc.handleRequestPlayerKD(data)
 	default:
 		// Received Unknown Code from client
-		return hc.handleUnknownSent()
+		return hc.handleUnknown(id)
 	}
 }
 
-func (hc *HubController) handleUnknownReceived(t []byte) protocol.Bytefy {
-	return server.NewUnknown()
+func (hc *HubController) handleUnknown(id uint8) protocol.Bytefy {
+	logger.Errorf("Received Unknown Opcode from Client[%d]", id)
+	return nil
 }
 
 func (hc *HubController) handleDisconnect(t []byte, id uint8) protocol.Bytefy {
@@ -303,11 +314,6 @@ func (hc *HubController) handleDisconnect(t []byte, id uint8) protocol.Bytefy {
 	// We ignore the error here, as it is impossible per definition
 	_ = hc.removeClient(meta)
 	return newDisconnect
-}
-
-func (hc *HubController) handleUnknownSent() protocol.Bytefy {
-	logger.Error("Unknown Opcode was sent")
-	return nil
 }
 
 func (hc *HubController) handleWhoAmI(t []byte, id uint8) protocol.Bytefy {
@@ -374,9 +380,7 @@ func (hc *HubController) handleRequestOtherPlayer(t []byte) protocol.Bytefy {
 	}
 
 	newPlayerInfo := server.NewSendAllPlayerInfo(hc.clientManager.GetPlayers())
-	hc.broadCast(newPlayerInfo, helpers.NewIdSet())
-
-	return nil
+	return newPlayerInfo
 }
 
 func (hc *HubController) handleRequestPlayerKD(t []byte) protocol.Bytefy {
