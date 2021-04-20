@@ -5,8 +5,8 @@ import (
 	"errors"
 	"math"
 
-	"github.zhaw.ch/raycasters/server/log"
 	"github.zhaw.ch/raycasters/server/room/client"
+	"github.zhaw.ch/raycasters/server/room/controller"
 	"github.zhaw.ch/raycasters/server/utils"
 )
 
@@ -14,10 +14,6 @@ import (
 // footprint, this is used for signals
 // counters.
 type void struct{}
-
-// logger responsible for all the logging
-// happening
-var logger = log.Log()
 
 // HubClientLimit is the absolute upper limit supported
 // by a single hub. This limitation comes from the
@@ -35,7 +31,7 @@ type Hub struct {
 	id int
 	// controller is the struct responsible for running all the client opcodes
 	// and handling all the io.
-	controller *hubController
+	controller *controller.HubController
 	// The channel over which a new connection
 	// is added. This connections input can be accessed
 	// via the `RegisterClient` function associated
@@ -53,7 +49,7 @@ type Hub struct {
 func NewHub(hubId int) *Hub {
 	h := &Hub{
 		input:      make(chan client.ClientMeta),
-		controller: newHubController(),
+		controller: controller.NewHubController(),
 		shutdown:   make(chan void),
 		id:         hubId,
 		isActive:   utils.NewAtomicBool(false),
@@ -88,7 +84,7 @@ func (h *Hub) RegisterClient(meta client.ClientMeta) error {
 		// increment the counter
 		// if the counter already is maxed out
 		// this will return an error
-		err := h.controller.acquire()
+		err := h.controller.Acquire()
 
 		if err != nil {
 			return ErrHubIsFull
@@ -125,7 +121,7 @@ func (h *Hub) Run() {
 			return
 		case meta := <-h.input:
 			logger.Debugf("Adding a new player to hub [%d]", h.id)
-			h.controller.registerClient(meta)
+			h.controller.RegisterClient(meta)
 		}
 	}
 }
@@ -137,7 +133,7 @@ func (h *Hub) Shutdown(cxt context.Context) {
 	waitCompletion := make(chan void)
 
 	go func() {
-		h.controller.shutdown(cxt)
+		h.controller.Shutdown(cxt)
 		// make sure that the main thread is closed
 		close(h.shutdown)
 		// close blocker
