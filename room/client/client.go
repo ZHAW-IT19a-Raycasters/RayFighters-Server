@@ -74,7 +74,7 @@ func NewClient(id uint8, meta ClientMeta, queue helpers.ClientQueue) *Client {
 	c := Client{
 		queue:    queue,
 		status:   Offline,
-		meta: 	  newClientInternalMeta(id, meta),
+		meta:     newClientInternalMeta(id, meta),
 		isActive: utils.NewAtomicBool(false),
 		wg:       sync.WaitGroup{},
 		lock:     sync.RWMutex{},
@@ -84,6 +84,11 @@ func NewClient(id uint8, meta ClientMeta, queue helpers.ClientQueue) *Client {
 	c.registerConn(meta, queue)
 
 	return &c
+}
+
+// GetStatus will return the current connection status of the client
+func (c *Client) GetStatus() ConnectionStatus {
+	return c.status
 }
 
 // GetInternalMeta will return the internal version of the
@@ -276,6 +281,7 @@ func (c *Client) sendDataHelper(message []byte) bool {
 	return !checkErr(err) && messageType == defaultMessageType
 }
 
+// recvDataHandler will handle the received data pacakges
 func (c *Client) recvDataHandler(messageType int, message io.Reader) error {
 
 	logger.Debugf("Received message type [%d]", messageType)

@@ -25,11 +25,10 @@ func setupTimerDefault(t *testing.T) time.Time {
 }
 
 func TestTimer(t *testing.T) {
-	const limit = 10
 	const expId = 1
 	expTime := setupTimerDefault(t)
 
-	ht := NewHubTimer(limit)
+	ht := NewHubTimer()
 	ct := ht.NewClientTimer(expId)
 
 	// try to reset here

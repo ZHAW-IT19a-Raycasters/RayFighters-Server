@@ -17,11 +17,12 @@ import (
 func NewHubController() *HubController {
 	// TODO: add map implementation
 	return &HubController{
-		clientManager: client.NewClientManager(),
-		connections:   make(map[uint8]helpers.HubQueue),
-		gameState:     NewGameState(),
-		wg:            sync.WaitGroup{},
-		lock:          sync.RWMutex{},
+		clientManager:      client.NewClientManager(),
+		connections:        make(map[uint8]helpers.HubQueue),
+		gameState:          NewGameState(),
+		timeoutClientQueue: helpers.NewHubTimer(),
+		wg:                 sync.WaitGroup{},
+		lock:               sync.RWMutex{},
 	}
 }
 
@@ -34,6 +35,9 @@ type HubController struct {
 	// gameState stores the current state of the game
 	// such as player kills and their deaths.
 	gameState GameState
+	// timeoutClientQueue stores the currently timedout clients
+	// so that they can be removed once the timeout runs out.
+	timeoutClientQueue helpers.HubTimer
 	// Semaphore, counts the totally active
 	// player connections, although that number is already available
 	// via the client map length, is would have to be accessed
@@ -47,6 +51,51 @@ type HubController struct {
 	// lock is used to limit the access to the connections.
 	// as well as to the client manager.
 	lock sync.RWMutex
+}
+
+// TimerQueue will return a receiving channel for the
+// timer data. Attention only use this function to
+// access and do not save the value individually.
+func (hc *HubController) TimerQueue() <-chan helpers.TimerData {
+	return hc.timeoutClientQueue.GetQueue()
+}
+
+// RemoveClientIfTimeout will remove a client only
+// if the client is timedout
+func (hc *HubController) RemoveClientIfTimeout(id uint8) error {
+	checkState := func() error {
+		hc.lock.RLock()
+		defer hc.lock.RUnlock()
+		status, ok := hc.clientManager.GetClientStatus(id)
+		if !ok {
+			return ErrClientDoesNotExist{
+				id: id,
+			}
+		} else if status != client.Timeout {
+			return ErrClientNotTimedOut{
+				id: id,
+			}
+		}
+		return nil
+	}
+
+	err := checkState()
+	if err != nil {
+		return err
+	}
+
+	// actually timed out :(
+	// remove the client but make sure for a
+	// last time that there was no previous
+	// removal during the moment since
+	// releasing the lock.
+	meta, ok := hc.clientManager.MapMeta(id)
+	if !ok {
+		return ErrClientDoesNotExist{
+			id: id,
+		}
+	}
+	return hc.removeClient(meta)
 }
 
 // Acquire will increment the counted value for the semaphore
@@ -269,6 +318,7 @@ func (hc *HubController) Shutdown(cxt context.Context) {
 	hc.clientManager.Shutdown(cxt)
 }
 
+// handleRead will as the name implies handle all the given reads.
 func (hc *HubController) handleRead(data []byte, id uint8) protocol.Bytefy {
 	// we can ommit the nil check here
 	// as a len for a nil slice if

@@ -122,6 +122,8 @@ func (h *Hub) Run() {
 		case meta := <-h.input:
 			logger.Debugf("Adding a new player to hub [%d]", h.id)
 			h.controller.RegisterClient(meta)
+		case <-h.controller.TimerQueue():
+			// TODO: register the timeData to the timer
 		}
 	}
 }
