@@ -5,7 +5,6 @@ import (
 	"io"
 	"os"
 
-	"github.zhaw.ch/raycasters/server/gamelocation/utils"
 	"github.zhaw.ch/raycasters/server/log"
 )
 
@@ -25,14 +24,14 @@ func check(e error) {
 
 // LoadMap loads game map from the given file path.
 // It panics if any problemns are encountered, while reading the file.
-func LoadMap(filePath string) ([][]utils.LocationElement, error) {
+func LoadMap(filePath string) ([][]MapElement, error) {
 	file, err := os.Open(filePath)
 	check(err)
 	defer file.Close()
 	return parseMap(file)
 }
 
-func parseMap(file io.Reader) ([][]utils.LocationElement, error) {
+func parseMap(file io.Reader) ([][]MapElement, error) {
 
-	return [][]utils.LocationElement{}, nil
+	return [][]MapElement{}, nil
 }
