@@ -155,7 +155,7 @@ func TestClientManagerMaxClients(t *testing.T) {
 	// no errors here
 	for i := 0; i <= math.MaxUint8; i += 1 {
 		clientQueue, _ := helpers.NewWorkQueue()
-		meta, _ := getClientMeta(i)
+			meta, _ := getClientMeta(i)
 		err := cm.AddClient(meta, clientQueue)
 
 		if err != nil {

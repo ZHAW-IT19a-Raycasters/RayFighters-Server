@@ -1,46 +1,11 @@
-package room
+package controller
 
 import (
-	"fmt"
 	"sync"
 
 	"github.zhaw.ch/raycasters/server/protocol/server"
 	"github.zhaw.ch/raycasters/server/room/client"
 )
-
-// ErrClientDoesNotExist will be returned in cases
-// where the specified client does not yet exist.
-type ErrClientDoesNotExist struct {
-	id uint8
-}
-
-// Error satisfies the error
-func (err ErrClientDoesNotExist) Error() string {
-	return fmt.Sprintf("the given client [%d] already exists", err.id)
-}
-
-// Is satisfies the error.Is configuration
-func (err ErrClientDoesNotExist) Is(target error) bool {
-	_, ok := target.(ErrClientDoesNotExist)
-	return ok
-}
-
-// ErrClientExists is the error that will be returned
-// if the given client does already exists.
-type ErrClientExists struct {
-	id uint8
-}
-
-// Error satisfies the error
-func (err ErrClientExists) Error() string {
-	return fmt.Sprintf("the given client [%d] already exists", err.id)
-}
-
-// Is satisfies the error.Is configuration
-func (err ErrClientExists) Is(target error) bool {
-	_, ok := target.(ErrClientExists)
-	return ok
-}
 
 // GameState represents the current state of the
 // game board.
@@ -59,7 +24,7 @@ func NewGameState() GameState {
 
 // GetClient will return a the state of a specific client.
 // And if the client could not be found false will be returned
-func (gs GameState) GetClient(id uint8) (*client.ClientGame, bool) {
+func (gs *GameState) GetClient(id uint8) (*client.ClientGame, bool) {
 	gs.lock.RLock()
 	defer gs.lock.RUnlock()
 	c, ok := gs.clients[id]
@@ -71,7 +36,7 @@ func (gs GameState) GetClient(id uint8) (*client.ClientGame, bool) {
 
 // GetPlayersKD will return the player kd of all the currently
 // logged in players.
-func (gs GameState) GetPlayersKD() server.PlayersKD {
+func (gs *GameState) GetPlayersKD() server.PlayersKD {
 	gs.lock.RLock()
 	defer gs.lock.RUnlock()
 	playersKD := make([]server.PlayerKD, 0, len(gs.clients))
