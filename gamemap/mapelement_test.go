@@ -222,3 +222,30 @@ func TestConvertInvalidSymbol(t *testing.T) {
 	}
 
 }
+
+// Test if empty slice considered to be squared.
+func TestIsSquaredEmpty(t *testing.T) {
+	expected := true
+	actual := isSquared(make([][]MapElement, 0))
+	if expected != actual {
+		t.Errorf("false result: (expected: %v; actual: %v)", expected, actual)
+	}
+}
+
+// Test if squared slice considered to be squared.
+func TestIsSquaredPositive(t *testing.T) {
+	expected := true
+	actual := isSquared([][]MapElement{{Floor, Floor}, {Floor, Floor}})
+	if expected != actual {
+		t.Errorf("false result: (expected: %v; actual: %v)", expected, actual)
+	}
+}
+
+// Test if not squred slice considered to be not squared.
+func TestIsSquaredNegative(t *testing.T) {
+	expected := false
+	actual := isSquared([][]MapElement{{Floor, Floor}, {Floor}})
+	if expected != actual {
+		t.Errorf("false result: (expected: %v; actual: %v)", expected, actual)
+	}
+}
