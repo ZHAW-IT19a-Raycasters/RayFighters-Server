@@ -156,7 +156,9 @@ func (hc *HubController) RegisterClient(meta client.ClientMeta) error {
 	return nil
 }
 
-// runClientConnection
+// runClientConnection is the main excecuting function for interacting with
+// the client. It handles all the incommening opcodes received from the
+// client.
 func (hc *HubController) runClientConnection(hqueue helpers.HubQueue, id uint8) {
 	var wg sync.WaitGroup
 	defer wg.Wait()
@@ -268,7 +270,10 @@ func (hc *HubController) Shutdown(cxt context.Context) {
 }
 
 func (hc *HubController) handleRead(data []byte, id uint8) protocol.Bytefy {
-	if data == nil || len(data) == 0 {
+	// we can ommit the nil check here
+	// as a len for a nil slice if
+	// defined as 0.
+	if len(data) == 0 {
 		return hc.handleUnknown(id)
 	}
 	switch pclient.Detect(data[0]) {
