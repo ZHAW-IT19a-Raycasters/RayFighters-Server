@@ -3,6 +3,7 @@ package room
 import (
 	"context"
 	"testing"
+	"time"
 )
 
 func TestHub(t *testing.T) {
@@ -14,6 +15,7 @@ func TestHub(t *testing.T) {
 		// bussy wait until hub is running
 		for !hub.IsAlive() {
 		}
+		time.Sleep(500000 * time.Microsecond)
 		close(waitUntilActive)
 	}()
 
@@ -21,6 +23,7 @@ func TestHub(t *testing.T) {
 
 	// wait until active
 	<-waitUntilActive
+
 	// try to run the hub again
 	// this should
 	err := hub.Run()

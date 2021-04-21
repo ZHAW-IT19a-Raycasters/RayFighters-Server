@@ -28,6 +28,10 @@ const HubClientLimit = math.MaxUint8
 // system, before beeing removed from it.
 const ClientTimeout = 5 * time.Second
 
+// workerCount is the ammount of workers the
+// hub it self has at all times.
+const workerCount = 2
+
 var (
 	// ErrHubIsFull is the error that is returned on an RegisterClient error.
 	ErrHubIsFull = errors.New("the hub is currently filled to capacity")
@@ -37,6 +41,10 @@ var (
 	// ErrHubIsAlreadyRunning is the error returned if the
 	// hub is already running.
 	ErrHubIsAlreadyRunning = errors.New("hub is already running")
+	// ErrHubIsStillStartingUp is the error returned if the
+	// hub is still in the process of starting its
+	// subsystems.
+	ErrHubIsStillStartingUp = errors.New("hub is still starting up")
 )
 
 // Hub represents a single room.
@@ -59,7 +67,7 @@ type Hub struct {
 	isActive utils.AtomicBool
 	// wg is the wait group used to see if the
 	// workers are still running
-	wg sync.WaitGroup
+	wg *sync.WaitGroup
 }
 
 // NewHub will initiate a new hub struct.
@@ -72,7 +80,7 @@ func NewHub(hubId int) *Hub {
 		shutdown:   make(chan void),
 		id:         hubId,
 		isActive:   utils.NewAtomicBool(false),
-		wg:         sync.WaitGroup{},
+		wg:         &sync.WaitGroup{},
 	}
 	return h
 }
@@ -131,9 +139,8 @@ func (h *Hub) Run() error {
 	}
 
 	// add two runners
-	h.wg.Add(2)
+	h.wg.Add(workerCount)
 
-	// run the timer
 	go h.runTimer()
 	go h.runRegistration()
 
