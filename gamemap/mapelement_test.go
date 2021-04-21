@@ -214,3 +214,11 @@ func TestConvertValidDecoSymbol(t *testing.T) {
 		t.Errorf("false result: (expected: %v; actual: %v)", expected, actual)
 	}
 }
+
+func TestConvertInvalidSymbol(t *testing.T) {
+	_, err := convert(rune(' '))
+	if err == nil {
+		t.Error("an error should have been raised")
+	}
+
+}
