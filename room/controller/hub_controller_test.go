@@ -151,7 +151,6 @@ func TestHandleReadMovementError(t *testing.T) {
 	}
 }
 
-
 func TestHandleReadDisconnect(t *testing.T) {
 	hub := NewHubController()
 
@@ -310,26 +309,43 @@ func TestHandleReadRequestOtherPlayer(t *testing.T) {
 		0x02,
 	}
 
-	// AppendPlayer2
+	id1, _ := hub.clientManager.MapId(client1Meta)
 	id2, _ := hub.clientManager.MapId(client2Meta)
-	expected = append(expected, id2)
-	expected = append(expected, byte(len(client2Meta.GetName())))
-	expected = append(expected, 0)
-	expected = append(expected, []byte(client2Meta.GetName())...)
+
+	// AppendPlayer2
+	expected1 := append(expected, id2)
+	expected1 = append(expected1, byte(len(client2Meta.GetName())))
+	expected1 = append(expected1, 0)
+	expected1 = append(expected1, []byte(client2Meta.GetName())...)
 
 	// AppendPlayer1
-	id1, _ := hub.clientManager.MapId(client1Meta)
-	expected = append(expected, id1)
-	expected = append(expected, byte(len(client1Meta.GetName())))
-	expected = append(expected, 0)
-	expected = append(expected, []byte(client1Meta.GetName())...)
+	expected1 = append(expected1, id1)
+	expected1 = append(expected1, byte(len(client1Meta.GetName())))
+	expected1 = append(expected1, 0)
+	expected1 = append(expected1, []byte(client1Meta.GetName())...)
+
+	// map is random so we need to test both variations
+
+	// AppendPlayer1
+	expected2 := append(expected, id1)
+	expected2 = append(expected2, byte(len(client1Meta.GetName())))
+	expected2 = append(expected2, 0)
+	expected2 = append(expected2, []byte(client1Meta.GetName())...)
+
+	// AppendPlayer2
+	expected2 = append(expected2, id2)
+	expected2 = append(expected2, byte(len(client2Meta.GetName())))
+	expected2 = append(expected2, 0)
+	expected2 = append(expected2, []byte(client2Meta.GetName())...)
 
 	if actual == nil {
 		t.Error("there should be a returned value on movement player")
 		return
 	}
 
-	if !compareByteArrays(expected, actual.Bytes(), t) {
+	bytes := actual.Bytes()
+
+	if !compareByteArrays(expected1, bytes, t) && !compareByteArrays(expected2, actual.Bytes(), t) {
 		t.Errorf("Happend in Request other Players")
 	}
 }
