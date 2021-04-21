@@ -1,6 +1,7 @@
 package gamemap
 
 import (
+	"bufio"
 	"bytes"
 	"io/ioutil"
 	"os"
@@ -187,5 +188,55 @@ func TestParseLineEmptyLine(t *testing.T) {
 	actual := equals1d(expectedSlice, actualSlice)
 	if expected != actual {
 		t.Errorf("false result: (expected: %v; actual: %v)", expected, actual)
+	}
+}
+
+// Test if skipping some numbers will return an expected result.
+func TestSkipLines(t *testing.T) {
+
+	scanner := bufio.NewScanner(intoMapReader(0, []string{"1", "2", "3", "4"}))
+	err := skipLines(scanner, headerLength+3)
+	if err != nil {
+		t.Errorf("unexpected error: %s", err.Error())
+		return
+	}
+	scanner.Scan()
+	expected := "4"
+	actual := scanner.Text()
+	if expected != actual {
+		t.Errorf("false result: (expected: %s; actual: %s)", expected, actual)
+	}
+}
+
+// Test if trying to skip more lines than file in total has will raise an error.
+func TestSkipLinesShortFile(t *testing.T) {
+	scanner := bufio.NewScanner(strings.NewReader(""))
+	err := skipLines(scanner, 10)
+	if err == nil {
+		t.Errorf("an error should have been raised")
+	}
+}
+
+// Test if reading a dimension from a file will return an expected rusult.
+func TestReadMapDimension(t *testing.T) {
+	scanner := bufio.NewScanner(strings.NewReader("40"))
+	expected := 40
+	actual, err := readMapDimension(scanner)
+	if err != nil {
+		t.Errorf("unexpected error: %s", err.Error())
+		return
+	}
+	if expected != actual {
+		t.Errorf("false result: (expected: %d; actual: %d)", expected, actual)
+	}
+}
+
+// Test if reading negative dimesion will raise an error
+func TestReadMapDimensionNegativeNumber(t *testing.T) {
+	scanner := bufio.NewScanner(strings.NewReader("-666"))
+	_, err := readMapDimension(scanner)
+	if err == nil {
+		t.Errorf("an error should have been raised")
+		return
 	}
 }
