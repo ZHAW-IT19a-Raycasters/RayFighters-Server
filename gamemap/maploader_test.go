@@ -2,38 +2,11 @@ package gamemap
 
 import (
 	"bufio"
-	"bytes"
 	"io/ioutil"
 	"os"
-	"strconv"
 	"strings"
 	"testing"
 )
-
-// intoMapReader converts given slice into proper map format an return a *string.Reader on it.
-func intoMapReader(mapDim int, mapSlice []string) *strings.Reader {
-	return strings.NewReader(intoMapString(mapDim, mapSlice))
-}
-
-// intoMapString converts given 1d slice into string, each position of given slice is interpreted as a new row.
-// Is a helper function used in testing.
-func intoMapString(mapDim int, mapSlice []string) string {
-	var map2d bytes.Buffer
-	for i := 0; i < headerLength-1; i++ {
-		map2d.WriteString("\n")
-	}
-
-	map2d.WriteString(strconv.Itoa(mapDim))
-	map2d.WriteString("\n")
-	dim := len(mapSlice)
-	for i := 0; i < dim; i++ {
-		map2d.WriteString(mapSlice[i])
-		if i != dim-1 {
-			map2d.WriteString("\n")
-		}
-	}
-	return map2d.String()
-}
 
 // Test if loading file from non-existing path will raise an error.
 func TestLoadMapInvalidPath(t *testing.T) {
@@ -47,20 +20,11 @@ func TestLoadMapInvalidPath(t *testing.T) {
 func TestLoadMapValidPath(t *testing.T) {
 	file, err := ioutil.TempFile(".", "tempfile")
 	if err != nil {
-		t.Error(err)
-		return
+		t.Error(err.Error())
 	}
 	// "defer" stacks
 	defer os.Remove(file.Name())
-	if err != nil {
-		t.Error(err)
-		return
-	}
 	defer file.Close()
-	if err != nil {
-		t.Error(err)
-		return
-	}
 	_, err = LoadMap(file.Name())
 	if err == nil {
 		t.Errorf("an error should have been raised")
@@ -101,15 +65,6 @@ func TestParseMapWrongSymbols(t *testing.T) {
 	if err == nil {
 		t.Errorf("an error should have been raised")
 		return
-	}
-}
-
-// Test if mapString produces expected result.
-func TestMapString(t *testing.T) {
-	expected := "\n\n\n\n2\n00\n0"
-	actual := intoMapString(2, []string{"00", "0"})
-	if expected != actual {
-		t.Errorf("\nfalse result: (\nexpected:\n%s\nactual:\n%s", expected, actual)
 	}
 }
 

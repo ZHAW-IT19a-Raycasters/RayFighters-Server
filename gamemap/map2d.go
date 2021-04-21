@@ -12,7 +12,8 @@ type Map2d struct {
 
 // Error codes returned by failures in gamemap.
 var (
-	ErrMap2dIndx = errors.New("map2d: index out of bound")
+	ErrMap2dIndx  = errors.New("map2d: index out of bound")
+	ErrMap2dNotSq = errors.New("map2d: invalid map dimension")
 )
 
 // LoadMap2d loads map from given path and wraps it into ingame abstraction.
@@ -23,7 +24,7 @@ func LoadMap2d(filePath string) (Map2d, error) {
 		return Map2d{}, err
 	}
 	if !isSquared(map2dSlice) {
-		return Map2d{}, err
+		return Map2d{}, ErrMap2dNotSq
 	}
 	return newMap2d(len(map2dSlice), map2dSlice)
 }
