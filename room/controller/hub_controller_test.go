@@ -305,7 +305,17 @@ func TestHandleReadRequestOtherPlayer(t *testing.T) {
 		client.RequestOtherPlayersOpcode.Value(),
 	}
 	actual := hub.handleRead(request, userId)
-	expected := []byte{
+
+	if actual == nil {
+		t.Error("there should be a returned value on movement player")
+		return
+	}
+
+	expected1 := []byte{
+		server.SendAllPlayerInfoOpcode.Value(),
+		0x02,
+	}
+	expected2 := []byte{
 		server.SendAllPlayerInfoOpcode.Value(),
 		0x02,
 	}
@@ -314,7 +324,7 @@ func TestHandleReadRequestOtherPlayer(t *testing.T) {
 	id2, _ := hub.clientManager.MapId(client2Meta)
 
 	// AppendPlayer2
-	expected1 := append(expected, id2)
+	expected1 = append(expected1, id2)
 	expected1 = append(expected1, byte(len(client2Meta.GetName())))
 	expected1 = append(expected1, 0)
 	expected1 = append(expected1, []byte(client2Meta.GetName())...)
@@ -328,7 +338,7 @@ func TestHandleReadRequestOtherPlayer(t *testing.T) {
 	// map is random so we need to test both variations
 
 	// AppendPlayer1
-	expected2 := append(expected, id1)
+	expected2 = append(expected2, id1)
 	expected2 = append(expected2, byte(len(client1Meta.GetName())))
 	expected2 = append(expected2, 0)
 	expected2 = append(expected2, []byte(client1Meta.GetName())...)
@@ -339,14 +349,9 @@ func TestHandleReadRequestOtherPlayer(t *testing.T) {
 	expected2 = append(expected2, 0)
 	expected2 = append(expected2, []byte(client2Meta.GetName())...)
 
-	if actual == nil {
-		t.Error("there should be a returned value on movement player")
-		return
-	}
+	actualBytes := actual.Bytes()
 
-	bytes := actual.Bytes()
-
-	if !compareByteArrays(expected1, bytes, t) && !compareByteArrays(expected2, actual.Bytes(), t) {
+	if !compareByteArraysNoError(expected1, actualBytes) && !compareByteArraysNoError(expected2, actualBytes) {
 		t.Errorf("Happend in Request other Players")
 	}
 }
@@ -390,10 +395,14 @@ func TestHandleReadRequestPlayerKD(t *testing.T) {
 
 	userId1, _ := hub.clientManager.MapId(client1Meta)
 
+	userId1Kills := uint16(2)
+	userId1Death := uint16(1)
 	hub.gameState.IncKill(userId1)
 	hub.gameState.IncKill(userId1)
 	hub.gameState.IncDeaths(userId1)
 
+	userId2Kills := uint16(1)
+	userId2Death := uint16(2)
 	hub.gameState.IncKill(userId2)
 	hub.gameState.IncDeaths(userId2)
 	hub.gameState.IncDeaths(userId2)
@@ -402,19 +411,30 @@ func TestHandleReadRequestPlayerKD(t *testing.T) {
 		client.RequestPlayerKDOpcode.Value(),
 	}
 	actual := hub.handleRead(request, userId1)
-	expected := []byte{
-		server.SendAllPlayerKDOpcode.Value(),
-		0x02,
-		userId2, 0x01, 0x00, 0x02, 0x00,
-		// 0x01, 0x02, 0x00, 0x01, 0x00,
-	}
 
 	if actual == nil {
 		t.Error("there should be a returned value on Send All PlayersKD request")
 		return
 	}
+	actualBytes := actual.Bytes()
+	var expected1 [12]byte
+	var expected2 [12]byte
+	expected1[0] = server.SendAllPlayerKDOpcode.Value()
+	expected1[1] = 2
 
-	if !compareByteArrays(expected, actual.Bytes(), t) {
+	expected2[0] = server.SendAllPlayerKDOpcode.Value()
+	expected2[1] = 2
+
+	user2 := server.NewPlayerKD(userId2, userId2Kills, userId2Death)
+	user1 := server.NewPlayerKD(userId1, userId1Kills, userId1Death)
+
+	user1.PutBytes(expected1[2:])
+	user1.PutBytes(expected2[7:])
+
+	user2.PutBytes(expected2[2:])
+	user2.PutBytes(expected1[7:])
+
+	if !compareByteArraysNoError(expected1[:], actualBytes) && !compareByteArraysNoError(expected2[:], actualBytes) {
 		t.Errorf("Happend in Request other Players KD")
 	}
 }
