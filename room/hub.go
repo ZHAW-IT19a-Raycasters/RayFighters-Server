@@ -4,9 +4,12 @@ import (
 	"context"
 	"errors"
 	"math"
+	"sync"
+	"time"
 
 	"github.zhaw.ch/raycasters/server/room/client"
 	"github.zhaw.ch/raycasters/server/room/controller"
+	"github.zhaw.ch/raycasters/server/room/helpers"
 	"github.zhaw.ch/raycasters/server/utils"
 )
 
@@ -19,6 +22,11 @@ type void struct{}
 // by a single hub. This limitation comes from the
 // decision to only support a player id of size uint8.
 const HubClientLimit = math.MaxUint8
+
+// ClientTimeout says the maximal time a client
+// may not have an active connection to the
+// system, before beeing removed from it.
+const ClientTimeout = 5 * time.Second
 
 // ErrHubIsFull is the error that is returned on an RegisterClient error.
 var ErrHubIsFull = errors.New("the hub is currently filled to capacity")
@@ -41,6 +49,9 @@ type Hub struct {
 	shutdown chan void
 	// If the current hub is running or not.
 	isActive utils.AtomicBool
+	// wg is the wait group used to see if the
+	// workers are still running
+	wg sync.WaitGroup
 }
 
 // NewHub will initiate a new hub struct.
@@ -53,6 +64,7 @@ func NewHub(hubId int) *Hub {
 		shutdown:   make(chan void),
 		id:         hubId,
 		isActive:   utils.NewAtomicBool(false),
+		wg:         sync.WaitGroup{},
 	}
 	return h
 }
@@ -109,10 +121,20 @@ func (h *Hub) Run() {
 		logger.Warnf("Hub [%d] is already running", h.id)
 		return
 	}
+
+	// add two runners
+	h.wg.Add(2)
+
+	// run the timer
+	go h.runTimer()
+
 	// set alive bool
 	// reset the state of is active, on shutdown or
 	// crash
-	defer h.isActive.SetFalse()
+	defer func() {
+		h.wg.Done()
+		h.isActive.SetFalse()
+	}()
 
 	for {
 		select {
@@ -122,8 +144,39 @@ func (h *Hub) Run() {
 		case meta := <-h.input:
 			logger.Debugf("Adding a new player to hub [%d]", h.id)
 			h.controller.RegisterClient(meta)
-		case <-h.controller.TimerQueue():
-			// TODO: register the timeData to the timer
+		}
+	}
+}
+
+// runTimer is the timer instance that governs the hub
+func (h *Hub) runTimer() {
+	defer h.wg.Done()
+	// create the timer without any time to wait
+	timerHandler := time.NewTimer(0)
+	// temporily save the current client to wait for
+	var currentlyTimedOut helpers.TimerData
+
+	for {
+
+		// wait here if there is no other timeout currently
+		select {
+		case <-h.shutdown:
+			// shutting down
+			return
+		case currentlyTimedOut = <-h.controller.TimerQueue():
+			// set the timer to only wait for a moment
+			diff := time.Until(currentlyTimedOut.GetTime().Add(ClientTimeout))
+			timerHandler.Reset(diff)
+		}
+
+		// wait here until the timer is done for
+		select {
+		case <-h.shutdown:
+			// shutting down
+			return
+		case <-timerHandler.C:
+			// error irrelevant for system
+			_ = h.controller.RemoveClientIfTimeout(currentlyTimedOut.GetId())
 		}
 	}
 }
@@ -136,8 +189,14 @@ func (h *Hub) Shutdown(cxt context.Context) {
 
 	go func() {
 		h.controller.Shutdown(cxt)
+
 		// make sure that the main thread is closed
 		close(h.shutdown)
+
+		// wait until the main thread and the timer
+		// have shutdown
+		h.wg.Wait()
+
 		// close blocker
 		close(waitCompletion)
 	}()
