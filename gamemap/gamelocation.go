@@ -2,11 +2,7 @@ package gamemap
 
 import (
 	"fmt"
-
-	"github.zhaw.ch/raycasters/server/log"
 )
-
-var logger = log.Log()
 
 // Location is abstraction for game location.
 type Location struct {
@@ -22,6 +18,7 @@ func GameLocation(filePath string) (Location, error) {
 		logger.Errorf("unexpected error: %s", err.Error())
 		return Location{}, fmt.Errorf("unexpected error: %s", err.Error())
 	}
+	// hier sollte es entschieden werden ob map hat die richtige dimmension
 	return newLocation(len(locationMap), locationMap)
 }
 
