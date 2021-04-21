@@ -2,12 +2,11 @@ package gamemap
 
 import (
 	"errors"
-	"fmt"
 )
 
 // Error codes returned by failures in gamemap.
 var (
-	ErrMeWrSym = errors.New("mapelement: unsupported symbol")
+	ErrMapElmtWrgSym = errors.New("mapelement: unsupported symbol")
 )
 
 // MapElement is enum representation of elements of game map.
@@ -34,7 +33,7 @@ func convert(r rune) (MapElement, error) {
 	case (r >= rune('!') && r <= rune('~')):
 		return Floor, nil
 	default:
-		return 0, fmt.Errorf("%s: %s ", ErrMeWrSym, string(r))
+		return 0, ErrMapElmtWrgSym
 	}
 }
 

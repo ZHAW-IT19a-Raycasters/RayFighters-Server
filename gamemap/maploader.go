@@ -12,9 +12,9 @@ var headerLength = 5
 
 // Error codes returned by failures to parse a map.
 var (
-	ErrMapDimNeg = errors.New("maploader: map dimesion is negative")
-	ErrMapDimCol = errors.New("maploader: map is shorter as expected")
-	ErrMapHead   = errors.New("maploader: invalid header format")
+	ErrMapDimNeg = errors.New("maploader: negative map dimesion")
+	ErrMapDimCol = errors.New("maploader: shorter than expected :(")
+	ErrMapHead   = errors.New("maploader: wrong header format")
 )
 
 // LoadMap loads square game map from the given file path.

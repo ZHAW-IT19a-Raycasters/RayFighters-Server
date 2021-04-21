@@ -68,7 +68,7 @@ func TestLoadMapValidPath(t *testing.T) {
 }
 
 // Test if map in the given file, having more columns than given dimesion, will not raise an error.
-func TestLoadMapLessRowsThanDimension(t *testing.T) {
+func TestParseMapLessRowsThanDimension(t *testing.T) {
 	expectedMap := [][]MapElement{
 		{Floor, Floor, Floor},
 		{Floor, Floor},
@@ -89,6 +89,15 @@ func TestLoadMapLessRowsThanDimension(t *testing.T) {
 // Test if reading map-file, having negative dimesion-number, will raise an error.
 func TestParseMapNegativeDimension(t *testing.T) {
 	_, err := parseMap(intoMapReader(-3, []string{}))
+	if err == nil {
+		t.Errorf("an error should have been raised")
+		return
+	}
+}
+
+// Test if parsing a map file consistin of unsupported symbols will raise an error.
+func TestParseMapWrongSymbols(t *testing.T) {
+	_, err := parseMap(intoMapReader(2, []string{"  ", "  "}))
 	if err == nil {
 		t.Errorf("an error should have been raised")
 		return
@@ -191,6 +200,15 @@ func TestParseLineEmptyLine(t *testing.T) {
 	}
 }
 
+// Feeding empty string should return empty slice.
+func TestParseLineInvalidSymobols(t *testing.T) {
+	_, err := parseLine("  ")
+	if err == nil {
+		t.Errorf("an error should have been raises")
+		return
+	}
+}
+
 // Test if skipping some numbers will return an expected result.
 func TestSkipLines(t *testing.T) {
 
@@ -239,4 +257,26 @@ func TestReadMapDimensionNegativeNumber(t *testing.T) {
 		t.Errorf("an error should have been raised")
 		return
 	}
+}
+
+// Test if reading non integer number will raise an error
+func TestReadMapDimensionNonInt(t *testing.T) {
+	scanner := bufio.NewScanner(strings.NewReader("muhaha"))
+	_, err := readMapDimension(scanner)
+	if err == nil {
+		t.Errorf("an error should have been raised")
+		return
+	}
+}
+
+// Test if reading a dimension from a file with no lines left will raise an error.
+func TestReadMapDimensionNoLinesToRead(t *testing.T) {
+	scanner := bufio.NewScanner(strings.NewReader("40"))
+	scanner.Scan()
+	_, err := readMapDimension(scanner)
+	if err == nil {
+		t.Errorf("an error should have been raised")
+		return
+	}
+
 }
