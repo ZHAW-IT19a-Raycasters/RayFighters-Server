@@ -23,7 +23,7 @@ func TestGetNewLocationValid(t *testing.T) {
 		return
 	}
 	expected := true
-	actual := utils.Compare2DMapElementSlices(expectedMap, loc.locationMap)
+	actual := utils.Compare2DMapElementSlices(expectedMap, loc.map2d)
 	if expected != actual {
 		t.Errorf("wrong dimesion: (expected: %d; actual: %d)", dim, loc.dimension)
 		return
@@ -55,7 +55,7 @@ func TestGetGameLocationValid(t *testing.T) {
 		return
 	}
 	defer file.Close()
-	_, err = maploader.LoadMap(path)
+	_, err = maploader.ParseMap(path)
 	if err != nil {
 		t.Errorf("unexpected error: %s", err.Error())
 		return

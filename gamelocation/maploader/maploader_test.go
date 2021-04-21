@@ -1,4 +1,4 @@
-package maploader_test
+package maploader
 
 import (
 	"bufio"
@@ -7,30 +7,10 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.zhaw.ch/raycasters/server/gamelocation/maploader"
 	"github.zhaw.ch/raycasters/server/gamelocation/utils"
 )
 
 var testFolderPath string = "test/testmaps/"
-
-// Test reading correct map, having valid symbol, will be loaded correctly.
-func TestLoadMapValidMapOneSymbol(t *testing.T) {
-	expectedMap := [][]utils.LocationElement{
-		{utils.Floor, utils.Floor},
-		{utils.Floor, utils.Floor},
-	}
-	actualMap, err := loadTestFile("testmap_01_valid_one_symbol.txt")
-	if err != nil {
-		t.Errorf("unexpected error: %s", err.Error())
-		return
-	}
-	expected := true
-	actual := utils.Compare2DMapElementSlices(expectedMap, *actualMap)
-	if expected != actual {
-		t.Errorf("false result: (expected: %v; actual: %v)", expected, actual)
-		return
-	}
-}
 
 // Test reading correct map, having multiple valid symbols, will not throw an error.
 func TestLoadMapValidMapMultipleSymbols(t *testing.T) {
@@ -81,7 +61,7 @@ func TestLoadMapIllegalDimension(t *testing.T) {
 // Loads testfile.
 // Throws error if:
 // - can not build file path
-// - maploader.LoadMap() fails
+// -  LoadMap() fails
 func loadTestFile(fileName string) (*[][]utils.LocationElement, error) {
 	path, err := os.Getwd()
 	if err != nil {
@@ -89,7 +69,7 @@ func loadTestFile(fileName string) (*[][]utils.LocationElement, error) {
 		return &([][]utils.LocationElement{}), fmt.Errorf("unexpected error: %s", err.Error())
 	}
 	path = filepath.Join(path, testFolderPath, fileName)
-	actualMap, err := maploader.LoadMap(path)
+	actualMap, err := ParseMap(path)
 	if err != nil {
 		return &([][]utils.LocationElement{}), fmt.Errorf("unexpected error: %s", err.Error())
 	}
@@ -110,7 +90,7 @@ func TestSkipLines(t *testing.T) {
 	}
 	defer file.Close()
 	scanner := bufio.NewScanner(file)
-	err = maploader.SkipLines(scanner, 5)
+	err = skipLines(scanner, 5)
 	if err != nil {
 		t.Errorf("unexpected error: %s", err.Error())
 		return
@@ -136,7 +116,7 @@ func TestSkipLinesShortFile(t *testing.T) {
 	}
 	defer file.Close()
 	scanner := bufio.NewScanner(file)
-	err = maploader.SkipLines(scanner, 5)
+	err = skipLines(scanner, 5)
 	if err == nil {
 		t.Errorf("no error was thrown")
 	}
@@ -157,7 +137,7 @@ func TestReadMapDimension(t *testing.T) {
 	defer file.Close()
 	scanner := bufio.NewScanner(file)
 	expected := 40
-	actual, err := maploader.ReadMapDimension(scanner)
+	actual, err := readMapDimension(scanner)
 	if err != nil {
 		t.Errorf("unexpected error: %s", err.Error())
 		return
@@ -182,47 +162,9 @@ func TestReadMapDimensionNegativeNumber(t *testing.T) {
 	defer file.Close()
 	scanner := bufio.NewScanner(file)
 
-	_, err = maploader.ReadMapDimension(scanner)
+	_, err = readMapDimension(scanner)
 	if err == nil {
 		t.Errorf("no error was thrown")
 		return
-	}
-}
-
-func TestParseLine(t *testing.T) {
-	someRune := rune('0')
-	someElement, err := utils.GetLocationElement(someRune)
-	if err != nil {
-		t.Errorf("unexpected error: %s", err.Error())
-		return
-	}
-	expectedSlice := []utils.LocationElement{someElement, someElement, someElement}
-	str := string(someRune)
-	str += str + str
-	actualSlice, err := maploader.ParseLine(str)
-	if err != nil {
-		t.Errorf("unexpected error: %s", err.Error())
-		return
-	}
-	expected := true
-	actual := utils.Compare1DMapElementSlices(expectedSlice, *actualSlice)
-	if expected != actual {
-		t.Errorf("false result: (expected: %v; actual: %v)", expected, actual)
-	}
-}
-
-// Feeding empty string should return empty slice.
-func TestParseLineEmptyLine(t *testing.T) {
-	expectedSlice := []utils.LocationElement{}
-	str := ""
-	actualSlice, err := maploader.ParseLine(str)
-	if err != nil {
-		t.Errorf("unexpected error: %s", err.Error())
-		return
-	}
-	expected := true
-	actual := utils.Compare1DMapElementSlices(expectedSlice, *actualSlice)
-	if expected != actual {
-		t.Errorf("false result: (expected: %v; actual: %v)", expected, actual)
 	}
 }
