@@ -20,7 +20,7 @@ const (
 	Weapon
 )
 
-// convert maps given rune to MapElement.
+// convert return corresponding MapElement for given rune.
 func convert(r rune) (MapElement, error) {
 	switch {
 	case r == '0':

@@ -3,7 +3,6 @@ package gamemap
 import (
 	"bufio"
 	"errors"
-	"fmt"
 	"io"
 	"os"
 	"strconv"
@@ -15,96 +14,91 @@ var headerLength = 5
 var (
 	ErrMapDimNeg = errors.New("maploader: map dimesion is negative")
 	ErrMapDimCol = errors.New("maploader: map is shorter as expected")
+	ErrMapHead   = errors.New("maploader: invalid header format")
 )
-
-func check(e error) {
-	if e != nil {
-		logger.Errorf(e.Error())
-		panic(e)
-	}
-}
 
 // LoadMap loads square game map from the given file path.
 // It panics if any problemns are encountered, while reading the file.
 func LoadMap(filePath string) ([][]MapElement, error) {
 	file, err := os.Open(filePath)
-	check(err)
+	if err != nil {
+		logger.Errorf(err.Error())
+		return nil, err
+	}
 	defer file.Close()
 	return parseMap(file)
 }
 
 func parseMap(file io.Reader) ([][]MapElement, error) {
 	scanner := bufio.NewScanner(file)
+	// Skip header
 	err := skipLines(scanner, headerLength-1)
 	if err != nil {
-		logger.Errorf("unexpected error: %s", err.Error())
-		return [][]MapElement{{}}, fmt.Errorf("unexpected error: %s", err.Error())
+		logger.Error(err.Error())
+		return nil, err
 	}
+	// Read the map dimesion and make sure it is positive
 	mapDimesion, err := readMapDimension(scanner)
 	if err != nil {
-		logger.Errorf("unexpected error: %s", err.Error())
-		return [][]MapElement{{}}, fmt.Errorf("unexpected error: %s", err.Error())
+		logger.Errorf(err.Error())
+		return nil, err
 	}
 
-	// go row by row read symbols to the gamemap
+	// Convert map in the file into in gamemap structure
 	locationMap := make([][]MapElement, mapDimesion)
 	for rowIndex := 0; rowIndex < mapDimesion; rowIndex += 1 {
 		if !scanner.Scan() {
-			logger.Errorf(". expected length: %d, actual length:", mapDimesion, rowIndex)
-			return [][]MapElement{{}}, ErrMapDimCol
+			logger.Error(ErrMapDimCol)
+			return nil, ErrMapDimCol
 		}
 		res, err := parseLine(scanner.Text())
 		locationMap[rowIndex] = res
 		if err != nil {
-			logger.Errorf("unexpected error: %s", err.Error())
-			return [][]MapElement{{}}, fmt.Errorf("unexpected error: %s", err.Error())
+			logger.Error(err.Error())
+			return nil, err
 		}
 	}
 
 	return locationMap, nil
 }
 
-// Skips "lineCount" lines.
-// NOTE: To get content of the line n+1: use sc.Scan() first.
-// Throws error if:
-// - file is too short for given "lineCount"
+// skipLines skips "lineCount" lines.
 func skipLines(sc *bufio.Scanner, linesCount int) error {
 	for i := 0; i < linesCount; i += 1 {
 		if !sc.Scan() {
-			return fmt.Errorf("can not skip: file too short")
+			logger.Error(ErrMapHead.Error())
+			return ErrMapHead
 		}
 	}
 	return nil
 }
 
 // readMapDimension reads int from the next line.
-// Throws error if:
-// - there no lines to read
-// - there is int conversion error
-// - gotten number is negative
 func readMapDimension(sc *bufio.Scanner) (int, error) {
 	if !sc.Scan() {
-		return 0, fmt.Errorf("unexpected end of file")
+		logger.Error(ErrMapDimCol.Error())
+		return 0, ErrMapDimCol
 	}
 	mapDimesion, err := strconv.Atoi(sc.Text())
 	if err != nil {
+		logger.Error(err.Error())
 		return 0, err
 	}
 	if mapDimesion < 0 {
+		logger.Error(ErrMapDimNeg)
 		return 0, ErrMapDimNeg
 	}
 	return mapDimesion, nil
 }
 
-// parseLine converts string into slice of MapElments.
-// Throws error if:
-// - utils.LocationEelment() fails
+// parseLine converts string into slice of MapElements.
 func parseLine(line string) ([]MapElement, error) {
 	slice := make([]MapElement, len(line))
 	for rowIndex, c := range line {
 		element, err := convert(c)
 		if err != nil {
-			return []MapElement{}, err
+			logger.Error(err.Error())
+			return nil, err
 		}
 		slice[rowIndex] = element
 	}
