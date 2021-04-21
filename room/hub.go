@@ -28,8 +28,16 @@ const HubClientLimit = math.MaxUint8
 // system, before beeing removed from it.
 const ClientTimeout = 5 * time.Second
 
-// ErrHubIsFull is the error that is returned on an RegisterClient error.
-var ErrHubIsFull = errors.New("the hub is currently filled to capacity")
+var (
+	// ErrHubIsFull is the error that is returned on an RegisterClient error.
+	ErrHubIsFull = errors.New("the hub is currently filled to capacity")
+	// ErrHubIsNotRunning is the error that as the name implies
+	// means that the hub is currently not active.
+	ErrHubIsNotRunning = errors.New("hub is not running")
+	// ErrHubIsAlreadyRunning is the error returned if the
+	// hub is already running.
+	ErrHubIsAlreadyRunning = errors.New("hub is already running")
+)
 
 // Hub represents a single room.
 // The hub controls the the individual connections between the
@@ -114,12 +122,12 @@ func (h *Hub) RegisterClient(meta client.ClientMeta) error {
 // from the hub instance.
 // Attention this is a blocking function, so
 // run this in a gorutine.
-func (h *Hub) Run() {
+func (h *Hub) Run() error {
 	// check if the hub is active
 	if !h.isActive.SetTrue() {
 		// do not restart the hub, if it's already running
 		logger.Warnf("Hub [%d] is already running", h.id)
-		return
+		return ErrHubIsAlreadyRunning
 	}
 
 	// add two runners
@@ -127,7 +135,12 @@ func (h *Hub) Run() {
 
 	// run the timer
 	go h.runTimer()
+	go h.runRegistration()
 
+	return nil
+}
+
+func (h *Hub) runRegistration() {
 	// set alive bool
 	// reset the state of is active, on shutdown or
 	// crash
@@ -138,12 +151,12 @@ func (h *Hub) Run() {
 
 	for {
 		select {
-		case <-h.shutdown:
-			logger.Infof("Shutting down hub [%d]", h.id)
-			return
 		case meta := <-h.input:
 			logger.Debugf("Adding a new player to hub [%d]", h.id)
 			h.controller.RegisterClient(meta)
+		case <-h.shutdown:
+			logger.Infof("Shutting down hub [%d]", h.id)
+			return
 		}
 	}
 }
@@ -184,7 +197,12 @@ func (h *Hub) runTimer() {
 // Shutdown will initialize a complete shutdown of any and all clients.
 // With the cxt context a premature cancelation of all client
 // connections can be started.
-func (h *Hub) Shutdown(cxt context.Context) {
+func (h *Hub) Shutdown(cxt context.Context) error {
+
+	if !h.isActive.SetFalse() {
+		return ErrHubIsNotRunning
+	}
+
 	waitCompletion := make(chan void)
 
 	go func() {
@@ -207,4 +225,6 @@ func (h *Hub) Shutdown(cxt context.Context) {
 	case <-waitCompletion:
 		logger.Infof("Hub [%d] was successfully shutdown", h.id)
 	}
+
+	return nil
 }
