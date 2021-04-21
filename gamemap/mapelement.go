@@ -77,3 +77,17 @@ func equals2d(sliceOne, sliceTwo [][]MapElement) bool {
 	}
 	return true
 }
+
+// isSquared returns true if given slice is squared.
+func isSquared(s [][]MapElement) bool {
+	d := len(s)
+	if d == 0 {
+		return true
+	}
+	for i := 0; i < d; i += 1 {
+		if len(s[i][:]) != d {
+			return false
+		}
+	}
+	return true
+}
