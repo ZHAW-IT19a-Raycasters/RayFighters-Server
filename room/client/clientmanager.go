@@ -127,6 +127,21 @@ func (manager *ClientManager) mapToInternalId(meta ClientMeta) (uint8, bool) {
 	return id, ok
 }
 
+// GetClientStatus will return the current connection status of the client
+// if the client currently exists.
+func (manager *ClientManager) GetClientStatus(id uint8) (ConnectionStatus, bool) {
+	manager.lock.RLock()
+	defer manager.lock.RUnlock()
+
+	status := Offline
+	client, ok := manager.clients[id]
+	if !ok {
+		return status, ok
+	}
+
+	return client.GetStatus(), ok
+}
+
 // GetPlayers will return the senable player configuration
 // and true if it exists, else it will return an empty
 // server.Player struct and false.
