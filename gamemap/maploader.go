@@ -13,8 +13,8 @@ var headerLength = 5
 
 // Error codes returned by failures to parse a map.
 var (
-	ErrShoF   = errors.New("maploader: internal error")
-	ErrMapDim = errors.New("maploader: invalid map dimension")
+	ErrMapDimNeg = errors.New("maploader: map dimesion is negative")
+	ErrMapDimCol = errors.New("maploader: map is shorter as expected")
 )
 
 func check(e error) {
@@ -50,8 +50,8 @@ func parseMap(file io.Reader) ([][]MapElement, error) {
 	locationMap := make([][]MapElement, mapDimesion)
 	for rowIndex := 0; rowIndex < mapDimesion; rowIndex += 1 {
 		if !scanner.Scan() {
-			logger.Errorf("unexpected file end. expected length: %d, actual length:", mapDimesion, rowIndex)
-			return [][]MapElement{{}}, fmt.Errorf("unexpected file end. expected length: %d, actual length:%d", mapDimesion, rowIndex)
+			logger.Errorf(". expected length: %d, actual length:", mapDimesion, rowIndex)
+			return [][]MapElement{{}}, ErrMapDimCol
 		}
 		res, err := parseLine(scanner.Text())
 		locationMap[rowIndex] = res
@@ -91,7 +91,7 @@ func readMapDimension(sc *bufio.Scanner) (int, error) {
 		return 0, err
 	}
 	if mapDimesion < 0 {
-		return 0, ErrMapDim
+		return 0, ErrMapDimNeg
 	}
 	return mapDimesion, nil
 }

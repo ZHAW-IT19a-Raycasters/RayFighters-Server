@@ -12,24 +12,6 @@ import (
 
 var testFolderPath string = "test/testmaps/"
 
-// Test reading correct map, having multiple valid symbols, will not throw an error.
-func TestLoadMapValidMapMultipleSymbols(t *testing.T) {
-	_, err := loadTestFile("testmap_03_valid_multiple_symbols.txt")
-	if err != nil {
-		t.Errorf("unexpected error: %s", err.Error())
-		return
-	}
-}
-
-// Test if reading the map in the file, having less columns as given dimension, will throw an error.
-func TestLoadMapWrongLessColumnsThanDimension(t *testing.T) {
-	_, err := loadTestFile("testmap_02_wrong_cdimension.txt")
-	if err == nil {
-		t.Errorf("no error was thrown")
-		return
-	}
-}
-
 // Test if map in the given file, having more columns than given dimesion, will not throw an error.
 func TestLoadMapLessRowsThanDimension(t *testing.T) {
 	expectedMap := [][]utils.LocationElement{

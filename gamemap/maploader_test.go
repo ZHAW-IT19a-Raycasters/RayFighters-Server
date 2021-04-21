@@ -77,7 +77,7 @@ func TestMapString(t *testing.T) {
 }
 
 // Test reading given valid map, produces expected result.
-func TestLoadMapValidMapOneSymbol(t *testing.T) {
+func TestParseMapValidMapOneSymbol(t *testing.T) {
 	expectedMap := [][]MapElement{
 		{Floor, Floor},
 		{Floor, Floor},
@@ -96,6 +96,35 @@ func TestLoadMapValidMapOneSymbol(t *testing.T) {
 	}
 }
 
+// Test reading correct map, having multiple valid symbols, will raise no errors.
+func TestLoadMapValidMapMultipleSymbols(t *testing.T) {
+	_, err := parseMap(mapReader(8, []string{
+		"00123456",
+		"789abcde",
+		"fghjklmn",
+		"opqrstuv",
+		"wxyzABCD",
+		"EFGHIJKL",
+		"MNOPQRST",
+		"UVWXYZ+*"}))
+	if err != nil {
+		t.Errorf("unexpected error: %s", err.Error())
+		return
+	}
+}
+
+// Test if reading a map, having less columns as given dimension, will raise an error.
+func TestLoadMapWrongLessColumnsThanDimension(t *testing.T) {
+	_, err := parseMap(mapReader(2, []string{"00"}))
+	if err == nil {
+		t.Errorf("no error was thrown")
+		return
+	}
+	if err != ErrMapDimCol {
+		t.Errorf("not an expected error was thrown")
+		return
+	}
+}
 func TestParseLine(t *testing.T) {
 	someRune := rune('0')
 	someElement, err := convert(someRune)
