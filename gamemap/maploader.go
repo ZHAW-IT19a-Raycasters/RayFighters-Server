@@ -7,11 +7,8 @@ import (
 	"io"
 	"os"
 	"strconv"
-
-	"github.zhaw.ch/raycasters/server/log"
 )
 
-var logger = log.Log()
 var headerLength = 5
 
 // Error codes returned by failures to parse a map.
@@ -27,7 +24,7 @@ func check(e error) {
 	}
 }
 
-// LoadMap loads game map from the given file path.
+// LoadMap loads square game map from the given file path.
 // It panics if any problemns are encountered, while reading the file.
 func LoadMap(filePath string) ([][]MapElement, error) {
 	file, err := os.Open(filePath)
