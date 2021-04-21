@@ -154,6 +154,11 @@ func (hc *HubController) RegisterClient(meta client.ClientMeta) error {
 	// to adding above without any errors
 	id, _ := hc.clientManager.MapId(meta)
 
+	// we can ignore this error, as there is no
+	// benefit of knowing again if the client id
+	// already existed before.
+	_ = hc.gameState.AddClient(id)
+
 	// initialize the queues with the start up messages
 	youAreCalled := server.NewYouAreCalled(id)
 

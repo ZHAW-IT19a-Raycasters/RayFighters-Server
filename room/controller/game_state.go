@@ -24,7 +24,7 @@ func NewGameState() GameState {
 
 // GetClient will return a the state of a specific client.
 // And if the client could not be found false will be returned
-func (gs GameState) GetClient(id uint8) (*client.ClientGame, bool) {
+func (gs *GameState) GetClient(id uint8) (*client.ClientGame, bool) {
 	gs.lock.RLock()
 	defer gs.lock.RUnlock()
 	c, ok := gs.clients[id]
@@ -36,7 +36,7 @@ func (gs GameState) GetClient(id uint8) (*client.ClientGame, bool) {
 
 // GetPlayersKD will return the player kd of all the currently
 // logged in players.
-func (gs GameState) GetPlayersKD() server.PlayersKD {
+func (gs *GameState) GetPlayersKD() server.PlayersKD {
 	gs.lock.RLock()
 	defer gs.lock.RUnlock()
 	playersKD := make([]server.PlayerKD, 0, len(gs.clients))
