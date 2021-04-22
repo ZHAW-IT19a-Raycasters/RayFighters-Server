@@ -11,7 +11,7 @@ type ErrClientNotTimedOut struct {
 
 // Error satisfies the error
 func (err ErrClientNotTimedOut) Error() string {
-	return fmt.Sprintf("the given client [%d] already exists", err.id)
+	return fmt.Sprintf("the client [%d] is currently not timedout", err.id)
 }
 
 // Is satisfies the error.Is configuration
@@ -28,7 +28,7 @@ type ErrClientDoesNotExist struct {
 
 // Error satisfies the error
 func (err ErrClientDoesNotExist) Error() string {
-	return fmt.Sprintf("the given client [%d] already exists", err.id)
+	return fmt.Sprintf("the given client [%d] does currently not exists", err.id)
 }
 
 // Is satisfies the error.Is configuration
