@@ -246,7 +246,8 @@ func (manager *ClientManager) RemoveClient(meta ClientMeta) error {
 
 	// make sure it is shutdown, at most wait for the timeout
 	// afterwards kill it.
-	// TODO: change context to parameter given by caller
+	// as we don't have the limitation given by a shutdown we are
+	// using the background context here.
 	cxt, cancel := context.WithTimeout(context.Background(), ClientShutdownTime)
 
 	waiter := make(chan struct{})

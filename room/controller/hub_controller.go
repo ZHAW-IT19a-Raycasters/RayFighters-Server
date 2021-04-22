@@ -286,6 +286,8 @@ func (hc *HubController) removeClient(meta client.ClientMeta) error {
 	_ = hc.gameState.RemoveClient(id)
 
 	// client exists so lock everything down to remove him
+	// as we do not have any type of limitation using
+	// background here
 	_ = hc.clientManager.RemoveClient(meta)
 
 	hc.broadCast(server.NewPlayerLeft(id), helpers.NewIdSet())
