@@ -61,23 +61,25 @@ func (err ErrNonBinaryMessage) Is(target error) bool {
 // This struct stores all the information about a single
 // client instance in a hub.
 type Client struct {
-	meta     clientInternalMeta
-	queue    helpers.ClientQueue
-	status   ConnectionStatus
-	isActive utils.AtomicBool
-	wg       sync.WaitGroup
-	lock     sync.RWMutex
+	meta        clientInternalMeta
+	queue       helpers.ClientQueue
+	timoutQueue helpers.ClientTimer
+	status      ConnectionStatus
+	isActive    utils.AtomicBool
+	wg          sync.WaitGroup
+	lock        sync.RWMutex
 }
 
 // NewClient creates and sets up a new client from it's meta information.
-func NewClient(id uint8, meta ClientMeta, queue helpers.ClientQueue) *Client {
+func NewClient(id uint8, meta ClientMeta, queue helpers.ClientQueue, tq helpers.ClientTimer) *Client {
 	c := Client{
-		queue:    queue,
-		status:   Offline,
-		meta:     newClientInternalMeta(id, meta),
-		isActive: utils.NewAtomicBool(false),
-		wg:       sync.WaitGroup{},
-		lock:     sync.RWMutex{},
+		queue:       queue,
+		status:      Offline,
+		meta:        newClientInternalMeta(id, meta),
+		timoutQueue: tq,
+		isActive:    utils.NewAtomicBool(false),
+		wg:          sync.WaitGroup{},
+		lock:        sync.RWMutex{},
 	}
 
 	// register connection

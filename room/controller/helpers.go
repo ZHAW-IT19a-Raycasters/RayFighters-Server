@@ -28,7 +28,8 @@ type ErrClientDoesNotExist struct {
 
 // Error satisfies the error
 func (err ErrClientDoesNotExist) Error() string {
-	return fmt.Sprintf("the given client [%d] does currently not exists", err.id)
+	res := fmt.Sprintf("the given client [%d] does currently not exists", err.id)
+	return res
 }
 
 // Is satisfies the error.Is configuration

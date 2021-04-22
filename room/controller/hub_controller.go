@@ -143,7 +143,7 @@ func (hc *HubController) RegisterClient(meta client.ClientMeta) error {
 
 	// directly add the client to the manager and
 	// let it figure out, what to do here
-	err := hc.clientManager.AddClient(meta, cqueue)
+	err := hc.clientManager.AddClient(meta, cqueue, hc.timeoutClientQueue.NewClientTimer)
 
 	// something went wrong while adding the client
 	if err != nil {
