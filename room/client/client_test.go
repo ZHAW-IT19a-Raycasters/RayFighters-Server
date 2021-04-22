@@ -81,7 +81,7 @@ func TestClientregisterConn(t *testing.T) {
 		if err == nil {
 			t.Error("there should be an error here")
 			return false
-		} else if !errors.Is(err, ErrClientReaderAlreadyActive) {
+		} else if !errors.Is(err, ErrClientWorkersAlreadyActive) {
 			t.Error("wrong error returned")
 			return false
 		}

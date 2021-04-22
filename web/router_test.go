@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -57,7 +58,7 @@ func TestWebSocketHandshake(t *testing.T) {
 	go func() {
 		server.Start()
 	}()
-	defer server.ServerStop(ShutdownContext())
+	defer server.ServerStop(context.TODO())
 
 	u := url.URL{Scheme: "ws", Host: conf.String(), Path: "/ws/1"}
 	fmt.Printf("connecting to %s\n", u.String())
