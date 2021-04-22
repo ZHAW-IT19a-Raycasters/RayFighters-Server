@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/json"
+	"context"
 	"fmt"
 	"io"
 	"log"
@@ -79,6 +80,13 @@ func TestAuthorizedWebsocketEstablishment(t *testing.T) {
 	client := &http.Client{
 		Jar: jar,
 	}
+
+
+
+	go func() {
+		server.Start()
+	}()
+	defer server.ServerStop(context.TODO())
 
 
 	postBody, _ := json.Marshal(map[string]string{

@@ -53,7 +53,7 @@ func compareByteSlices(expeced, gotten []byte, t *testing.T) bool {
 	return true
 }
 
-func TestClientManagerAddClientSigle(t *testing.T) {
+func TestClientManagerAddClientSingle(t *testing.T) {
 
 	cm := NewClientManager()
 	defer cm.Shutdown(context.Background())
@@ -67,7 +67,9 @@ func TestClientManagerAddClientSigle(t *testing.T) {
 	clientMeta, _ := getClientMeta(0)
 	clientQueue, _ := helpers.NewWorkQueue()
 
-	err := cm.AddClient(clientMeta, clientQueue)
+	_, getClientTimer := helpTimeout()
+
+	err := cm.AddClient(clientMeta, clientQueue, getClientTimer)
 
 	if err != nil {
 		t.Errorf("An unexpected error occurred, while adding a new client\n[%s]", err.Error())
@@ -102,6 +104,12 @@ func TestClientManagerAddClientSigle(t *testing.T) {
 		t.Error("Wrong uuid has been used, while mapping.")
 	} else if client.meta.name != clientMeta.name {
 		t.Error("Wrong name has been used, while mapping.")
+	} else if client.GetStatus() != Active {
+		t.Error("Wrong status for client")
+	} else if gottenStatus, _ := cm.GetClientStatus(iId); client.GetStatus() != gottenStatus {
+		t.Error("Wrong status for client")
+	} else if _, ok := cm.GetClientStatus(iId + 1); ok {
+		t.Error("there should not be an id of the given type")
 	}
 }
 
@@ -113,7 +121,10 @@ func TestClientManagerAddClientTwice(t *testing.T) {
 
 	clientQueue, _ := helpers.NewWorkQueue()
 
-	err := cm.AddClient(clientMeta, clientQueue)
+	_, getClientTimer := helpTimeout()
+
+	err := cm.AddClient(clientMeta, clientQueue, getClientTimer)
+
 	if err != nil {
 		t.Errorf("An unexpected error occurred, while adding a new client\n[%s]", err.Error())
 		return
@@ -130,7 +141,7 @@ func TestClientManagerAddClientTwice(t *testing.T) {
 
 	clientQueue, _ = helpers.NewWorkQueue()
 
-	err = cm.AddClient(clientMeta, clientQueue)
+	err = cm.AddClient(clientMeta, clientQueue, getClientTimer)
 	if err != nil {
 		t.Errorf("An unexpected error occurred, while adding a new client\n[%s]", err.Error())
 		return
@@ -155,8 +166,10 @@ func TestClientManagerMaxClients(t *testing.T) {
 	// no errors here
 	for i := 0; i <= math.MaxUint8; i += 1 {
 		clientQueue, _ := helpers.NewWorkQueue()
-			meta, _ := getClientMeta(i)
-		err := cm.AddClient(meta, clientQueue)
+		meta, _ := getClientMeta(i)
+		_, getClientTimer := helpTimeout()
+
+		err := cm.AddClient(meta, clientQueue, getClientTimer)
 
 		if err != nil {
 			t.Errorf("During fill up of client manager, an error happened:\n[%s]", err.Error())
@@ -173,7 +186,9 @@ func TestClientManagerMaxClients(t *testing.T) {
 	// add an additional client
 	meta, _ := getClientMeta(256)
 	clientQueue, _ := helpers.NewWorkQueue()
-	err := cm.AddClient(meta, clientQueue)
+	_, getClientTimer := helpTimeout()
+
+	err := cm.AddClient(meta, clientQueue, getClientTimer)
 	if err == nil {
 		t.Error("A client was added illegally here.")
 	}
@@ -195,7 +210,9 @@ func TestClientManagerRemoveClients(t *testing.T) {
 	}
 
 	clientQueue, _ := helpers.NewWorkQueue()
-	cm.AddClient(meta, clientQueue)
+	_, getClientTimer := helpTimeout()
+
+	_ = cm.AddClient(meta, clientQueue, getClientTimer)
 
 	if cm.Size() != 1 {
 		t.Error("size is not at 1")
@@ -253,7 +270,10 @@ func TestClientManagerShutdown(t *testing.T) {
 		// assume this works
 		meta, _ := getClientMeta(i)
 		clientQueue, _ := helpers.NewWorkQueue()
-		err := cm.AddClient(meta, clientQueue)
+		_, getClientTimer := helpTimeout()
+
+		err := cm.AddClient(meta, clientQueue, getClientTimer)
+
 		if err != nil {
 			t.Error("There was an error while adding the clients")
 			return
@@ -300,7 +320,9 @@ func TestClientManagerIncorrectAddClient(t *testing.T) {
 
 	meta, _ := getClientMeta(0)
 	clientQueue, _ := helpers.NewWorkQueue()
-	_ = cm.AddClient(meta, clientQueue)
+	_, getClientTimer := helpTimeout()
+
+	_ = cm.AddClient(meta, clientQueue, getClientTimer)
 
 	id, _ := cm.MapId(meta)
 	client := cm.clients[id]
@@ -315,7 +337,7 @@ func TestClientManagerIncorrectAddClient(t *testing.T) {
 	// or else this will hang forever
 	cm.wg.Done()
 
-	_ = cm.AddClient(meta, clientQueue)
+	_ = cm.AddClient(meta, clientQueue, getClientTimer)
 }
 
 func TestClientManagerNotExistingClientRemoved(t *testing.T) {
@@ -349,7 +371,9 @@ func TestClientManagerIncorrectRemoveClientID(t *testing.T) {
 
 	meta, _ := getClientMeta(0)
 	cq, _ := helpers.NewWorkQueue()
-	_ = cm.AddClient(meta, cq)
+	_, getClientTimer := helpTimeout()
+
+	_ = cm.AddClient(meta, cq, getClientTimer)
 
 	id, _ := cm.MapId(meta)
 	client := cm.clients[id]
@@ -373,7 +397,10 @@ func TestClientManagerMapping(t *testing.T) {
 	meta, _ := getClientMeta(0)
 
 	cq, _ := helpers.NewWorkQueue()
-	_ = cm.AddClient(meta, cq)
+	_, getClientTimer := helpTimeout()
+
+	_ = cm.AddClient(meta, cq, getClientTimer)
+
 	defer cm.Shutdown(context.TODO())
 
 	// get the id
@@ -411,7 +438,10 @@ func TestClientManagerGetPlayer(t *testing.T) {
 
 	cq, _ := helpers.NewWorkQueue()
 
-	_ = cm.AddClient(meta, cq)
+	_, getClientTimer := helpTimeout()
+
+	_ = cm.AddClient(meta, cq, getClientTimer)
+
 	id, _ := cm.MapId(meta)
 
 	defer cm.Shutdown(context.TODO())
@@ -444,7 +474,10 @@ func TestClientManagerGetPlayers(t *testing.T) {
 
 	cq, _ := helpers.NewWorkQueue()
 
-	_ = cm.AddClient(meta, cq)
+	_, getClientTimer := helpTimeout()
+
+	_ = cm.AddClient(meta, cq, getClientTimer)
+
 	id, _ := cm.MapId(meta)
 
 	defer cm.Shutdown(context.TODO())

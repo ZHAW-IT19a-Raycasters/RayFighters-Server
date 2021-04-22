@@ -83,11 +83,6 @@ func (p *Server) Start() error {
 	return p.endpoint.ListenAndServe()
 }
 
-// ShutdownContext returns server's shutdown context.
-func ShutdownContext() context.Context {
-	return context.Background()
-}
-
 // ServerStop will initialize a graceful shutdown of the server.
 func (p *Server) ServerStop(ctx context.Context) error {
 	return p.endpoint.Shutdown(ctx)
