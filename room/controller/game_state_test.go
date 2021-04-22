@@ -137,7 +137,7 @@ func TestGameStateRemoveClientError(t *testing.T) {
 		t.Error("No Error was returned while trying to remove a client that doesn't exist")
 	} else if !errors.Is(err, ErrClientDoesNotExist{}) {
 		t.Error("Wrong error type returned")
-	} else if !strings.HasSuffix(err.Error(), "[1] already exists") {
+	} else if !strings.HasSuffix(err.Error(), "[1] does currently not exists") {
 		t.Error("Wrong error suffix used")
 	}
 }

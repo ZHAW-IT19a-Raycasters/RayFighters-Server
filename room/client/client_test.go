@@ -13,60 +13,14 @@ import (
 	"github.zhaw.ch/raycasters/server/room/helpers"
 )
 
-type blockChan chan struct{}
-
-type chanFuncReader chan func() (int, io.Reader, error)
-
-type chanFuncWriter chan func(messageType int) (io.WriteCloser, error)
-
-func setupMock(mock *MockedConnection) (blockChan, chanFuncReader, chanFuncWriter) {
-
-	done := make(blockChan)
-
-	// make the connections blocking, so that we can run other
-	// stuff while it waits
-	funcTransferReader := make(chanFuncReader, 10)
-	funcTransferWriter := make(chanFuncWriter, 10)
-
-	mock.mwc.cl = func() error {
-		close(done)
-		return nil
-	}
-
-	mock.funcNextReader = func() (int, io.Reader, error) {
-		select {
-		case <-done:
-			return 0, nil, websocket.ErrCloseSent
-		case d := <-funcTransferReader:
-			return d()
-		}
-	}
-
-	mock.funcNextWriter = func(messageType int) (io.WriteCloser, error) {
-		select {
-		case <-done:
-			return nil, websocket.ErrCloseSent
-		case d := <-funcTransferWriter:
-			return d(messageType)
-		}
-	}
-
-	// override the closer, so that the channels don't get changed by it
-	mock.funcCloser = func() error {
-		select {
-		case <-done:
-		default:
-			close(done)
-		}
-		return nil
-	}
-	return done, funcTransferReader, funcTransferWriter
-}
-
-func TestClientregisterConn(t *testing.T) {
+func TestClientRegisterConn(t *testing.T) {
 	clientQueue, _ := helpers.NewWorkQueue()
-	meta, _ := getClientMeta(42)
-	client := NewClient(42, meta, clientQueue)
+	const id = 42
+	meta, _ := getClientMeta(id)
+	_, getClientTimer := helpTimeout()
+	cT := getClientTimer(id)
+
+	client := NewClient(id, meta, clientQueue, cT)
 	defer client.Shutdown(context.TODO())
 
 	// test get meta
@@ -81,7 +35,7 @@ func TestClientregisterConn(t *testing.T) {
 		if err == nil {
 			t.Error("there should be an error here")
 			return false
-		} else if !errors.Is(err, ErrClientReaderAlreadyActive) {
+		} else if !errors.Is(err, ErrClientWorkersAlreadyActive) {
 			t.Error("wrong error returned")
 			return false
 		}
@@ -118,12 +72,15 @@ func TestClientregisterConn(t *testing.T) {
 }
 
 func TestClientRecv(t *testing.T) {
+	const ID = 1
 	cq, hq := helpers.NewWorkQueue()
-	cmeta, mock := getClientMeta(1)
+	cmeta, mock := getClientMeta(ID)
 
 	_, funcTransferReader, _ := setupMock(mock)
 
-	client := NewClient(1, cmeta, cq)
+	_, getClientTimer := helpTimeout()
+	cT := getClientTimer(ID)
+	client := NewClient(1, cmeta, cq, cT)
 	defer client.Shutdown(context.TODO())
 
 	client.Run()
@@ -164,8 +121,11 @@ func TestClientRecv(t *testing.T) {
 }
 
 func TestClientSend(t *testing.T) {
+	const ID = 1
 	cq, hq := helpers.NewWorkQueue()
-	cmeta, mock := getClientMeta(1)
+	cmeta, mock := getClientMeta(ID)
+	_, getClientTimer := helpTimeout()
+	cT := getClientTimer(ID)
 
 	done, _, funcTransferWriter := setupMock(mock)
 
@@ -192,7 +152,7 @@ func TestClientSend(t *testing.T) {
 		return
 	}
 
-	client := NewClient(1, cmeta, cq)
+	client := NewClient(ID, cmeta, cq, cT)
 	defer client.Shutdown(context.TODO())
 
 	client.Run()
@@ -208,8 +168,11 @@ func TestClientSend(t *testing.T) {
 	compareByteSlices(exp, gotten, t)
 }
 func TestClientSendShutdown(t *testing.T) {
+	const ID = 1
 	cq, hq := helpers.NewWorkQueue()
-	cmeta, mock := getClientMeta(1)
+	cmeta, mock := getClientMeta(ID)
+	_, getClientTimer := helpTimeout()
+	cT := getClientTimer(ID)
 
 	done, _, funcTransferWriter := setupMock(mock)
 
@@ -231,7 +194,7 @@ func TestClientSendShutdown(t *testing.T) {
 		return
 	}
 
-	client := NewClient(1, cmeta, cq)
+	client := NewClient(ID, cmeta, cq, cT)
 	defer client.Shutdown(context.TODO())
 
 	client.Run()
@@ -248,8 +211,11 @@ func TestClientSendShutdown(t *testing.T) {
 }
 
 func TestClientSendNextWriterError(t *testing.T) {
+	const ID = 1
 	cq, hq := helpers.NewWorkQueue()
-	cmeta, mock := getClientMeta(1)
+	cmeta, mock := getClientMeta(ID)
+	_, getClientTimer := helpTimeout()
+	cT := getClientTimer(ID)
 
 	done, _, _ := setupMock(mock)
 
@@ -261,7 +227,7 @@ func TestClientSendNextWriterError(t *testing.T) {
 		return
 	}
 
-	client := NewClient(1, cmeta, cq)
+	client := NewClient(ID, cmeta, cq, cT)
 	defer client.Shutdown(context.TODO())
 
 	client.Run()
