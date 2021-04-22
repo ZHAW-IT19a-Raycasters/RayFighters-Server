@@ -53,7 +53,7 @@ func compareByteSlices(expeced, gotten []byte, t *testing.T) bool {
 	return true
 }
 
-func TestClientManagerAddClientSigle(t *testing.T) {
+func TestClientManagerAddClientSingle(t *testing.T) {
 
 	cm := NewClientManager()
 	defer cm.Shutdown(context.Background())
@@ -104,6 +104,12 @@ func TestClientManagerAddClientSigle(t *testing.T) {
 		t.Error("Wrong uuid has been used, while mapping.")
 	} else if client.meta.name != clientMeta.name {
 		t.Error("Wrong name has been used, while mapping.")
+	} else if client.GetStatus() != Active {
+		t.Error("Wrong status for client")
+	} else if gottenStatus, _ := cm.GetClientStatus(iId); client.GetStatus() != gottenStatus {
+		t.Error("Wrong status for client")
+	} else if _, ok := cm.GetClientStatus(iId + 1); ok {
+		t.Error("there should not be an id of the given type")
 	}
 }
 
