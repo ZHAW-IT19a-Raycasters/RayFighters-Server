@@ -27,10 +27,10 @@ const (
 var logger = log.Log()
 
 var (
-	// ErrClientReaderAlreadyActive is the error that as the name implies
+	// ErrClientWorkersAlreadyActive is the error that as the name implies
 	// tries to show to the caller that the respective client already
 	// has a running send and receiver pump thread.
-	ErrClientReaderAlreadyActive = errors.New("the client worker is already active")
+	ErrClientWorkersAlreadyActive = errors.New("the client workers are already active")
 
 	// ErrNoBytesRead is the error returned in case that the received
 	// byte count it zero.
@@ -61,23 +61,25 @@ func (err ErrNonBinaryMessage) Is(target error) bool {
 // This struct stores all the information about a single
 // client instance in a hub.
 type Client struct {
-	meta     clientInternalMeta
-	queue    helpers.ClientQueue
-	status   ConnectionStatus
-	isActive utils.AtomicBool
-	wg       sync.WaitGroup
-	lock     sync.RWMutex
+	meta        clientInternalMeta
+	queue       helpers.ClientQueue
+	timoutQueue helpers.ClientTimer
+	status      ConnectionStatus
+	isActive    utils.AtomicBool
+	wg          sync.WaitGroup
+	lock        sync.RWMutex
 }
 
 // NewClient creates and sets up a new client from it's meta information.
-func NewClient(id uint8, meta ClientMeta, queue helpers.ClientQueue) *Client {
+func NewClient(id uint8, meta ClientMeta, queue helpers.ClientQueue, tq helpers.ClientTimer) *Client {
 	c := Client{
-		queue:    queue,
-		status:   Offline,
-		meta:     newClientInternalMeta(id, meta),
-		isActive: utils.NewAtomicBool(false),
-		wg:       sync.WaitGroup{},
-		lock:     sync.RWMutex{},
+		queue:       queue,
+		status:      Offline,
+		meta:        newClientInternalMeta(id, meta),
+		timoutQueue: tq,
+		isActive:    utils.NewAtomicBool(false),
+		wg:          sync.WaitGroup{},
+		lock:        sync.RWMutex{},
 	}
 
 	// register connection
@@ -103,7 +105,7 @@ func (c *Client) GetInternalMeta() clientInternalMeta {
 func (c *Client) registerConn(conn ClientMeta, queue helpers.ClientQueue) error {
 	// check if the receiving routine is running
 	if c.isActive.Get() {
-		return ErrClientReaderAlreadyActive
+		return ErrClientWorkersAlreadyActive
 	}
 
 	// wait until there are no working connections
@@ -116,7 +118,7 @@ func (c *Client) registerConn(conn ClientMeta, queue helpers.ClientQueue) error 
 	// make sure that there is no chance of this conn
 	// already being registered
 	if c.status == Registered {
-		return ErrClientReaderAlreadyActive
+		return ErrClientWorkersAlreadyActive
 	}
 
 	c.meta = newClientInternalMeta(c.meta.id, conn)
@@ -135,14 +137,13 @@ func (c *Client) registerConn(conn ClientMeta, queue helpers.ClientQueue) error 
 func (c *Client) Run() error {
 	// check if there already is an active worker
 	if !c.isActive.SetTrue() {
-		return ErrClientReaderAlreadyActive
+		return ErrClientWorkersAlreadyActive
 	}
 
 	// make sure that there is no chance of this conn
 	// already being registered
 	if !c.checkRegistered() {
-		// TODO: change error
-		return ErrClientReaderAlreadyActive
+		return ErrClientWorkersAlreadyActive
 	}
 
 	// setup the states needed to run the client
@@ -366,7 +367,6 @@ func (c *Client) registerTimeout() {
 		return
 	}
 
-	// TODO: Timer
 	c.status = Timeout
 
 	c.shutdownHandler()

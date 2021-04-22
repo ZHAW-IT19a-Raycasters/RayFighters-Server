@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -15,14 +16,19 @@ import (
 // logFile is the file, where to the logs shall be logged to
 const logFile string = "logs.txt"
 
+// the system logger
+var logger = log.Log()
+
 func setupLogger() error {
 	b := log.NewBuilder()
 
-	// TODO:
-
 	// register file handler
+	fh := log.NewFileHandler(log.Info, logFile)
+	b.RegisterHandler(fh)
 
 	// register console handler
+	ch := log.NewConsoleHandler(log.Debug)
+	b.RegisterHandler(ch)
 
 	return b.Build()
 }
@@ -44,7 +50,7 @@ func main() {
 	server := web.NewServer(&conf.Web)
 
 	done := make(chan struct{})
-	ctx := web.ShutdownContext()
+	ctx := context.Background()
 
 	go func() {
 		sigs := make(chan os.Signal, 1)
@@ -67,8 +73,8 @@ func main() {
 		fmt.Println(err)
 	}
 
-	fmt.Println("awaiting server shutdown")
+	logger.Info("awaiting server shutdown")
 
 	<-done
-	fmt.Println("Shutdown completed")
+	logger.Info("Shutdown completed")
 }

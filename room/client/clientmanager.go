@@ -175,9 +175,12 @@ func (manager *ClientManager) GetPlayers() []server.Player {
 // over a new connection. If the client UUID already has a working
 // connection, an error will be returned.
 //
-// If there is no more space left in the client manager
+// As to not have to rebuild an unneeded ClientTimer the function is
+// only called in the case that there is a new client added.
+//
+// If there is an invariant due to some incorrect programming then
 // this function will panic.
-func (manager *ClientManager) AddClient(meta ClientMeta, queue helpers.ClientQueue) error {
+func (manager *ClientManager) AddClient(meta ClientMeta, queue helpers.ClientQueue, timeoutMessanger func(id uint8) helpers.ClientTimer) error {
 
 	// lock the hub, so that writing is okay
 	manager.lock.Lock()
@@ -220,7 +223,7 @@ func (manager *ClientManager) AddClient(meta ClientMeta, queue helpers.ClientQue
 		manager.mapping[meta.id] = id
 
 		// create the client with the correct information
-		client := NewClient(id, meta, queue)
+		client := NewClient(id, meta, queue, timeoutMessanger(id))
 		manager.clients[id] = client
 
 		// start the client
@@ -243,7 +246,8 @@ func (manager *ClientManager) RemoveClient(meta ClientMeta) error {
 
 	// make sure it is shutdown, at most wait for the timeout
 	// afterwards kill it.
-	// TODO: change context to parameter given by caller
+	// as we don't have the limitation given by a shutdown we are
+	// using the background context here.
 	cxt, cancel := context.WithTimeout(context.Background(), ClientShutdownTime)
 
 	waiter := make(chan struct{})

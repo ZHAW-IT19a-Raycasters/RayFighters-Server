@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/gorilla/websocket"
+	"github.zhaw.ch/raycasters/server/room/helpers"
 )
 
 type MockedConnection struct {
@@ -106,4 +107,62 @@ func newMockedReader() MockedReader {
 	return MockedReader{
 		new(bytes.Buffer),
 	}
+}
+
+type blockChan chan struct{}
+
+type chanFuncReader chan func() (int, io.Reader, error)
+
+type chanFuncWriter chan func(messageType int) (io.WriteCloser, error)
+
+func setupMock(mock *MockedConnection) (blockChan, chanFuncReader, chanFuncWriter) {
+
+	done := make(blockChan)
+
+	// make the connections blocking, so that we can run other
+	// stuff while it waits
+	funcTransferReader := make(chanFuncReader, 10)
+	funcTransferWriter := make(chanFuncWriter, 10)
+
+	mock.mwc.cl = func() error {
+		close(done)
+		return nil
+	}
+
+	mock.funcNextReader = func() (int, io.Reader, error) {
+		select {
+		case <-done:
+			return 0, nil, websocket.ErrCloseSent
+		case d := <-funcTransferReader:
+			return d()
+		}
+	}
+
+	mock.funcNextWriter = func(messageType int) (io.WriteCloser, error) {
+		select {
+		case <-done:
+			return nil, websocket.ErrCloseSent
+		case d := <-funcTransferWriter:
+			return d(messageType)
+		}
+	}
+
+	// override the closer, so that the channels don't get changed by it
+	mock.funcCloser = func() error {
+		select {
+		case <-done:
+		default:
+			close(done)
+		}
+		return nil
+	}
+	return done, funcTransferReader, funcTransferWriter
+}
+
+func helpTimeout() (helpers.HubTimer, func(id uint8) helpers.ClientTimer) {
+	ht := helpers.NewHubTimer()
+	f := func(id uint8) helpers.ClientTimer {
+		return ht.NewClientTimer(id)
+	}
+	return ht, f
 }
