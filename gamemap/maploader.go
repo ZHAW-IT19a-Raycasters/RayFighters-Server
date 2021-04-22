@@ -8,7 +8,7 @@ import (
 	"strconv"
 )
 
-var headerLength = 5
+var headerLength = 6
 
 // Error codes returned by failures to parse a map.
 var (
