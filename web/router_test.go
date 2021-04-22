@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/json"
-	"context"
 	"fmt"
 	"io"
 	"log"
@@ -50,15 +49,13 @@ func TestAPIRoot(t *testing.T) {
 	}
 }
 
-
-
 // TestAuthorizedWebsocketEstablishment is the whole shebang in one test!
 func TestAuthorizedWebsocketEstablishment(t *testing.T) {
 	privKey, _ := rsa.GenerateKey(rand.Reader, 2048)
 	// set up a router for auth and ws
 	router := mux.NewRouter()
-	router.HandleFunc("/auth",ServeAuthWithKey(privKey))
-	router.HandleFunc("/ws/{roomID:[0-9]+}", func(rw http.ResponseWriter, r *http.Request) {serveWs([]*room.Hub{} ,rw, r)})
+	router.HandleFunc("/auth", ServeAuthWithKey(privKey))
+	router.HandleFunc("/ws/{roomID:[0-9]+}", func(rw http.ResponseWriter, r *http.Request) { serveWs([]*room.Hub{}, rw, r) })
 
 	// Start our server
 	ts := httptest.NewServer(router)
@@ -81,20 +78,12 @@ func TestAuthorizedWebsocketEstablishment(t *testing.T) {
 		Jar: jar,
 	}
 
-
-
-	go func() {
-		server.Start()
-	}()
-	defer server.ServerStop(context.TODO())
-
-
 	postBody, _ := json.Marshal(map[string]string{
-		"username":  "Phil",
+		"username": "Phil",
 	})
 
-	// 
-	if _, err = client.Post(u.String()+"/auth","application/json",bytes.NewBuffer(postBody)); err != nil {
+	//
+	if _, err = client.Post(u.String()+"/auth", "application/json", bytes.NewBuffer(postBody)); err != nil {
 		log.Fatal(err)
 	}
 
@@ -114,11 +103,11 @@ func TestAuthorizedWebsocketEstablishment(t *testing.T) {
 	fmt.Printf("connecting to %s\n", u.String())
 
 	c, res, err := websocket.DefaultDialer.Dial(u.String(), nil)
-	defer c.Close()
 
 	if err != nil {
 		fmt.Print("Error during handshake", err)
 	}
+	defer c.Close()
 
 	if res.StatusCode != http.StatusSwitchingProtocols {
 		t.Errorf("handler returned wrong status code during handshake: got %v want %v",
@@ -137,7 +126,7 @@ func TestWSBadRoomID(t *testing.T) {
 	io.ReadAll(res.Body)
 	if res.StatusCode != http.StatusConflict {
 		t.Errorf("handler returned wrong status code for bad request: got %v want %v",
-		res.StatusCode, http.StatusConflict)
+			res.StatusCode, http.StatusConflict)
 	}
 }
 
