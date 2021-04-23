@@ -14,14 +14,7 @@ const hubTimerSize = helpers.IdCountLimit
 func TestTimer(t *testing.T) {
 	const expId = 1
 	// fix timeout (so that we don't wait multiple seconds)
-	oldTimeout := ClientTimeout
-	t.Cleanup(
-		func() {
-			ClientTimeout = oldTimeout
-		},
-	)
-
-	ClientTimeout = 50 * time.Millisecond
+	const clienttimeout = 50 * time.Millisecond
 
 	queue := make(chan uint8)
 	callback := func(id uint8) {
@@ -29,6 +22,8 @@ func TestTimer(t *testing.T) {
 	}
 
 	ht := NewHubTimer(hubTimerSize, callback)
+	ht.baseTimer.SetTimeout(clienttimeout)
+
 	ht.Run()
 
 	defer ht.Shutdown(context.TODO())

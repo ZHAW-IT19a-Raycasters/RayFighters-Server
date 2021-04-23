@@ -11,7 +11,7 @@ import (
 // ClientTimeout says the maximal time a client
 // may not have an active connection to the
 // system, before beeing removed from it.
-var ClientTimeout = 5 * time.Second // is a var so that it can be used for testing.
+const ClientTimeout = 5 * time.Second // is a var so that it can be used for testing.
 
 // getTime is the function that will return the
 // current time.

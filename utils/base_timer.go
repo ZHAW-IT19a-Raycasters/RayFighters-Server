@@ -39,6 +39,7 @@ type BaseTimer struct {
 	timeoutTime time.Duration
 	isAlive     AtomicBool
 	shutdown    chan void
+	lock        *sync.RWMutex
 	wg          *sync.WaitGroup
 }
 
@@ -50,8 +51,23 @@ func NewBaseTimer(bufferSize int, timeoutTime time.Duration, callback func(elem 
 		timeoutTime: timeoutTime,
 		isAlive:     NewAtomicBool(false),
 		shutdown:    make(chan void),
+		lock:        &sync.RWMutex{},
 		wg:          &sync.WaitGroup{},
 	}
+}
+
+// SetTimerTime will set the timer timeout duration
+func (t *BaseTimer) SetTimeout(timeout time.Duration) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	t.timeoutTime = timeout
+}
+
+// GetTimeout will return the timeout duration
+func (t *BaseTimer) GetTimeout() time.Duration {
+	t.lock.RLock()
+	defer t.lock.RUnlock()
+	return t.timeoutTime
 }
 
 // Enqueue will add the item to the queue
@@ -89,7 +105,7 @@ func (t *BaseTimer) runTimer() {
 			return
 		case currentWaiter = <-t.queue:
 			// set the timer to only wait for a moment
-			diff := time.Until(currentWaiter.GetTime().Add(t.timeoutTime))
+			diff := time.Until(currentWaiter.GetTime().Add(t.GetTimeout()))
 			timerHandler.Reset(diff)
 		}
 

@@ -97,7 +97,7 @@ func TestBaseTimerShutdown(t *testing.T) {
 	<-waiter
 
 	// forcefully increase the timeout time
-	bt.timeoutTime = 1 * time.Second
+	bt.SetTimeout(1 * time.Second)
 
 	bt.Enqueue(&elem)
 
