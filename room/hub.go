@@ -161,40 +161,6 @@ func (h *Hub) runRegistration() {
 	}
 }
 
-/*
-// runTimer is the timer instance that governs the hub
-func (h *Hub) runTimer() {
-	defer h.wg.Done()
-	// create the timer without any time to wait
-	timerHandler := time.NewTimer(0)
-	// temporily save the current client to wait for
-	var currentlyTimedOut client.TimerData
-
-	for {
-
-		// wait here if there is no other timeout currently
-		select {
-		case <-h.shutdown:
-			// shutting down
-			return
-		case currentlyTimedOut = <-h.controller.TimerQueue():
-			// set the timer to only wait for a moment
-			diff := time.Until(currentlyTimedOut.GetTime().Add(ClientTimeout))
-			timerHandler.Reset(diff)
-		}
-
-		// wait here until the timer is done for
-		select {
-		case <-h.shutdown:
-			// shutting down
-			return
-		case <-timerHandler.C:
-			// error irrelevant for system
-			_ = h.controller.RemoveClientIfTimeout(currentlyTimedOut.GetId())
-		}
-	}
-}*/
-
 // Shutdown will initialize a complete shutdown of any and all clients.
 // With the cxt context a premature cancelation of all client
 // connections can be started.

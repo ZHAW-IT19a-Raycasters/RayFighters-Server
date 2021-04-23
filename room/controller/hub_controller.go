@@ -60,7 +60,14 @@ func NewHubController() *HubController {
 
 	// TODO: implement item timer callbacks (blocked by missing map implementation)
 
-	// TODO: implement client timer callbacks
+	// client timer callbacks
+	cTimerCallback := func(id uint8) {
+		// error is not important for execution
+		// as it only says if there was an
+		// execution or not
+		_ = hc.RemoveClientIfTimeout(id)
+	}
+	hc.timeoutClientQueue = client.NewHubTimer(helpers.IdCountLimit, cTimerCallback)
 
 	return &hc
 }
@@ -365,7 +372,6 @@ func (hc *HubController) Shutdown(cxt context.Context) {
 	case <-cxt.Done():
 		logger.Info("forced shutdown of controller")
 	}
-
 }
 
 // handleRead will as the name implies handle all the given reads.
