@@ -9,15 +9,6 @@ import (
 	"github.zhaw.ch/raycasters/server/room/helpers"
 )
 
-func setupTimer(t *testing.T, f func() time.Time) {
-	org := getTime
-	getTime = f
-
-	t.Cleanup(func() {
-		getTime = org
-	})
-}
-
 const hubTimerSize = helpers.IdCountLimit
 
 func TestTimer(t *testing.T) {
