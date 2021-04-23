@@ -159,7 +159,11 @@ func setupMock(mock *MockedConnection) (blockChan, chanFuncReader, chanFuncWrite
 }
 
 func helpTimeout() (HubTimer, func(id uint8) ClientTimer) {
-	ht := NewHubTimer(hubTimerSize)
+
+	// empty callback as it make no sense in this context
+	callback := func(id uint8) {}
+
+	ht := NewHubTimer(hubTimerSize, callback)
 	f := func(id uint8) ClientTimer {
 		return ht.NewClientTimer(id)
 	}

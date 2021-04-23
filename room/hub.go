@@ -5,7 +5,6 @@ import (
 	"errors"
 	"math"
 	"sync"
-	"time"
 
 	"github.zhaw.ch/raycasters/server/room/client"
 	"github.zhaw.ch/raycasters/server/room/controller"
@@ -22,14 +21,9 @@ type void struct{}
 // decision to only support a player id of size uint8.
 const HubClientLimit = math.MaxUint8
 
-// ClientTimeout says the maximal time a client
-// may not have an active connection to the
-// system, before beeing removed from it.
-const ClientTimeout = 5 * time.Second
-
 // workerCount is the ammount of workers the
 // hub it self has at all times.
-const workerCount = 2
+const workerCount = 1
 
 var (
 	// ErrHubIsFull is the error that is returned on an RegisterClient error.
@@ -140,7 +134,7 @@ func (h *Hub) Run() error {
 	// add two runners
 	h.wg.Add(workerCount)
 
-	go h.runTimer()
+	// go h.runTimer()
 	go h.runRegistration()
 
 	return nil
@@ -167,6 +161,7 @@ func (h *Hub) runRegistration() {
 	}
 }
 
+/*
 // runTimer is the timer instance that governs the hub
 func (h *Hub) runTimer() {
 	defer h.wg.Done()
@@ -198,7 +193,7 @@ func (h *Hub) runTimer() {
 			_ = h.controller.RemoveClientIfTimeout(currentlyTimedOut.GetId())
 		}
 	}
-}
+}*/
 
 // Shutdown will initialize a complete shutdown of any and all clients.
 // With the cxt context a premature cancelation of all client

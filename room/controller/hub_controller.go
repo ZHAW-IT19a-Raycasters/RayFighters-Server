@@ -16,14 +16,19 @@ import (
 // NewHubController will create a new controller
 func NewHubController() *HubController {
 	// TODO: add map implementation
-	return &HubController{
-		clientManager:      client.NewClientManager(),
-		connections:        make(map[uint8]client.HubQueue),
-		gameState:          NewGameState(),
-		timeoutClientQueue: client.NewHubTimer(helpers.IdCountLimit),
-		wg:                 sync.WaitGroup{},
-		lock:               sync.RWMutex{},
+	hc := HubController{
+		clientManager: client.NewClientManager(),
+		connections:   make(map[uint8]client.HubQueue),
+		gameState:     NewGameState(),
+		wg:            sync.WaitGroup{},
+		lock:          sync.RWMutex{},
 	}
+
+	// TODO: implement item timer callbacks (blocked by missing map implementation)
+
+	// TODO: implement client timer callbacks
+
+	return &hc
 }
 
 // HubController is the main brain of the hub
@@ -54,13 +59,6 @@ type HubController struct {
 	// lock is used to limit the access to the connections.
 	// as well as to the client manager.
 	lock sync.RWMutex
-}
-
-// TimerQueue will return a receiving channel for the
-// timer data. Attention only use this function to
-// access and do not save the value individually.
-func (hc *HubController) TimerQueue() <-chan client.TimerData {
-	return hc.timeoutClientQueue.GetQueue()
 }
 
 // RemoveClientIfTimeout will remove a client only
@@ -326,6 +324,8 @@ func (hc *HubController) Shutdown(cxt context.Context) {
 
 	// shutdown the controller
 	hc.clientManager.Shutdown(cxt)
+
+	// TODO: shutdown the timers
 }
 
 // handleRead will as the name implies handle all the given reads.
