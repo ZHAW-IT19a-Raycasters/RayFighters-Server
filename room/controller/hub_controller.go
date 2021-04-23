@@ -26,6 +26,9 @@ func NewHubController() *HubController {
 	}
 }
 
+// HubController is the main brain of the hub
+// it is soley responsible for all the interactions
+// done by the user.
 type HubController struct {
 	// The manager of the different client with the different connections.
 	clientManager client.ClientManager

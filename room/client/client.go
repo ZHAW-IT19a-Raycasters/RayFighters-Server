@@ -125,6 +125,9 @@ func (c *Client) registerConn(conn ClientMeta, queue helpers.ClientQueue) error 
 	c.queue = queue
 	c.status = Registered
 
+	// rearm the queue
+	c.timoutQueue.Reset()
+
 	return nil
 }
 
