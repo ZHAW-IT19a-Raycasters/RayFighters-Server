@@ -1,10 +1,15 @@
 package web
 
 import (
-	"context"
+	"bytes"
+	"crypto/rand"
+	"crypto/rsa"
+	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
+	"net/http/cookiejar"
 	"net/http/httptest"
 	"net/url"
 	"testing"
@@ -12,7 +17,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 	"github.zhaw.ch/raycasters/server/room"
-	webconfig "github.zhaw.ch/raycasters/server/web/config"
+	"golang.org/x/net/publicsuffix"
 )
 
 func TestAPIRoot(t *testing.T) {
@@ -44,31 +49,65 @@ func TestAPIRoot(t *testing.T) {
 	}
 }
 
-func TestWebSocketHandshake(t *testing.T) {
-	// runs the server and establishes a websocket connection
+// TestAuthorizedWebsocketEstablishment is the whole shebang in one test!
+func TestAuthorizedWebsocketEstablishment(t *testing.T) {
+	privKey, _ := rsa.GenerateKey(rand.Reader, 2048)
+	// set up a router for auth and ws
+	router := mux.NewRouter()
+	router.HandleFunc("/auth", ServeAuthWithKey(privKey))
+	router.HandleFunc("/ws/{roomID:[0-9]+}", func(rw http.ResponseWriter, r *http.Request) { serveWs([]*room.Hub{}, rw, r) })
 
-	// TODO: couldn't read config via utils. do manually for now:
-	var conf = webconfig.WebConfig{
-		Ip:   "localhost",
-		Port: 8081,
+	// Start our server
+	ts := httptest.NewServer(router)
+	defer ts.Close()
+
+	u, err := url.Parse(ts.URL)
+	if err != nil {
+		log.Fatal(err)
+
 	}
 
-	server := NewServer(&conf)
+	// All users of cookiejar should import "golang.org/x/net/publicsuffix"
+	jar, err := cookiejar.New(&cookiejar.Options{PublicSuffixList: publicsuffix.List})
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	go func() {
-		server.Start()
-	}()
-	defer server.ServerStop(context.TODO())
+	// create a client with our jar
+	client := &http.Client{
+		Jar: jar,
+	}
 
-	u := url.URL{Scheme: "ws", Host: conf.String(), Path: "/ws/1"}
+	postBody, _ := json.Marshal(map[string]string{
+		"username": "Phil",
+	})
+
+	//
+	if _, err = client.Post(u.String()+"/auth", "application/json", bytes.NewBuffer(postBody)); err != nil {
+		log.Fatal(err)
+	}
+
+	// we should have the auth token as cookie in the jar, mmmmmhhh cookies :)
+	fmt.Println("After 1st request:")
+	for _, cookie := range jar.Cookies(u) {
+		fmt.Printf("  %s: %s\n", cookie.Name, cookie.Value)
+	}
+
+	// add our jar to the default dialer
+	websocket.DefaultDialer.Jar = jar
+
+	// change url to ws endpoint for same host
+	u.Scheme = "ws"
+	u.Path = "/ws/1"
+
 	fmt.Printf("connecting to %s\n", u.String())
 
 	c, res, err := websocket.DefaultDialer.Dial(u.String(), nil)
-	defer c.Close()
 
 	if err != nil {
 		fmt.Print("Error during handshake", err)
 	}
+	defer c.Close()
 
 	if res.StatusCode != http.StatusSwitchingProtocols {
 		t.Errorf("handler returned wrong status code during handshake: got %v want %v",
@@ -84,11 +123,10 @@ func TestWSBadRoomID(t *testing.T) {
 	router.HandleFunc("/ws/{roomID:[0-9]+}", func(rw http.ResponseWriter, r *http.Request) { serveWs([]*room.Hub{}, rw, r) })
 	router.ServeHTTP(rr, req)
 	res := rr.Result()
-	body, _ := io.ReadAll(res.Body)
-	t.Log(string(body))
-	if res.StatusCode != http.StatusForbidden {
+	io.ReadAll(res.Body)
+	if res.StatusCode != http.StatusConflict {
 		t.Errorf("handler returned wrong status code for bad request: got %v want %v",
-			res.StatusCode, http.StatusForbidden)
+			res.StatusCode, http.StatusConflict)
 	}
 }
 

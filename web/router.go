@@ -2,6 +2,9 @@ package web
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -9,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
+	"github.com/lestrrat-go/jwx/jwt"
 	"github.zhaw.ch/raycasters/server/log"
 	"github.zhaw.ch/raycasters/server/room"
 	"github.zhaw.ch/raycasters/server/room/client"
@@ -26,6 +30,9 @@ type Server struct {
 	endpoint *http.Server
 }
 
+// ErrRoomIdUnavailable can be thrown when a room is requested that cannot currently be accessed.
+var ErrRoomIdUnavailable = errors.New("No Room available for the given ID")
+
 // NewServer registers routes for all exposed endpoints
 // and attaches the appropriate routehandler functions
 func NewServer(conf *webconfig.WebConfig) *Server {
@@ -37,17 +44,33 @@ func NewServer(conf *webconfig.WebConfig) *Server {
 		go hubs[i].Run()
 	}
 
+	// generate private key
+	privKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		logger.Warnf("failed to generate private key: %s", err)
+	}
+
+	// init global jwt decoding
+	jwt.RegisterCustomField("uuid", uuid.UUID{})
+
+	amw := authenticationMiddleware{privKey}
+
 	router := mux.NewRouter()
-	router.HandleFunc("/", serveRoot)
-	// router.HandleFunc("/auth", serveAuth).Methods("POST")
-	router.HandleFunc("/ws/{roomID:[0-9]+}", func(w http.ResponseWriter, r *http.Request) {
+	// serve /auth without authentication middleware
+	router.Path("/auth").Handler(http.HandlerFunc(ServeAuthWithKey(privKey))).Methods("POST")
+	api := router.PathPrefix("/").Subrouter()
+	api.HandleFunc("/", serveRoot)
+	api.HandleFunc("/ws/{roomID:[0-9]+}", func(w http.ResponseWriter, r *http.Request) {
 		// TODO: get a hub reference from handler function via HubManager
 		// handle with a wrapper lambda for now
 		serveWs(hubs[:], w, r)
 	})
 
-	httpServer := &http.Server{Handler: router, Addr: conf.String(), WriteTimeout: 15 * time.Second, ReadTimeout: 15 * time.Second}
+	
+	api.Use(amw.Middleware)
 
+	httpServer := &http.Server{Handler: router, Addr: conf.String(), WriteTimeout: 15 * time.Second, ReadTimeout: 15 * time.Second}
+	
 	server := &Server{endpoint: httpServer}
 	return server
 }
@@ -84,9 +107,8 @@ func serveWs(hubs []*room.Hub, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if roomID < 0 || roomID >= hubsCount {
-		err := fmt.Errorf("no room with id %d available", roomID)
-		logger.Error(err)
-		http.Error(w, err.Error(), http.StatusForbidden)
+		logger.Error(ErrRoomIdUnavailable)
+		http.Error(w, ErrRoomIdUnavailable.Error(), http.StatusConflict)
 		return
 	}
 
@@ -98,19 +120,29 @@ func serveWs(hubs []*room.Hub, w http.ResponseWriter, r *http.Request) {
 	// upgrade HTTP to Websocket connection
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
+		// upgrader itself writes http error response
 		logger.Error(err)
 		return
 	}
 
-	logger.Infof("%s request to join room %d", r.RemoteAddr, roomID)
+	// get cookie from request
+	jwtCookie, err := r.Cookie(JWTCOOKIENAME)
+	if err != nil{
+		http.Error(w, "no JWT found in Cookies", http.StatusUnauthorized)
+		return
+	}
 
-	// create and register client
-	uuid := uuid.New()
-	cm := client.NewClientMeta(uuid, "john dude", conn)
+	// unmarshal the token
+	token, err := jwt.ParseString(jwtCookie.Value)
+	usernameI, userOk := token.Get(`username`)
+	uuidI, uuidOk := token.Get(`uuid`)
 
-	hubs[roomID].RegisterClient(cm)
+	if (userOk && uuidOk) {
+		uuid := uuidI.(uuid.UUID)
+		username := fmt.Sprintf("%v", usernameI)
+		cm := client.NewClientMeta(uuid, username, conn)
+		hubs[roomID].RegisterClient(cm)
+		logger.Infof("user %s with uuid %s joined room %d", username, uuid,roomID)
+	}
+
 }
-
-// func serveAuth(w http.ResponseWriter, r *http.Request) {}
-
-// create JWT and uuid here
