@@ -307,9 +307,7 @@ func (manager *ClientManager) Shutdown(cxt context.Context) {
 
 	// Remove from memory and close any open waiting channels.
 	waiter := make(chan struct{})
-	defer func() {
-		chancelCxt()
-	}()
+	defer chancelCxt()
 
 	// start up waiter first
 	go func() {

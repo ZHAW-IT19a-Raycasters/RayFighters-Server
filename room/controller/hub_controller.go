@@ -11,7 +11,41 @@ import (
 	pclient "github.zhaw.ch/raycasters/server/protocol/client"
 	"github.zhaw.ch/raycasters/server/room/client"
 	"github.zhaw.ch/raycasters/server/room/helpers"
+	"github.zhaw.ch/raycasters/server/room/items"
 )
+
+// HubController is the main brain of the hub
+// it is soley responsible for all the interactions
+// done by the user.
+type HubController struct {
+	// The manager of the different client with the different connections.
+	clientManager client.ClientManager
+	// connections stores the hub queues the soley conneciton
+	// points to the clients.
+	connections map[uint8]client.HubQueue
+	// gameState stores the current state of the game
+	// such as player kills and their deaths.
+	gameState GameState
+	// timeoutClientQueue stores the currently timedout clients
+	// so that they can be removed once the timeout runs out.
+	timeoutClientQueue client.HubTimer
+	// timeoutItemQueue stores the currently timedout map elements
+	// so that they can be respawned once the timeout runs out.
+	timeoutItemQueue items.ItemTimer
+	// Semaphore, counts the totally active
+	// player connections, although that number is already available
+	// via the client map length, is would have to be accessed
+	// from behind a lock. And so creates an unneeded overhead
+	// while asynchronously adding a new client. So to avoid the given
+	// overhead an atomic counting semaphore implementation is here used.
+	semaphore utils.CountingSemaphore
+	// wg is the wait group used for counting the ammout
+	// of active hub workers.
+	wg sync.WaitGroup
+	// lock is used to limit the access to the connections.
+	// as well as to the client manager.
+	lock sync.RWMutex
+}
 
 // NewHubController will create a new controller
 func NewHubController() *HubController {
@@ -29,36 +63,6 @@ func NewHubController() *HubController {
 	// TODO: implement client timer callbacks
 
 	return &hc
-}
-
-// HubController is the main brain of the hub
-// it is soley responsible for all the interactions
-// done by the user.
-type HubController struct {
-	// The manager of the different client with the different connections.
-	clientManager client.ClientManager
-	// connections stores the hub queues the soley conneciton
-	// points to the clients.
-	connections map[uint8]client.HubQueue
-	// gameState stores the current state of the game
-	// such as player kills and their deaths.
-	gameState GameState
-	// timeoutClientQueue stores the currently timedout clients
-	// so that they can be removed once the timeout runs out.
-	timeoutClientQueue client.HubTimer
-	// Semaphore, counts the totally active
-	// player connections, although that number is already available
-	// via the client map length, is would have to be accessed
-	// from behind a lock. And so creates an unneeded overhead
-	// while asynchronously adding a new client. So to avoid the given
-	// overhead an atomic counting semaphore implementation is here used.
-	semaphore utils.CountingSemaphore
-	// wg is the wait group used for counting the ammout
-	// of active hub workers.
-	wg sync.WaitGroup
-	// lock is used to limit the access to the connections.
-	// as well as to the client manager.
-	lock sync.RWMutex
 }
 
 // RemoveClientIfTimeout will remove a client only
@@ -322,10 +326,46 @@ func (hc *HubController) Shutdown(cxt context.Context) {
 	// send shutdown message to all the clients
 	hc.broadCast(server.NewDisconnect(), helpers.NewIdSet())
 
-	// shutdown the controller
-	hc.clientManager.Shutdown(cxt)
+	waiter := make(chan struct{})
+	wg := sync.WaitGroup{}
 
-	// TODO: shutdown the timers
+	// use complex way to avoid code repetition
+	// thanks sonar lint alert
+	shutdowns := [...]func(context.Context) error{
+		func(icxt context.Context) error {
+			// shutdown the item timer
+			hc.clientManager.Shutdown(icxt)
+			return nil
+		},
+		hc.timeoutClientQueue.Shutdown,
+		hc.timeoutItemQueue.Shutdown,
+	}
+
+	wg.Add(len(shutdowns))
+
+	shutdown := func(f func(context.Context) error) {
+		defer wg.Done()
+		// shutdown the timers
+		f(cxt)
+	}
+
+	for _, f := range shutdowns {
+		go shutdown(f)
+	}
+
+	go func() {
+		wg.Wait()
+		close(waiter)
+	}()
+
+	select {
+	case <-waiter:
+		// all good
+		logger.Info("shutdown controller")
+	case <-cxt.Done():
+		logger.Info("forced shutdown of controller")
+	}
+
 }
 
 // handleRead will as the name implies handle all the given reads.
