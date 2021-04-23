@@ -65,6 +65,7 @@ func (t *BaseTimer) Run() error {
 		return ErrTimerAlreadyRunning
 	}
 
+	t.wg.Add(1)
 	go t.runTimer()
 
 	return nil
@@ -112,7 +113,7 @@ func (t *BaseTimer) Shutdown(cxt context.Context) error {
 	waiter := make(chan void)
 
 	go func() {
-		t.wg.Done()
+		t.wg.Wait()
 		close(waiter)
 	}()
 
@@ -124,5 +125,4 @@ func (t *BaseTimer) Shutdown(cxt context.Context) error {
 	case <-waiter:
 		return nil
 	}
-
 }

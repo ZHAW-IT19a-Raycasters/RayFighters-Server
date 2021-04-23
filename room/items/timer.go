@@ -14,14 +14,6 @@ const ItemTimeout = 1 * time.Minute
 // mocking in tests.
 var getTime = time.Now
 
-// timerQueue is an alias of the more complex channel
-// needed for the item time data structures.
-type timerQueue chan itemTimeData
-
-// void is an emptry structure used
-// for a a zero memory channel.
-type void struct{}
-
 // itemTimeData is the structure holding all the information
 // needed to handle all the item timeouts used on item
 // pickup.
