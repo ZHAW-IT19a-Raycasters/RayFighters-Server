@@ -1,4 +1,4 @@
-package helpers
+package client
 
 import (
 	"errors"
@@ -6,11 +6,6 @@ import (
 
 	"github.zhaw.ch/raycasters/server/utils"
 )
-
-// hubTimerLimit is the limitation used
-// to limit the size of the max channel
-// buffer.
-const hubTimerLimit = IdCountLimit
 
 // getTime is the function that will return the
 // current time.
@@ -93,9 +88,9 @@ type HubTimer struct {
 }
 
 // NewHubTimer will create a new hub timer instance.
-func NewHubTimer() HubTimer {
+func NewHubTimer(bufferSize int) HubTimer {
 	return HubTimer{
-		queue: make(chan TimerData, hubTimerLimit),
+		queue: make(chan TimerData, bufferSize),
 	}
 }
 

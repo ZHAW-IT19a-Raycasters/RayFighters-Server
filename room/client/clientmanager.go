@@ -180,7 +180,7 @@ func (manager *ClientManager) GetPlayers() []server.Player {
 //
 // If there is an invariant due to some incorrect programming then
 // this function will panic.
-func (manager *ClientManager) AddClient(meta ClientMeta, queue helpers.ClientQueue, timeoutMessanger func(id uint8) helpers.ClientTimer) error {
+func (manager *ClientManager) AddClient(meta ClientMeta, queue ClientQueue, timeoutMessanger func(id uint8) ClientTimer) error {
 
 	// lock the hub, so that writing is okay
 	manager.lock.Lock()

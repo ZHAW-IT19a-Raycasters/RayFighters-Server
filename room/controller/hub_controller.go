@@ -18,9 +18,9 @@ func NewHubController() *HubController {
 	// TODO: add map implementation
 	return &HubController{
 		clientManager:      client.NewClientManager(),
-		connections:        make(map[uint8]helpers.HubQueue),
+		connections:        make(map[uint8]client.HubQueue),
 		gameState:          NewGameState(),
-		timeoutClientQueue: helpers.NewHubTimer(),
+		timeoutClientQueue: client.NewHubTimer(helpers.IdCountLimit),
 		wg:                 sync.WaitGroup{},
 		lock:               sync.RWMutex{},
 	}
@@ -34,13 +34,13 @@ type HubController struct {
 	clientManager client.ClientManager
 	// connections stores the hub queues the soley conneciton
 	// points to the clients.
-	connections map[uint8]helpers.HubQueue
+	connections map[uint8]client.HubQueue
 	// gameState stores the current state of the game
 	// such as player kills and their deaths.
 	gameState GameState
 	// timeoutClientQueue stores the currently timedout clients
 	// so that they can be removed once the timeout runs out.
-	timeoutClientQueue helpers.HubTimer
+	timeoutClientQueue client.HubTimer
 	// Semaphore, counts the totally active
 	// player connections, although that number is already available
 	// via the client map length, is would have to be accessed
@@ -59,7 +59,7 @@ type HubController struct {
 // TimerQueue will return a receiving channel for the
 // timer data. Attention only use this function to
 // access and do not save the value individually.
-func (hc *HubController) TimerQueue() <-chan helpers.TimerData {
+func (hc *HubController) TimerQueue() <-chan client.TimerData {
 	return hc.timeoutClientQueue.GetQueue()
 }
 
@@ -138,7 +138,7 @@ func (hc *HubController) RegisterClient(meta client.ClientMeta) error {
 	// TODO: register in the game state (if it is a new connection)
 
 	// prepare the queues
-	cqueue, hqueue := helpers.NewWorkQueue()
+	cqueue, hqueue := client.NewWorkQueue()
 
 	// prepare messages without the new player information
 	sendAllPLayerKd := hc.gameState.GetPlayersKD()
@@ -216,7 +216,7 @@ func (hc *HubController) RegisterClient(meta client.ClientMeta) error {
 // runClientConnection is the main excecuting function for interacting with
 // the client. It handles all the incommening opcodes received from the
 // client.
-func (hc *HubController) runClientConnection(hqueue helpers.HubQueue, id uint8) {
+func (hc *HubController) runClientConnection(hqueue client.HubQueue, id uint8) {
 	var wg sync.WaitGroup
 	defer wg.Wait()
 

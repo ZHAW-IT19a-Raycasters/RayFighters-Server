@@ -8,7 +8,6 @@ import (
 	"sync"
 
 	"github.zhaw.ch/raycasters/server/protocol/server"
-	"github.zhaw.ch/raycasters/server/room/helpers"
 	"github.zhaw.ch/raycasters/server/utils"
 
 	"github.com/gorilla/websocket"
@@ -62,8 +61,8 @@ func (err ErrNonBinaryMessage) Is(target error) bool {
 // client instance in a hub.
 type Client struct {
 	meta        clientInternalMeta
-	queue       helpers.ClientQueue
-	timoutQueue helpers.ClientTimer
+	queue       ClientQueue
+	timoutQueue ClientTimer
 	status      ConnectionStatus
 	isActive    utils.AtomicBool
 	wg          sync.WaitGroup
@@ -71,7 +70,7 @@ type Client struct {
 }
 
 // NewClient creates and sets up a new client from it's meta information.
-func NewClient(id uint8, meta ClientMeta, queue helpers.ClientQueue, tq helpers.ClientTimer) *Client {
+func NewClient(id uint8, meta ClientMeta, queue ClientQueue, tq ClientTimer) *Client {
 	c := Client{
 		queue:       queue,
 		status:      Offline,
@@ -102,7 +101,7 @@ func (c *Client) GetInternalMeta() clientInternalMeta {
 // registerConn will register the new client with it's exclusive hub connection.
 // Attention this function assumes that there already is a lock on the client
 // object.
-func (c *Client) registerConn(conn ClientMeta, queue helpers.ClientQueue) error {
+func (c *Client) registerConn(conn ClientMeta, queue ClientQueue) error {
 	// check if the receiving routine is running
 	if c.isActive.Get() {
 		return ErrClientWorkersAlreadyActive

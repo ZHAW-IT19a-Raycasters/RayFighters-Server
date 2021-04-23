@@ -6,7 +6,6 @@ import (
 	"sync"
 
 	"github.com/gorilla/websocket"
-	"github.zhaw.ch/raycasters/server/room/helpers"
 )
 
 type MockedConnection struct {
@@ -159,9 +158,9 @@ func setupMock(mock *MockedConnection) (blockChan, chanFuncReader, chanFuncWrite
 	return done, funcTransferReader, funcTransferWriter
 }
 
-func helpTimeout() (helpers.HubTimer, func(id uint8) helpers.ClientTimer) {
-	ht := helpers.NewHubTimer()
-	f := func(id uint8) helpers.ClientTimer {
+func helpTimeout() (HubTimer, func(id uint8) ClientTimer) {
+	ht := NewHubTimer(hubTimerSize)
+	f := func(id uint8) ClientTimer {
 		return ht.NewClientTimer(id)
 	}
 	return ht, f

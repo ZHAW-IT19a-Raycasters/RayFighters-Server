@@ -1,9 +1,11 @@
-package helpers
+package client
 
 import (
 	"errors"
 	"testing"
 	"time"
+
+	"github.zhaw.ch/raycasters/server/room/helpers"
 )
 
 func setupTimer(t *testing.T, f func() time.Time) {
@@ -14,6 +16,8 @@ func setupTimer(t *testing.T, f func() time.Time) {
 		getTime = org
 	})
 }
+
+const hubTimerSize = helpers.IdCountLimit
 
 func setupTimerDefault(t *testing.T) time.Time {
 	timeToTest := time.Now()
@@ -28,7 +32,7 @@ func TestTimer(t *testing.T) {
 	const expId = 1
 	expTime := setupTimerDefault(t)
 
-	ht := NewHubTimer()
+	ht := NewHubTimer(hubTimerSize)
 	ct := ht.NewClientTimer(expId)
 
 	// try to reset here

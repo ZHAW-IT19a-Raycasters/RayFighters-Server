@@ -9,7 +9,6 @@ import (
 
 	"github.zhaw.ch/raycasters/server/room/client"
 	"github.zhaw.ch/raycasters/server/room/controller"
-	"github.zhaw.ch/raycasters/server/room/helpers"
 	"github.zhaw.ch/raycasters/server/utils"
 )
 
@@ -174,7 +173,7 @@ func (h *Hub) runTimer() {
 	// create the timer without any time to wait
 	timerHandler := time.NewTimer(0)
 	// temporily save the current client to wait for
-	var currentlyTimedOut helpers.TimerData
+	var currentlyTimedOut client.TimerData
 
 	for {
 
