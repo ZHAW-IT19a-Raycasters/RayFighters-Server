@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"runtime"
 	"sync"
 
 	"github.zhaw.ch/raycasters/server/room/mapstate"
@@ -53,16 +54,23 @@ type HubController struct {
 	lock sync.RWMutex
 }
 
+func getMap() string {
+
+	_, filename, _, _ := runtime.Caller(0)
+	p := filepath.Dir(filename)
+	p = filepath.Dir(p)
+	p = filepath.Dir(p)
+
+	return filepath.Join(p, "maps", "sundown_resort.txt")
+}
+
 // NewHubController will create a new controller
 func NewHubController() *HubController {
 	// TODO: handle error
 	// TODO: fix issue with file paths...
 	// TODO: remove panics :(
-	f, err := filepath.Abs(filepath.Join("../..", "maps", "sundown_resort.txt"))
-	if err != nil {
-		panic(fmt.Sprintf("error happend while opening the map controller [%s]", err.Error()))
-	}
-	mapController, err := mapstate.NewMapController(f)
+	path := getMap()
+	mapController, err := mapstate.NewMapController(path)
 	if err != nil {
 		panic(fmt.Sprintf("error happend while opening the map controller [%s]", err.Error()))
 	}
@@ -204,6 +212,11 @@ func (hc *HubController) RegisterClient(meta client.ClientMeta) error {
 
 	for _, message := range messages {
 		hqueue.Enqueue(message.Bytes())
+	}
+
+	err = hc.mapController.AddClient(id)
+	if err != nil {
+		return err
 	}
 
 	// add the queue to the controller
@@ -463,6 +476,7 @@ func (hc *HubController) handleMovement(t []byte, id uint8) protocol.Bytefy {
 		newUnknown := server.NewUnknown()
 		return newUnknown
 	}
+
 	coordinate, err := hc.mapController.MoveClient(id, movement.CoorX(), movement.CoorY(), movement.AnglPl())
 	if err != nil {
 		newTeleportPLayer := server.NewTeleportPlayer(id, coordinate.X(), coordinate.Y())

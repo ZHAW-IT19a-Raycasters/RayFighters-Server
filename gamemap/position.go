@@ -26,10 +26,10 @@ func (mc MapCoordinate) Y() int {
 }
 
 type Coordinate struct {
-	lock  *sync.RWMutex
 	x     float64
 	y     float64
 	angle float64
+	lock  *sync.RWMutex
 }
 
 func NewCoordinate(x, y, angle float64) Coordinate {

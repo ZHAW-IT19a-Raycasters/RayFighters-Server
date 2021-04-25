@@ -50,7 +50,7 @@ func TestBaseTimerRun(t *testing.T) {
 
 	<-waiter
 
-	if time.Since(start) <= timeOutTime {
+	if time.Since(start) < timeOutTime {
 		t.Error("the timer should be waiting at least the timeout time")
 	}
 }

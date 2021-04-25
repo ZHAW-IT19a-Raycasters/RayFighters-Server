@@ -38,6 +38,7 @@ func (mc *MapController) AddClient(id uint8) error {
 		}
 	}
 
+	// TODO: find legal spawn point
 	mc.clients[id] = gamemap.NewCoordinate(0, 0, 0)
 	return nil
 }

@@ -93,10 +93,12 @@ func TestHandleReadMovement(t *testing.T) {
 	cQueue, hQueue := rClient.NewWorkQueue()
 	const otherId uint8 = 2
 	hub.connections[otherId] = hQueue
+	hub.mapController.AddClient(otherId)
 
 	_, hQueue = rClient.NewWorkQueue()
 	const userId uint8 = 1
 	hub.connections[userId] = hQueue
+	hub.mapController.AddClient(userId)
 
 	request := []byte{
 		client.MovementOpcode.Value(),
