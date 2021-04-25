@@ -300,3 +300,40 @@ func TestLoadFaultyMapController(t *testing.T) {
 		return
 	}
 }
+
+func TestSpawningPointAddClient(t *testing.T) {
+	file, err := setupTmpFile(t)
+	if err != nil {
+		t.Error("setupTmpFile failed")
+		return
+	}
+	err = writeTmpFile(file, sundownmap)
+	if err != nil {
+		t.Error("writeTmpFile failed")
+		return
+	}
+	mapController, err := NewMapController(file)
+	if err != nil {
+		t.Error("NewMapController returned error in TestMoveClient")
+		return
+	}
+
+	mapController.getNextInt = func(n int) int {return 4}
+
+	err = mapController.AddClient(1)
+
+	if err != nil {
+		t.Error("AddClient returned an error")
+		return
+	}
+
+	coordinate, ok := mapController.getClient(1)
+	if !ok {
+		t.Error("Client 1 wasn't created")
+		return
+	}
+
+	if coordinate.X() != mapController.spawingarea[4].X() && coordinate.Y() != mapController.spawingarea[4].Y() {
+		t.Error("Coordinates aren't the same")
+	}
+}

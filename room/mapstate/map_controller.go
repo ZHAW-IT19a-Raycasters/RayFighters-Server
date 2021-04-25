@@ -1,6 +1,7 @@
 package mapstate
 
 import (
+	"math/rand"
 	"sync"
 
 	"github.zhaw.ch/raycasters/server/gamemap"
@@ -8,7 +9,9 @@ import (
 
 type MapController struct {
 	clients map[uint8]gamemap.Coordinate
+	spawingarea []gamemap.Coordinate
 	map2d   gamemap.Map2d
+	getNextInt func(int) int
 	lock    *sync.RWMutex
 }
 
@@ -19,8 +22,10 @@ func NewMapController(filePath string) (MapController, error) {
 		return MapController{}, err
 	}
 	return MapController{
+		spawingarea: map2d.GetLegalSpawns(),
 		map2d:   map2d,
 		clients: make(map[uint8]gamemap.Coordinate),
+		getNextInt: rand.Intn,
 		lock:    &sync.RWMutex{},
 	}, nil
 }
@@ -38,8 +43,9 @@ func (mc *MapController) AddClient(id uint8) error {
 		}
 	}
 
-	// TODO: find legal spawn point
-	mc.clients[id] = gamemap.NewCoordinate(0, 0, 0)
+	nextRand := mc.getNextInt(len(mc.spawingarea))
+	spawn := mc.spawingarea[nextRand]
+	mc.clients[id] = gamemap.NewCoordinate(spawn.X(), spawn.Y(), 0)
 	return nil
 }
 

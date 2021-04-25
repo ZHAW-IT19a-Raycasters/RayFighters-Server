@@ -56,3 +56,24 @@ func (map2d *Map2d) Compare(other *Map2d) bool {
 	}
 	return equals2d(map2d.map2d, other.map2d)
 }
+
+func (map2d *Map2d) GetLegalSpawns() []Coordinate {
+	counter := 0
+	for _, x := range map2d.map2d  {
+		for _, y := range x {
+			if y != Wall {
+				counter+=1
+			}
+		}
+	}
+
+	res := make([]Coordinate, 0, counter)
+	for i, x := range map2d.map2d  {
+		for j, y := range x {
+			if y != Wall {
+				res = append(res, NewCoordinate(float64(i), float64(j), 0))
+			}
+		}
+	}
+	return res
+}
