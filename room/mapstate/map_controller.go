@@ -1,14 +1,15 @@
 package mapstate
 
 import (
-	"github.zhaw.ch/raycasters/server/gamemap"
 	"sync"
+
+	"github.zhaw.ch/raycasters/server/gamemap"
 )
 
 type MapController struct {
 	clients map[uint8]gamemap.Coordinate
-	map2d gamemap.Map2d
-	lock  *sync.RWMutex
+	map2d   gamemap.Map2d
+	lock    *sync.RWMutex
 }
 
 func NewMapController(filePath string) (MapController, error) {
@@ -18,13 +19,13 @@ func NewMapController(filePath string) (MapController, error) {
 		return MapController{}, err
 	}
 	return MapController{
-		map2d:	 map2d,
+		map2d:   map2d,
 		clients: make(map[uint8]gamemap.Coordinate),
-		lock:  	 &sync.RWMutex{},
+		lock:    &sync.RWMutex{},
 	}, nil
 }
 
-func (mc MapController) AddClient(id uint8) error {
+func (mc *MapController) AddClient(id uint8) error {
 	// TODO: Clean up
 	mc.lock.Lock()
 	defer mc.lock.Unlock()
@@ -42,7 +43,7 @@ func (mc MapController) AddClient(id uint8) error {
 }
 
 // RemoveClient will remove a client if possible
-func (mc MapController) RemoveClient(id uint8) error {
+func (mc *MapController) RemoveClient(id uint8) error {
 	mc.lock.Lock()
 	defer mc.lock.Unlock()
 	_, ok := mc.clients[id]
@@ -55,7 +56,7 @@ func (mc MapController) RemoveClient(id uint8) error {
 	return nil
 }
 
-func (mc MapController) MoveClient(id uint8, x, y, angle float64) (gamemap.Coordinate, error) {
+func (mc *MapController) MoveClient(id uint8, x, y, angle float64) (gamemap.Coordinate, error) {
 	mc.lock.Lock()
 	defer mc.lock.Unlock()
 	client, ok := mc.clients[id]

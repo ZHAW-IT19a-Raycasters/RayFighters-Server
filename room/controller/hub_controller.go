@@ -2,8 +2,11 @@ package controller
 
 import (
 	"context"
-	"github.zhaw.ch/raycasters/server/room/mapstate"
+	"fmt"
+	"path/filepath"
 	"sync"
+
+	"github.zhaw.ch/raycasters/server/room/mapstate"
 
 	"github.zhaw.ch/raycasters/server/protocol/server"
 	"github.zhaw.ch/raycasters/server/utils"
@@ -53,7 +56,17 @@ type HubController struct {
 // NewHubController will create a new controller
 func NewHubController() *HubController {
 	// TODO: handle error
-	mapController, _ := mapstate.NewMapController("./maps/sundown_resort.txt")
+	// TODO: fix issue with file paths...
+	// TODO: remove panics :(
+	f, err := filepath.Abs(filepath.Join("../..", "maps", "sundown_resort.txt"))
+	if err != nil {
+		panic(fmt.Sprintf("error happend while opening the map controller [%s]", err.Error()))
+	}
+	mapController, err := mapstate.NewMapController(f)
+	if err != nil {
+		panic(fmt.Sprintf("error happend while opening the map controller [%s]", err.Error()))
+	}
+
 	hc := HubController{
 		clientManager: client.NewClientManager(),
 		connections:   make(map[uint8]client.HubQueue),
