@@ -9,7 +9,7 @@ import (
 func TestCoordinate(t *testing.T) {
 	// Attention this test does not prove anything
 	// it is only ofr coverage
-	coor := gamemap.NewCoordinate()
+	coor := gamemap.NewCoordinate(0, 0, 0)
 	exp := 44.4
 	coor.SetAngle(exp)
 	got := coor.Angle()

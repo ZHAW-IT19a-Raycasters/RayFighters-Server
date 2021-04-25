@@ -2,7 +2,12 @@ package controller
 
 import (
 	"context"
+	"fmt"
+	"path/filepath"
+	"runtime"
 	"sync"
+
+	"github.zhaw.ch/raycasters/server/room/mapstate"
 
 	"github.zhaw.ch/raycasters/server/protocol/server"
 	"github.zhaw.ch/raycasters/server/utils"
@@ -11,33 +16,29 @@ import (
 	pclient "github.zhaw.ch/raycasters/server/protocol/client"
 	"github.zhaw.ch/raycasters/server/room/client"
 	"github.zhaw.ch/raycasters/server/room/helpers"
+	"github.zhaw.ch/raycasters/server/room/items"
 )
 
-// NewHubController will create a new controller
-func NewHubController() *HubController {
-	// TODO: add map implementation
-	return &HubController{
-		clientManager:      client.NewClientManager(),
-		connections:        make(map[uint8]helpers.HubQueue),
-		gameState:          NewGameState(),
-		timeoutClientQueue: helpers.NewHubTimer(),
-		wg:                 sync.WaitGroup{},
-		lock:               sync.RWMutex{},
-	}
-}
-
+// HubController is the main brain of the hub
+// it is soley responsible for all the interactions
+// done by the user.
 type HubController struct {
 	// The manager of the different client with the different connections.
 	clientManager client.ClientManager
 	// connections stores the hub queues the soley conneciton
 	// points to the clients.
-	connections map[uint8]helpers.HubQueue
+	connections map[uint8]client.HubQueue
 	// gameState stores the current state of the game
 	// such as player kills and their deaths.
 	gameState GameState
+	// mapManager is a Manager controlling the events of the map
+	mapController mapstate.MapController
 	// timeoutClientQueue stores the currently timedout clients
 	// so that they can be removed once the timeout runs out.
-	timeoutClientQueue helpers.HubTimer
+	timeoutClientQueue client.HubTimer
+	// timeoutItemQueue stores the currently timedout map elements
+	// so that they can be respawned once the timeout runs out.
+	timeoutItemQueue items.ItemTimer
 	// Semaphore, counts the totally active
 	// player connections, although that number is already available
 	// via the client map length, is would have to be accessed
@@ -53,11 +54,48 @@ type HubController struct {
 	lock sync.RWMutex
 }
 
-// TimerQueue will return a receiving channel for the
-// timer data. Attention only use this function to
-// access and do not save the value individually.
-func (hc *HubController) TimerQueue() <-chan helpers.TimerData {
-	return hc.timeoutClientQueue.GetQueue()
+func getMap() string {
+
+	_, filename, _, _ := runtime.Caller(0)
+	p := filepath.Dir(filename)
+	p = filepath.Dir(p)
+	p = filepath.Dir(p)
+
+	return filepath.Join(p, "maps", "sundown_resort.txt")
+}
+
+// NewHubController will create a new controller
+func NewHubController() *HubController {
+	// TODO: handle error
+	// TODO: fix issue with file paths...
+	// TODO: remove panics :(
+	path := getMap()
+	mapController, err := mapstate.NewMapController(path)
+	if err != nil {
+		panic(fmt.Sprintf("error happend while opening the map controller [%s]", err.Error()))
+	}
+
+	hc := HubController{
+		clientManager: client.NewClientManager(),
+		connections:   make(map[uint8]client.HubQueue),
+		gameState:     NewGameState(),
+		mapController: mapController,
+		wg:            sync.WaitGroup{},
+		lock:          sync.RWMutex{},
+	}
+
+	// TODO: implement item timer callbacks (blocked by missing map implementation)
+
+	// client timer callbacks
+	cTimerCallback := func(id uint8) {
+		// error is not important for execution
+		// as it only says if there was an
+		// execution or not
+		_ = hc.RemoveClientIfTimeout(id)
+	}
+	hc.timeoutClientQueue = client.NewHubTimer(helpers.IdCountLimit, cTimerCallback)
+
+	return &hc
 }
 
 // RemoveClientIfTimeout will remove a client only
@@ -135,7 +173,7 @@ func (hc *HubController) RegisterClient(meta client.ClientMeta) error {
 	// TODO: register in the game state (if it is a new connection)
 
 	// prepare the queues
-	cqueue, hqueue := helpers.NewWorkQueue()
+	cqueue, hqueue := client.NewWorkQueue()
 
 	// prepare messages without the new player information
 	sendAllPLayerKd := hc.gameState.GetPlayersKD()
@@ -176,6 +214,11 @@ func (hc *HubController) RegisterClient(meta client.ClientMeta) error {
 		hqueue.Enqueue(message.Bytes())
 	}
 
+	err = hc.mapController.AddClient(id)
+	if err != nil {
+		return err
+	}
+
 	// add the queue to the controller
 	hc.lock.Lock()
 	hc.connections[id] = hqueue
@@ -210,10 +253,10 @@ func (hc *HubController) RegisterClient(meta client.ClientMeta) error {
 	return nil
 }
 
-// runClientConnection is the main excecuting function for interacting with
-// the client. It handles all the incommening opcodes received from the
+// runClientConnection is the main executing function for interacting with
+// the client. It handles all the incoming opcodes received from the
 // client.
-func (hc *HubController) runClientConnection(hqueue helpers.HubQueue, id uint8) {
+func (hc *HubController) runClientConnection(hqueue client.HubQueue, id uint8) {
 	var wg sync.WaitGroup
 	defer wg.Wait()
 
@@ -254,7 +297,7 @@ func (hc *HubController) runClientConnection(hqueue helpers.HubQueue, id uint8) 
 	}
 }
 
-// removeClient is the actuall functionality, that is
+// removeClient is the actual functionality, that is
 // responsible for removing a given client from the
 // hub.
 // Attention this function assumes the client was already send or
@@ -321,13 +364,50 @@ func (hc *HubController) Shutdown(cxt context.Context) {
 	// send shutdown message to all the clients
 	hc.broadCast(server.NewDisconnect(), helpers.NewIdSet())
 
-	// shutdown the controller
-	hc.clientManager.Shutdown(cxt)
+	waiter := make(chan struct{})
+	wg := sync.WaitGroup{}
+
+	// use complex way to avoid code repetition
+	// thanks sonar lint alert
+	shutdowns := [...]func(context.Context) error{
+		func(icxt context.Context) error {
+			// shutdown the item timer
+			hc.clientManager.Shutdown(icxt)
+			return nil
+		},
+		hc.timeoutClientQueue.Shutdown,
+		hc.timeoutItemQueue.Shutdown,
+	}
+
+	wg.Add(len(shutdowns))
+
+	shutdown := func(f func(context.Context) error) {
+		defer wg.Done()
+		// shutdown the timers
+		f(cxt)
+	}
+
+	for _, f := range shutdowns {
+		go shutdown(f)
+	}
+
+	go func() {
+		wg.Wait()
+		close(waiter)
+	}()
+
+	select {
+	case <-waiter:
+		// all good
+		logger.Info("shutdown controller")
+	case <-cxt.Done():
+		logger.Info("forced shutdown of controller")
+	}
 }
 
 // handleRead will as the name implies handle all the given reads.
 func (hc *HubController) handleRead(data []byte, id uint8) protocol.Bytefy {
-	// we can ommit the nil check here
+	// we can omit the nil check here
 	// as a len for a nil slice if
 	// defined as 0.
 	if len(data) == 0 {
@@ -396,16 +476,20 @@ func (hc *HubController) handleMovement(t []byte, id uint8) protocol.Bytefy {
 		newUnknown := server.NewUnknown()
 		return newUnknown
 	}
-	// TODO: implement movement checking and in the negative case
-	// return a teleport action.
-	newMovementPlayer := server.NewMovementPlayer(id, movement.CoorX(), movement.CoorY(), movement.AnglPl())
-	// don't send the movement information back to the actuall player
-	// to avoid unneded information
+
+	coordinate, err := hc.mapController.MoveClient(id, movement.CoorX(), movement.CoorY(), movement.AnglPl())
+	if err != nil {
+		newTeleportPLayer := server.NewTeleportPlayer(id, coordinate.X(), coordinate.Y())
+		return newTeleportPLayer
+	}
+	newMovementPlayer := server.NewMovementPlayer(id, coordinate.X(), coordinate.Y(), coordinate.Angle())
+	// don't send the movement information back to the actual player
+	// to avoid unneeded information
 	except := helpers.NewIdSet()
 	except.Add(id)
 	hc.broadCast(newMovementPlayer, except)
 
-	// As the movement opcode does not actually requiere
+	// As the movement opcode does not actually require
 	// an answer send nothing back.
 	return nil
 }

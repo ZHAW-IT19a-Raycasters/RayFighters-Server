@@ -1,21 +1,51 @@
 package gamemap
 
-import "sync"
+import (
+	"math"
+	"sync"
+)
 
-func NewCoordinate() Coordinate {
+type MapCoordinate struct {
+	x int
+	y int
+}
+
+func NewMapCoordinate(x, y float64) MapCoordinate {
+	return MapCoordinate{
+		x: int(x),
+		y: int(y),
+	}
+}
+
+func (mc MapCoordinate) X() int {
+	return mc.x
+}
+
+func (mc MapCoordinate) Y() int {
+	return mc.y
+}
+
+type Coordinate struct {
+	x     float64
+	y     float64
+	angle float64
+	lock  *sync.RWMutex
+}
+
+func NewCoordinate(x, y, angle float64) Coordinate {
 	return Coordinate{
-		x:     0,
-		y:     0,
-		angle: 0,
+		x:     x,
+		y:     y,
+		angle: angle,
 		lock:  &sync.RWMutex{},
 	}
 }
 
-type Coordinate struct {
-	lock  *sync.RWMutex
-	x     float64
-	y     float64
-	angle float64
+func (c *Coordinate) GetMapCoordinate() MapCoordinate {
+	// x = 1.1 => 1.0
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+	return NewMapCoordinate(math.Floor(c.x), math.Floor(c.y))
 }
 
 func (c *Coordinate) X() float64 {

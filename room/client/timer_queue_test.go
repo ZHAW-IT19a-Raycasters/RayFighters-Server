@@ -1,34 +1,33 @@
-package helpers
+package client
 
 import (
+	"context"
 	"errors"
 	"testing"
 	"time"
+
+	"github.zhaw.ch/raycasters/server/room/helpers"
 )
 
-func setupTimer(t *testing.T, f func() time.Time) {
-	org := getTime
-	getTime = f
-
-	t.Cleanup(func() {
-		getTime = org
-	})
-}
-
-func setupTimerDefault(t *testing.T) time.Time {
-	timeToTest := time.Now()
-
-	setupTimer(t, func() time.Time {
-		return timeToTest
-	})
-	return timeToTest
-}
+const hubTimerSize = helpers.IdCountLimit
 
 func TestTimer(t *testing.T) {
 	const expId = 1
-	expTime := setupTimerDefault(t)
+	// fix timeout (so that we don't wait multiple seconds)
+	const clienttimeout = 50 * time.Millisecond
 
-	ht := NewHubTimer()
+	queue := make(chan uint8)
+	callback := func(id uint8) {
+		queue <- id
+	}
+
+	ht := NewHubTimer(hubTimerSize, callback)
+	ht.baseTimer.SetTimeout(clienttimeout)
+
+	ht.Run()
+
+	defer ht.Shutdown(context.TODO())
+
 	ct := ht.NewClientTimer(expId)
 
 	// try to reset here
@@ -43,12 +42,9 @@ func TestTimer(t *testing.T) {
 		return
 	}
 
-	got := <-ht.GetQueue()
+	got := <-queue
 
-	if expTime != got.GetTime() {
-		t.Error("incorrect time was returned")
-		return
-	} else if got.GetId() != expId {
+	if got != expId {
 		t.Error("Incorrect id used")
 		return
 	}
@@ -75,12 +71,9 @@ func TestTimer(t *testing.T) {
 		return
 	}
 
-	got = <-ht.GetQueue()
+	got = <-queue
 
-	if expTime != got.GetTime() {
-		t.Error("incorrect time was returned")
-		return
-	} else if got.GetId() != expId {
+	if got != expId {
 		t.Error("Incorrect id used")
 		return
 	}

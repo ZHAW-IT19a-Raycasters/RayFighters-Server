@@ -46,17 +46,39 @@ func (c ConnectionStatus) String() string {
 	return vals[c]
 }
 
+type Position struct {
+	x float64
+	y float64
+}
+
+func NewPosition() Position {
+	return Position{
+		x: 0,
+		y: 0,
+	}
+}
+
+func (p Position) GetX() float64 {
+	return p.x
+}
+
+func (p Position) GetY() float64 {
+	return p.y
+}
+
 // ClientGame represents the state of the client in the game
 type ClientGame struct {
-	kills  uint32
-	deaths uint32
+	kills     uint32
+	deaths	  uint32
+	position  Position
 }
 
 // NewClientGame creates the default client object.
 func NewClientGame() ClientGame {
 	return ClientGame{
-		kills:  0,
-		deaths: 0,
+		kills:    0,
+		deaths:   0,
+		position: NewPosition(),
 	}
 }
 
@@ -82,6 +104,15 @@ func (cg *ClientGame) IncKills() {
 // death counter by one
 func (cg *ClientGame) IncDeaths() {
 	atomic.AddUint32(&cg.deaths, 1)
+}
+
+func (cg *ClientGame) GetPosition() Position {
+	return cg.position
+}
+
+func (cg *ClientGame) MovePlayer(x float64, y float64) {
+	cg.position.x += x
+	cg.position.y += y
 }
 
 // ClientMeta contains the shared meta information of a
