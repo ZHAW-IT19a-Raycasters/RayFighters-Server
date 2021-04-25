@@ -109,10 +109,11 @@ func validUsername(str string) (string, error){
 	if !utf8.ValidString(str){
 		return "", fmt.Errorf("invalid utf-8 runes in username %s", str)
 	}
-	escaped := html.EscapeString(str)
-	if  utf8.RuneCountInString(escaped)>maxUsernameLength {
-		return "", fmt.Errorf("username contains too many runes %d, %s",utf8.RuneCountInString(str), escaped)
+	
+	if  utf8.RuneCountInString(str)>maxUsernameLength {
+		return "", fmt.Errorf("username contains too many runes %d, %s",utf8.RuneCountInString(str), str)
 	}
+	escaped := html.EscapeString(str)
 	return escaped, nil
 }
 
