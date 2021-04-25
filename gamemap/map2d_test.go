@@ -16,11 +16,7 @@ func TestLoadMap2dValid(t *testing.T) {
 	// "defer" stacks
 	defer os.Remove(file.Name())
 	defer file.Close()
-	expectedMap2d, err := newMap2d(2, [][]MapElement{{Floor, Floor}, {Floor, Floor}})
-	if err != nil {
-		t.Error(err.Error())
-		return
-	}
+	expectedMap2d := newMap2d(2, [][]MapElement{{Floor, Floor}, {Floor, Floor}})
 	file.WriteString(intoMapString(2, []string{"00", "00"}))
 	actualMap2d, err := LoadMap2d(file.Name())
 	if err != ErrMap2dNotSq && err != nil {
@@ -72,10 +68,7 @@ func TestGetGameLocationValid(t *testing.T) {
 //Check if getter returns expected dimension.
 func TestGetMapDimension(t *testing.T) {
 	expected := 2
-	actualMap2d, err := newMap2d(expected, make([][]MapElement, expected))
-	if err != nil {
-		t.Error(err)
-	}
+	actualMap2d := newMap2d(expected, make([][]MapElement, expected))
 	actual := actualMap2d.GetMapDimension()
 	if expected != actual {
 		t.Errorf("false result: (expected: %v; actual: %v)", expected, actual)
@@ -84,15 +77,9 @@ func TestGetMapDimension(t *testing.T) {
 
 //Check if getter returns expected map elment.
 func TestGetLocationElementPositive(t *testing.T) {
-	actualMap2d, err := newMap2d(4, [][]MapElement{{Floor, Floor}, {Floor, Wall}})
-	if err != nil {
-		t.Error(err)
-	}
+	actualMap2d := newMap2d(4, [][]MapElement{{Floor, Floor}, {Floor, Wall}})
 	expected := Wall
-	actual, err := actualMap2d.MapElementAt(1, 1)
-	if err != nil {
-		t.Error(err)
-	}
+	actual := actualMap2d.MapElementAt(1, 1)
 	if expected != actual {
 		t.Errorf("false result: (expected: %v; actual: %v)", expected, actual)
 	}
@@ -100,12 +87,9 @@ func TestGetLocationElementPositive(t *testing.T) {
 
 //Check if getter returns expected map elment.
 func TestGetLocationElementInvalidCoor(t *testing.T) {
-	actualMap2d, err := newMap2d(4, [][]MapElement{{Floor, Floor}, {Floor, Wall}})
-	if err != nil {
-		t.Error(err)
-	}
-	_, err = actualMap2d.MapElementAt(-1, -1)
-	if err == nil {
+	actualMap2d := newMap2d(4, [][]MapElement{{Floor, Floor}, {Floor, Wall}})
+	actual := actualMap2d.MapElementAt(-1, -1)
+	if actual == Wall {
 		t.Error("an should have been raised")
 	}
 
@@ -113,10 +97,7 @@ func TestGetLocationElementInvalidCoor(t *testing.T) {
 
 // Test if comparing two equal map2d returns true.
 func TestCompareEqualMap2ds(t *testing.T) {
-	map2dOne, err := newMap2d(1, make([][]MapElement, 1))
-	if err != nil {
-		t.Error(err)
-	}
+	map2dOne := newMap2d(1, make([][]MapElement, 1))
 	expected := true
 	actual := map2dOne.Compare(&map2dOne)
 	if expected != actual {
@@ -126,14 +107,8 @@ func TestCompareEqualMap2ds(t *testing.T) {
 
 // Test if comparing two map2d's having different dimesion will return false.
 func TestCompareDifferentDimension(t *testing.T) {
-	map2dOne, err := newMap2d(1, make([][]MapElement, 1))
-	if err != nil {
-		t.Error(err)
-	}
-	map2dTwo, err := newMap2d(2, make([][]MapElement, 2))
-	if err != nil {
-		t.Error(err)
-	}
+	map2dOne := newMap2d(1, make([][]MapElement, 1))
+	map2dTwo := newMap2d(2, make([][]MapElement, 2))
 	expected := false
 	actual := map2dOne.Compare(&map2dTwo)
 	if expected != actual {

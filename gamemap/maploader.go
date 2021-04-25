@@ -17,9 +17,9 @@ var (
 	ErrMapHead   = errors.New("maploader: wrong header format")
 )
 
-// LoadMap loads square game map from the given file path.
-// It panics if any problemns are encountered, while reading the file.
-func LoadMap(filePath string) ([][]MapElement, error) {
+// loadmap loads square game map from the given file path.
+// It panics if any problems are encountered, while reading the file.
+func loadmap(filePath string) ([][]MapElement, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
 		logger.Errorf(err.Error())

@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	"github.zhaw.ch/raycasters/server/room/mapstate"
 	"sync"
 
 	"github.zhaw.ch/raycasters/server/protocol/server"
@@ -26,6 +27,8 @@ type HubController struct {
 	// gameState stores the current state of the game
 	// such as player kills and their deaths.
 	gameState GameState
+	// mapManager is a Manager controlling the events of the map
+	mapController mapstate.MapController
 	// timeoutClientQueue stores the currently timedout clients
 	// so that they can be removed once the timeout runs out.
 	timeoutClientQueue client.HubTimer
@@ -49,11 +52,13 @@ type HubController struct {
 
 // NewHubController will create a new controller
 func NewHubController() *HubController {
-	// TODO: add map implementation
+	// TODO: handle error
+	mapController, _ := mapstate.NewMapController("./maps/sundown_resort.txt")
 	hc := HubController{
 		clientManager: client.NewClientManager(),
 		connections:   make(map[uint8]client.HubQueue),
 		gameState:     NewGameState(),
+		mapController: mapController,
 		wg:            sync.WaitGroup{},
 		lock:          sync.RWMutex{},
 	}
@@ -222,8 +227,8 @@ func (hc *HubController) RegisterClient(meta client.ClientMeta) error {
 	return nil
 }
 
-// runClientConnection is the main excecuting function for interacting with
-// the client. It handles all the incommening opcodes received from the
+// runClientConnection is the main executing function for interacting with
+// the client. It handles all the incoming opcodes received from the
 // client.
 func (hc *HubController) runClientConnection(hqueue client.HubQueue, id uint8) {
 	var wg sync.WaitGroup
@@ -266,7 +271,7 @@ func (hc *HubController) runClientConnection(hqueue client.HubQueue, id uint8) {
 	}
 }
 
-// removeClient is the actuall functionality, that is
+// removeClient is the actual functionality, that is
 // responsible for removing a given client from the
 // hub.
 // Attention this function assumes the client was already send or
@@ -376,7 +381,7 @@ func (hc *HubController) Shutdown(cxt context.Context) {
 
 // handleRead will as the name implies handle all the given reads.
 func (hc *HubController) handleRead(data []byte, id uint8) protocol.Bytefy {
-	// we can ommit the nil check here
+	// we can omit the nil check here
 	// as a len for a nil slice if
 	// defined as 0.
 	if len(data) == 0 {
@@ -445,16 +450,19 @@ func (hc *HubController) handleMovement(t []byte, id uint8) protocol.Bytefy {
 		newUnknown := server.NewUnknown()
 		return newUnknown
 	}
-	// TODO: implement movement checking and in the negative case
-	// return a teleport action.
-	newMovementPlayer := server.NewMovementPlayer(id, movement.CoorX(), movement.CoorY(), movement.AnglPl())
-	// don't send the movement information back to the actuall player
-	// to avoid unneded information
+	coordinate, err := hc.mapController.MoveClient(id, movement.CoorX(), movement.CoorY(), movement.AnglPl())
+	if err != nil {
+		newTeleportPLayer := server.NewTeleportPlayer(id, coordinate.X(), coordinate.Y())
+		return newTeleportPLayer
+	}
+	newMovementPlayer := server.NewMovementPlayer(id, coordinate.X(), coordinate.Y(), coordinate.Angle())
+	// don't send the movement information back to the actual player
+	// to avoid unneeded information
 	except := helpers.NewIdSet()
 	except.Add(id)
 	hc.broadCast(newMovementPlayer, except)
 
-	// As the movement opcode does not actually requiere
+	// As the movement opcode does not actually require
 	// an answer send nothing back.
 	return nil
 }

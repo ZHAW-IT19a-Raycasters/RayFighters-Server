@@ -6,22 +6,22 @@ import (
 )
 
 type MapCoordinate struct {
-	x float64
-	y float64
+	x int
+	y int
 }
 
 func NewMapCoordinate(x, y float64) MapCoordinate {
 	return MapCoordinate{
-		x: x,
-		y: y,
+		x: int(x),
+		y: int(y),
 	}
 }
 
-func (mc MapCoordinate) X() float64 {
+func (mc MapCoordinate) X() int {
 	return mc.x
 }
 
-func (mc MapCoordinate) Y() float64 {
+func (mc MapCoordinate) Y() int {
 	return mc.y
 }
 
@@ -32,11 +32,11 @@ type Coordinate struct {
 	angle float64
 }
 
-func NewCoordinate() Coordinate {
+func NewCoordinate(x, y, angle float64) Coordinate {
 	return Coordinate{
-		x:     0,
-		y:     0,
-		angle: 0,
+		x:     x,
+		y:     y,
+		angle: angle,
 		lock:  &sync.RWMutex{},
 	}
 }

@@ -37,7 +37,7 @@ func createItemMap(mapData gamemap.Map2d) itemMap {
 		for j := 0; j < dim; j += 1 {
 			// error is not important as we
 			// get the dimension before
-			item, _ := mapData.MapElementAt(i, j)
+			item := mapData.MapElementAt(i, j)
 			if item == gamemap.Medkit || item == gamemap.Weapon {
 				coord := gamemap.NewMapCoordinate(float64(i), float64(j))
 				im[coord] = newItem(item)

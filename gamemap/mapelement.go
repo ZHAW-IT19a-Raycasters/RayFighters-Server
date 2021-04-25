@@ -30,7 +30,7 @@ func convert(r rune) (MapElement, error) {
 		return Weapon, nil
 	case (r >= rune('1') && r <= rune('9')) || (r >= rune('A') && r <= rune('Z')):
 		return Wall, nil
-	case (r >= rune('!') && r <= rune('~')):
+	case r >= rune('!') && r <= rune('~'):
 		return Floor, nil
 	default:
 		return 0, ErrMapElmtWrgSym

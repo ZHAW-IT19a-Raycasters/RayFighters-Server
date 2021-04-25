@@ -18,7 +18,7 @@ var (
 
 // LoadMap2d loads map from given path and wraps it into ingame abstraction.
 func LoadMap2d(filePath string) (Map2d, error) {
-	map2dSlice, err := LoadMap(filePath)
+	map2dSlice, err := loadmap(filePath)
 	if err != nil {
 		logger.Error(err.Error())
 		return Map2d{}, err
@@ -26,21 +26,21 @@ func LoadMap2d(filePath string) (Map2d, error) {
 	if !isSquared(map2dSlice) {
 		return Map2d{}, ErrMap2dNotSq
 	}
-	return newMap2d(len(map2dSlice), map2dSlice)
+	return newMap2d(len(map2dSlice), map2dSlice), nil
 }
 
 // newMap2d is inpackage convinience function for creatin Map2d using passed parameters.
-func newMap2d(mDim int, lMap [][]MapElement) (Map2d, error) {
-	return Map2d{dim: mDim, map2d: lMap}, nil
+func newMap2d(mDim int, lMap [][]MapElement) Map2d {
+	return Map2d{dim: mDim, map2d: lMap}
 }
 
 // Return map element for given coordinates x and y.
-func (map2d *Map2d) MapElementAt(x int, y int) (MapElement, error) {
+func (map2d *Map2d) MapElementAt(x int, y int) MapElement {
 	d := map2d.dim
 	if x >= d || y >= d || x < 0 || y < 0 {
-		return 0, ErrMap2dIndx
+		return Floor
 	}
-	return map2d.map2d[x][y], nil
+	return map2d.map2d[x][y]
 }
 
 // GetMapDimension returns map dimension
@@ -50,9 +50,9 @@ func (map2d *Map2d) GetMapDimension() int {
 
 // Compare compares two Map2d structs.
 // Only dimension and elements on corresponding positions are same.
-func (l *Map2d) Compare(other *Map2d) bool {
-	if l.GetMapDimension() != other.dim { // NOTE: because in the same package dimesion of "other" can be accessed
+func (map2d *Map2d) Compare(other *Map2d) bool {
+	if map2d.GetMapDimension() != other.dim { // NOTE: because in the same package dimesion of "other" can be accessed
 		return false
 	}
-	return equals2d(l.map2d, other.map2d)
+	return equals2d(map2d.map2d, other.map2d)
 }

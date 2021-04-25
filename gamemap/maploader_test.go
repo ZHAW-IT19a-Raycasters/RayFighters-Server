@@ -10,7 +10,7 @@ import (
 
 // Test if loading file from non-existing path will raise an error.
 func TestLoadMapInvalidPath(t *testing.T) {
-	_, err := LoadMap("NonExistingPath")
+	_, err := loadmap("NonExistingPath")
 	if err == nil {
 		t.Errorf("an error should have been raised")
 	}
@@ -25,7 +25,7 @@ func TestLoadMapValidPath(t *testing.T) {
 	// "defer" stacks
 	defer os.Remove(file.Name())
 	defer file.Close()
-	_, err = LoadMap(file.Name())
+	_, err = loadmap(file.Name())
 	if err == nil {
 		t.Errorf("an error should have been raised")
 	}
