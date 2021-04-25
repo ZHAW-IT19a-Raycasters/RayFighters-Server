@@ -9,7 +9,6 @@ import (
 	"github.zhaw.ch/raycasters/server/protocol/client"
 	"github.zhaw.ch/raycasters/server/protocol/server"
 	rClient "github.zhaw.ch/raycasters/server/room/client"
-	"github.zhaw.ch/raycasters/server/room/helpers"
 )
 
 func getClientMeta(i int) (rClient.ClientMeta, *MockedConnection) {
@@ -91,13 +90,15 @@ func TestHandleReadWhoamiError(t *testing.T) {
 
 func TestHandleReadMovement(t *testing.T) {
 	hub := NewHubController()
-	cQueue, hQueue := helpers.NewWorkQueue()
+	cQueue, hQueue := rClient.NewWorkQueue()
 	const otherId uint8 = 2
 	hub.connections[otherId] = hQueue
+	hub.mapController.AddClient(otherId)
 
-	_, hQueue = helpers.NewWorkQueue()
+	_, hQueue = rClient.NewWorkQueue()
 	const userId uint8 = 1
 	hub.connections[userId] = hQueue
+	hub.mapController.AddClient(userId)
 
 	request := []byte{
 		client.MovementOpcode.Value(),
@@ -155,7 +156,7 @@ func TestHandleReadMovementError(t *testing.T) {
 func TestHandleReadDisconnect(t *testing.T) {
 	hub := NewHubController()
 
-	cQueue, hQueue := helpers.NewWorkQueue()
+	cQueue, hQueue := rClient.NewWorkQueue()
 	const otherId uint8 = 2
 	hub.connections[otherId] = hQueue
 
@@ -163,7 +164,7 @@ func TestHandleReadDisconnect(t *testing.T) {
 
 	hub.RegisterClient(client2Meta)
 
-	_, hQueue = helpers.NewWorkQueue()
+	_, hQueue = rClient.NewWorkQueue()
 	const userId uint8 = 1
 	hub.connections[userId] = hQueue
 
@@ -230,11 +231,11 @@ func TestHandleReadDisconnectError(t *testing.T) {
 
 func TestHandleReadShooting(t *testing.T) {
 	hub := NewHubController()
-	cQueue, hQueue := helpers.NewWorkQueue()
+	cQueue, hQueue := rClient.NewWorkQueue()
 	const otherId uint8 = 2
 	hub.connections[otherId] = hQueue
 
-	_, hQueue = helpers.NewWorkQueue()
+	_, hQueue = rClient.NewWorkQueue()
 	const userId uint8 = 1
 	hub.connections[userId] = hQueue
 

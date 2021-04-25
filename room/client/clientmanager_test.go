@@ -11,7 +11,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.zhaw.ch/raycasters/server/log"
-	"github.zhaw.ch/raycasters/server/room/helpers"
 )
 
 func getClientMeta(i int) (ClientMeta, *MockedConnection) {
@@ -65,7 +64,7 @@ func TestClientManagerAddClientSingle(t *testing.T) {
 	}
 
 	clientMeta, _ := getClientMeta(0)
-	clientQueue, _ := helpers.NewWorkQueue()
+	clientQueue, _ := NewWorkQueue()
 
 	_, getClientTimer := helpTimeout()
 
@@ -119,7 +118,7 @@ func TestClientManagerAddClientTwice(t *testing.T) {
 
 	clientMeta, _ := getClientMeta(0)
 
-	clientQueue, _ := helpers.NewWorkQueue()
+	clientQueue, _ := NewWorkQueue()
 
 	_, getClientTimer := helpTimeout()
 
@@ -139,7 +138,7 @@ func TestClientManagerAddClientTwice(t *testing.T) {
 	mock := NewMockedConnection()
 	clientMeta.conn = &mock
 
-	clientQueue, _ = helpers.NewWorkQueue()
+	clientQueue, _ = NewWorkQueue()
 
 	err = cm.AddClient(clientMeta, clientQueue, getClientTimer)
 	if err != nil {
@@ -165,7 +164,7 @@ func TestClientManagerMaxClients(t *testing.T) {
 
 	// no errors here
 	for i := 0; i <= math.MaxUint8; i += 1 {
-		clientQueue, _ := helpers.NewWorkQueue()
+		clientQueue, _ := NewWorkQueue()
 		meta, _ := getClientMeta(i)
 		_, getClientTimer := helpTimeout()
 
@@ -185,7 +184,7 @@ func TestClientManagerMaxClients(t *testing.T) {
 	}
 	// add an additional client
 	meta, _ := getClientMeta(256)
-	clientQueue, _ := helpers.NewWorkQueue()
+	clientQueue, _ := NewWorkQueue()
 	_, getClientTimer := helpTimeout()
 
 	err := cm.AddClient(meta, clientQueue, getClientTimer)
@@ -209,7 +208,7 @@ func TestClientManagerRemoveClients(t *testing.T) {
 		return
 	}
 
-	clientQueue, _ := helpers.NewWorkQueue()
+	clientQueue, _ := NewWorkQueue()
 	_, getClientTimer := helpTimeout()
 
 	_ = cm.AddClient(meta, clientQueue, getClientTimer)
@@ -269,7 +268,7 @@ func TestClientManagerShutdown(t *testing.T) {
 	for i := 0; i <= math.MaxUint8; i += 1 {
 		// assume this works
 		meta, _ := getClientMeta(i)
-		clientQueue, _ := helpers.NewWorkQueue()
+		clientQueue, _ := NewWorkQueue()
 		_, getClientTimer := helpTimeout()
 
 		err := cm.AddClient(meta, clientQueue, getClientTimer)
@@ -319,7 +318,7 @@ func TestClientManagerIncorrectAddClient(t *testing.T) {
 	}()
 
 	meta, _ := getClientMeta(0)
-	clientQueue, _ := helpers.NewWorkQueue()
+	clientQueue, _ := NewWorkQueue()
 	_, getClientTimer := helpTimeout()
 
 	_ = cm.AddClient(meta, clientQueue, getClientTimer)
@@ -370,7 +369,7 @@ func TestClientManagerIncorrectRemoveClientID(t *testing.T) {
 	}()
 
 	meta, _ := getClientMeta(0)
-	cq, _ := helpers.NewWorkQueue()
+	cq, _ := NewWorkQueue()
 	_, getClientTimer := helpTimeout()
 
 	_ = cm.AddClient(meta, cq, getClientTimer)
@@ -396,7 +395,7 @@ func TestClientManagerMapping(t *testing.T) {
 
 	meta, _ := getClientMeta(0)
 
-	cq, _ := helpers.NewWorkQueue()
+	cq, _ := NewWorkQueue()
 	_, getClientTimer := helpTimeout()
 
 	_ = cm.AddClient(meta, cq, getClientTimer)
@@ -436,7 +435,7 @@ func TestClientManagerGetPlayer(t *testing.T) {
 
 	meta, _ := getClientMeta(0)
 
-	cq, _ := helpers.NewWorkQueue()
+	cq, _ := NewWorkQueue()
 
 	_, getClientTimer := helpTimeout()
 
@@ -472,7 +471,7 @@ func TestClientManagerGetPlayers(t *testing.T) {
 
 	meta, _ := getClientMeta(0)
 
-	cq, _ := helpers.NewWorkQueue()
+	cq, _ := NewWorkQueue()
 
 	_, getClientTimer := helpTimeout()
 

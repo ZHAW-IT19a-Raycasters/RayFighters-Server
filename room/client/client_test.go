@@ -10,11 +10,10 @@ import (
 	"github.com/gorilla/websocket"
 	pclient "github.zhaw.ch/raycasters/server/protocol/client"
 	"github.zhaw.ch/raycasters/server/protocol/server"
-	"github.zhaw.ch/raycasters/server/room/helpers"
 )
 
 func TestClientRegisterConn(t *testing.T) {
-	clientQueue, _ := helpers.NewWorkQueue()
+	clientQueue, _ := NewWorkQueue()
 	const id = 42
 	meta, _ := getClientMeta(id)
 	_, getClientTimer := helpTimeout()
@@ -73,7 +72,7 @@ func TestClientRegisterConn(t *testing.T) {
 
 func TestClientRecv(t *testing.T) {
 	const ID = 1
-	cq, hq := helpers.NewWorkQueue()
+	cq, hq := NewWorkQueue()
 	cmeta, mock := getClientMeta(ID)
 
 	_, funcTransferReader, _ := setupMock(mock)
@@ -122,7 +121,7 @@ func TestClientRecv(t *testing.T) {
 
 func TestClientSend(t *testing.T) {
 	const ID = 1
-	cq, hq := helpers.NewWorkQueue()
+	cq, hq := NewWorkQueue()
 	cmeta, mock := getClientMeta(ID)
 	_, getClientTimer := helpTimeout()
 	cT := getClientTimer(ID)
@@ -169,7 +168,7 @@ func TestClientSend(t *testing.T) {
 }
 func TestClientSendShutdown(t *testing.T) {
 	const ID = 1
-	cq, hq := helpers.NewWorkQueue()
+	cq, hq := NewWorkQueue()
 	cmeta, mock := getClientMeta(ID)
 	_, getClientTimer := helpTimeout()
 	cT := getClientTimer(ID)
@@ -212,7 +211,7 @@ func TestClientSendShutdown(t *testing.T) {
 
 func TestClientSendNextWriterError(t *testing.T) {
 	const ID = 1
-	cq, hq := helpers.NewWorkQueue()
+	cq, hq := NewWorkQueue()
 	cmeta, mock := getClientMeta(ID)
 	_, getClientTimer := helpTimeout()
 	cT := getClientTimer(ID)

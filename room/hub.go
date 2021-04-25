@@ -5,11 +5,9 @@ import (
 	"errors"
 	"math"
 	"sync"
-	"time"
 
 	"github.zhaw.ch/raycasters/server/room/client"
 	"github.zhaw.ch/raycasters/server/room/controller"
-	"github.zhaw.ch/raycasters/server/room/helpers"
 	"github.zhaw.ch/raycasters/server/utils"
 )
 
@@ -23,14 +21,9 @@ type void struct{}
 // decision to only support a player id of size uint8.
 const HubClientLimit = math.MaxUint8
 
-// ClientTimeout says the maximal time a client
-// may not have an active connection to the
-// system, before beeing removed from it.
-const ClientTimeout = 5 * time.Second
-
 // workerCount is the ammount of workers the
 // hub it self has at all times.
-const workerCount = 2
+const workerCount = 1
 
 var (
 	// ErrHubIsFull is the error that is returned on an RegisterClient error.
@@ -141,7 +134,7 @@ func (h *Hub) Run() error {
 	// add two runners
 	h.wg.Add(workerCount)
 
-	go h.runTimer()
+	// go h.runTimer()
 	go h.runRegistration()
 
 	return nil
@@ -164,39 +157,6 @@ func (h *Hub) runRegistration() {
 		case <-h.shutdown:
 			logger.Infof("Shutting down hub [%d]", h.id)
 			return
-		}
-	}
-}
-
-// runTimer is the timer instance that governs the hub
-func (h *Hub) runTimer() {
-	defer h.wg.Done()
-	// create the timer without any time to wait
-	timerHandler := time.NewTimer(0)
-	// temporily save the current client to wait for
-	var currentlyTimedOut helpers.TimerData
-
-	for {
-
-		// wait here if there is no other timeout currently
-		select {
-		case <-h.shutdown:
-			// shutting down
-			return
-		case currentlyTimedOut = <-h.controller.TimerQueue():
-			// set the timer to only wait for a moment
-			diff := time.Until(currentlyTimedOut.GetTime().Add(ClientTimeout))
-			timerHandler.Reset(diff)
-		}
-
-		// wait here until the timer is done for
-		select {
-		case <-h.shutdown:
-			// shutting down
-			return
-		case <-timerHandler.C:
-			// error irrelevant for system
-			_ = h.controller.RemoveClientIfTimeout(currentlyTimedOut.GetId())
 		}
 	}
 }

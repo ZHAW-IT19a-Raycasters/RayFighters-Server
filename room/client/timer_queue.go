@@ -1,16 +1,17 @@
-package helpers
+package client
 
 import (
+	"context"
 	"errors"
 	"time"
 
 	"github.zhaw.ch/raycasters/server/utils"
 )
 
-// hubTimerLimit is the limitation used
-// to limit the size of the max channel
-// buffer.
-const hubTimerLimit = IdCountLimit
+// ClientTimeout says the maximal time a client
+// may not have an active connection to the
+// system, before beeing removed from it.
+const ClientTimeout = 5 * time.Second // is a var so that it can be used for testing.
 
 // getTime is the function that will return the
 // current time.
@@ -25,26 +26,26 @@ var ErrAlreadyTimeout = errors.New("this client is already timed out")
 // TimerData is the struct holding all the
 // information needed to handle all the
 // timeouts
-type TimerData struct {
+type timerData struct {
 	id   uint8
 	from time.Time
 }
 
 // GetId will return the id, of the
 // timed out client.
-func (td *TimerData) GetId() uint8 {
+func (td *timerData) GetItem() interface{} {
 	return td.id
 }
 
 // GetTime will return the moment
 // this timeout has been registered.
-func (td *TimerData) GetTime() time.Time {
+func (td *timerData) GetTime() time.Time {
 	return td.from
 }
 
 // newTimeData will return a new TimerData instance.
-func newTimeData(id uint8) TimerData {
-	return TimerData{
+func newTimeData(id uint8) timerData {
+	return timerData{
 		id:   id,
 		from: getTime(),
 	}
@@ -55,7 +56,7 @@ func newTimeData(id uint8) TimerData {
 type ClientTimer struct {
 	alreadySend utils.AtomicBool
 	id          uint8
-	sender      chan<- TimerData
+	sender      func(data timerData)
 }
 
 // RegisterTimeout will register a new timeout
@@ -66,7 +67,8 @@ func (ct *ClientTimer) RegisterTimeout() error {
 		return ErrAlreadyTimeout
 	}
 
-	ct.sender <- newTimeData(ct.id)
+	ct.sender(newTimeData(ct.id))
+
 	return nil
 }
 
@@ -78,7 +80,7 @@ func (ct *ClientTimer) Reset() bool {
 
 // newClientTimer will create a new instance of
 // a client timeout handler.
-func newClientTimer(id uint8, sender chan<- TimerData) ClientTimer {
+func newClientTimer(id uint8, sender func(timerData)) ClientTimer {
 	return ClientTimer{
 		alreadySend: utils.NewAtomicBool(false),
 		id:          id,
@@ -89,25 +91,45 @@ func newClientTimer(id uint8, sender chan<- TimerData) ClientTimer {
 // HubTimer is the parent handler for any timeouts
 // registered by clients.
 type HubTimer struct {
-	queue chan TimerData
+	callback  func(id uint8)
+	baseTimer utils.BaseTimer
 }
 
 // NewHubTimer will create a new hub timer instance.
-func NewHubTimer() HubTimer {
-	return HubTimer{
-		queue: make(chan TimerData, hubTimerLimit),
+func NewHubTimer(bufferSize int, callback func(id uint8)) HubTimer {
+	ht := HubTimer{
+		callback: callback,
 	}
+
+	iCallback := func(elem interface{}) {
+		// as this function can only be called
+		// from the given context of the
+		// ItemTimer the element will always
+		// be a gamemap.MapCoordinate
+		id, _ := elem.(uint8)
+		ht.callback(id)
+	}
+
+	ht.baseTimer = utils.NewBaseTimer(bufferSize, ClientTimeout, iCallback)
+
+	return ht
 }
 
-// GetQueue will reuturn a receiver channel based
-// on the main channel. This function can and
-// should be used from inside a select statement.
-func (ht HubTimer) GetQueue() <-chan TimerData {
-	return ht.queue
+// Run will run the timer instance
+func (ht *HubTimer) Run() error {
+	return ht.baseTimer.Run()
+}
+
+// Shutdown will shutdown the timer
+func (ht *HubTimer) Shutdown(cxt context.Context) error {
+	return ht.baseTimer.Shutdown(cxt)
 }
 
 // NewClientTimer will create a new client timer
 // connected to this hub timer.
-func (ht HubTimer) NewClientTimer(id uint8) ClientTimer {
-	return newClientTimer(id, ht.queue)
+func (ht *HubTimer) NewClientTimer(id uint8) ClientTimer {
+	sender := func(td timerData) {
+		ht.baseTimer.Enqueue(&td)
+	}
+	return newClientTimer(id, sender)
 }
