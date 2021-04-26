@@ -15,7 +15,7 @@ type rawLogger struct {
 // used for all logging.
 func newRawLogger(level Level, out io.Writer) *rawLogger {
 	return &rawLogger{
-		ilogger: log.New(out, "", log.Ldate|log.Ltime|log.Lshortfile),
+		ilogger: log.New(out, "", log.Ldate|log.Ltime|log.Lmicroseconds),
 		level:   level,
 	}
 }
