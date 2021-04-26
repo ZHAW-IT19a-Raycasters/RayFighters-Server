@@ -13,6 +13,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 	"github.com/lestrrat-go/jwx/jwt"
+	"github.com/rs/cors"
 	"github.zhaw.ch/raycasters/server/log"
 	"github.zhaw.ch/raycasters/server/room"
 	"github.zhaw.ch/raycasters/server/room/client"
@@ -56,30 +57,44 @@ func NewServer(conf *webconfig.WebConfig) *Server {
 	amw := authenticationMiddleware{privKey}
 
 	router := mux.NewRouter()
+
 	// serve /auth without authentication middleware
-	router.Path("/auth").Handler(http.HandlerFunc(ServeAuthWithKey(privKey))).Methods("POST")
+	router.Path("/auth").
+		Handler(http.HandlerFunc(ServeAuthWithKey(privKey))).
+		Methods(http.MethodPost, http.MethodOptions)
+
+	// create a sub router for the blocked paths
 	api := router.PathPrefix("/").Subrouter()
+	api.Use(amw.Middleware)
 	api.HandleFunc("/", serveRoot)
+
 	api.HandleFunc("/ws/{roomID:[0-9]+}", func(w http.ResponseWriter, r *http.Request) {
 		// TODO: get a hub reference from handler function via HubManager
 		// handle with a wrapper lambda for now
 		serveWs(hubs[:], w, r)
 	})
 
-	
-	api.Use(amw.Middleware)
+	// handle CORS-requests
+	// see https://de.wikipedia.org/wiki/Cross-Origin_Resource_Sharing
+	// for more information about the topic
+	corsHandler := cors.Default()
 
-	httpServer := &http.Server{Handler: router, Addr: conf.String(), WriteTimeout: 15 * time.Second, ReadTimeout: 15 * time.Second}
-	
-	server := &Server{endpoint: httpServer}
-	return server
+	httpServer := &http.Server{
+		Handler:      corsHandler.Handler(router),
+		Addr:         conf.String(),
+		WriteTimeout: 15 * time.Second,
+		ReadTimeout:  15 * time.Second,
+	}
+
+	return &Server{
+		endpoint: httpServer,
+	}
 }
 
 // Start starts listening and serving the configured server.
 // Blocking.
 func (p *Server) Start() error {
 	logger.Infof("Server listening on: %s", p.endpoint.Addr)
-	fmt.Println("Server listening on: ", p.endpoint.Addr)
 	return p.endpoint.ListenAndServe()
 }
 
@@ -127,7 +142,7 @@ func serveWs(hubs []*room.Hub, w http.ResponseWriter, r *http.Request) {
 
 	// get cookie from request
 	jwtCookie, err := r.Cookie(JWTCOOKIENAME)
-	if err != nil{
+	if err != nil {
 		http.Error(w, "no JWT found in Cookies", http.StatusUnauthorized)
 		return
 	}
@@ -137,12 +152,12 @@ func serveWs(hubs []*room.Hub, w http.ResponseWriter, r *http.Request) {
 	usernameI, userOk := token.Get(`username`)
 	uuidI, uuidOk := token.Get(`uuid`)
 
-	if (userOk && uuidOk) {
+	if userOk && uuidOk {
 		uuid := uuidI.(uuid.UUID)
 		username := fmt.Sprintf("%v", usernameI)
 		cm := client.NewClientMeta(uuid, username, conn)
 		hubs[roomID].RegisterClient(cm)
-		logger.Infof("user %s with uuid %s joined room %d", username, uuid,roomID)
+		logger.Infof("user %s with uuid %s joined room %d", username, uuid, roomID)
 	}
 
 }
