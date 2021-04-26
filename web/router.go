@@ -13,6 +13,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 	"github.com/lestrrat-go/jwx/jwt"
+	"github.com/rs/cors"
 	"github.zhaw.ch/raycasters/server/log"
 	"github.zhaw.ch/raycasters/server/room"
 	"github.zhaw.ch/raycasters/server/room/client"
@@ -57,25 +58,6 @@ func NewServer(conf *webconfig.WebConfig) *Server {
 
 	router := mux.NewRouter()
 
-	// handle CORS-requests
-	// see https://de.wikipedia.org/wiki/Cross-Origin_Resource_Sharing
-	// for more information about the topic
-	router.Use(mux.CORSMethodMiddleware(router))
-
-	// this custom middleware is based on the example
-	// "Handling CORS Requests" of the gorilla mux router.
-	router.Use(func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// allow all the cros access
-			w.Header().Set("Access-Control-Allow-Origin", "*")
-			logger.Debug("Accessing the cors helper middleware")
-			if r.Method == http.MethodOptions {
-				return
-			}
-			next.ServeHTTP(w, r)
-		})
-	})
-
 	// serve /auth without authentication middleware
 	router.Path("/auth").
 		Handler(http.HandlerFunc(ServeAuthWithKey(privKey))).
@@ -92,22 +74,27 @@ func NewServer(conf *webconfig.WebConfig) *Server {
 		serveWs(hubs[:], w, r)
 	})
 
+	// handle CORS-requests
+	// see https://de.wikipedia.org/wiki/Cross-Origin_Resource_Sharing
+	// for more information about the topic
+	corsHandler := cors.Default()
+
 	httpServer := &http.Server{
-		Handler:      router,
+		Handler:      corsHandler.Handler(router),
 		Addr:         conf.String(),
 		WriteTimeout: 15 * time.Second,
 		ReadTimeout:  15 * time.Second,
 	}
 
-	server := &Server{endpoint: httpServer}
-	return server
+	return &Server{
+		endpoint: httpServer,
+	}
 }
 
 // Start starts listening and serving the configured server.
 // Blocking.
 func (p *Server) Start() error {
 	logger.Infof("Server listening on: %s", p.endpoint.Addr)
-	fmt.Println("Server listening on: ", p.endpoint.Addr)
 	return p.endpoint.ListenAndServe()
 }
 

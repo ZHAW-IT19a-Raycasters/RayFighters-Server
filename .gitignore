@@ -32,4 +32,7 @@
 ### Custom ###
 # logs
 logs.txt
+log.txt
 lcov.info
+# build data
+build/
