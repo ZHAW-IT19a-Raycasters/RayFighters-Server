@@ -56,21 +56,49 @@ func NewServer(conf *webconfig.WebConfig) *Server {
 	amw := authenticationMiddleware{privKey}
 
 	router := mux.NewRouter()
+
+	// handle CORS-requests
+	// see https://de.wikipedia.org/wiki/Cross-Origin_Resource_Sharing
+	// for more information about the topic
+	router.Use(mux.CORSMethodMiddleware(router))
+
+	// this custom middleware is based on the example
+	// "Handling CORS Requests" of the gorilla mux router.
+	router.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// allow all the cros access
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+			logger.Debug("Accessing the cors helper middleware")
+			if r.Method == http.MethodOptions {
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	})
+
 	// serve /auth without authentication middleware
-	router.Path("/auth").Handler(http.HandlerFunc(ServeAuthWithKey(privKey))).Methods("POST")
+	router.Path("/auth").
+		Handler(http.HandlerFunc(ServeAuthWithKey(privKey))).
+		Methods(http.MethodPost, http.MethodOptions)
+
+	// create a sub router for the blocked paths
 	api := router.PathPrefix("/").Subrouter()
+	api.Use(amw.Middleware)
 	api.HandleFunc("/", serveRoot)
+
 	api.HandleFunc("/ws/{roomID:[0-9]+}", func(w http.ResponseWriter, r *http.Request) {
 		// TODO: get a hub reference from handler function via HubManager
 		// handle with a wrapper lambda for now
 		serveWs(hubs[:], w, r)
 	})
 
-	
-	api.Use(amw.Middleware)
+	httpServer := &http.Server{
+		Handler:      router,
+		Addr:         conf.String(),
+		WriteTimeout: 15 * time.Second,
+		ReadTimeout:  15 * time.Second,
+	}
 
-	httpServer := &http.Server{Handler: router, Addr: conf.String(), WriteTimeout: 15 * time.Second, ReadTimeout: 15 * time.Second}
-	
 	server := &Server{endpoint: httpServer}
 	return server
 }
@@ -127,7 +155,7 @@ func serveWs(hubs []*room.Hub, w http.ResponseWriter, r *http.Request) {
 
 	// get cookie from request
 	jwtCookie, err := r.Cookie(JWTCOOKIENAME)
-	if err != nil{
+	if err != nil {
 		http.Error(w, "no JWT found in Cookies", http.StatusUnauthorized)
 		return
 	}
@@ -137,12 +165,12 @@ func serveWs(hubs []*room.Hub, w http.ResponseWriter, r *http.Request) {
 	usernameI, userOk := token.Get(`username`)
 	uuidI, uuidOk := token.Get(`uuid`)
 
-	if (userOk && uuidOk) {
+	if userOk && uuidOk {
 		uuid := uuidI.(uuid.UUID)
 		username := fmt.Sprintf("%v", usernameI)
 		cm := client.NewClientMeta(uuid, username, conn)
 		hubs[roomID].RegisterClient(cm)
-		logger.Infof("user %s with uuid %s joined room %d", username, uuid,roomID)
+		logger.Infof("user %s with uuid %s joined room %d", username, uuid, roomID)
 	}
 
 }
