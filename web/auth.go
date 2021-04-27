@@ -88,6 +88,7 @@ func (amw *authenticationMiddleware) Middleware(next http.Handler) http.Handler 
 			logger.Warnf("no JWT found in request Cookies %s", err)
 			return
 		}
+		logger.Debug(*jwtCookie)
 
 		token, err := jwt.ParseString(jwtCookie.Value, jwt.WithVerify(jwa.RS512, amw.privateKey.PublicKey))
 		if err != nil {
