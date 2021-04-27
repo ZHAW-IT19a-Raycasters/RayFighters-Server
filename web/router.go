@@ -77,7 +77,21 @@ func NewServer(conf *webconfig.WebConfig) *Server {
 	// handle CORS-requests
 	// see https://de.wikipedia.org/wiki/Cross-Origin_Resource_Sharing
 	// for more information about the topic
-	corsHandler := cors.Default()
+	corsHandler := cors.New(
+		cors.Options{
+			// TODO: add allowed domains from config
+			AllowedOrigins: []string{
+				// this system
+				"http://127.0.0.1:8080",
+				"http://localhost:8080",
+				// frontend
+				"http://127.0.0.1:9000",
+				"http://localhost:9000",
+			},
+			AllowedMethods:   []string{http.MethodGet, http.MethodPost, http.MethodOptions},
+			AllowCredentials: true,
+		},
+	)
 
 	httpServer := &http.Server{
 		Handler:      corsHandler.Handler(router),

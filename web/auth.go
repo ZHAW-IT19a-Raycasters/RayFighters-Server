@@ -59,14 +59,15 @@ func ServeAuthWithKey(privKey *rsa.PrivateKey) (HandleFunc func(w http.ResponseW
 			return
 		}
 
-		w.Write(signed)
+		// w.Write(signed)
 		// Finally, we request to set the client cookie to the JWT we just generated
 		// TODO expiry time?
-		//http.SetCookie(w, &http.Cookie{
-		//  Name:  JWTCOOKIENAME,
-		//  Value: string(signed[:]),
-		//  Path:  "/",
-		//})
+		http.SetCookie(w, &http.Cookie{
+			Name:     JWTCOOKIENAME,
+			Value:    string(signed[:]),
+			Path:     "/",
+			SameSite: http.SameSiteLaxMode,
+		})
 
 	}
 }
