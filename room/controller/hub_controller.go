@@ -61,7 +61,7 @@ func getMap() string {
 	p = filepath.Dir(p)
 	p = filepath.Dir(p)
 
-	return filepath.Join(p, "maps", "sundown_resort.txt")
+	return filepath.Join(p, "maps", "desert.txt")
 }
 
 // NewHubController will create a new controller

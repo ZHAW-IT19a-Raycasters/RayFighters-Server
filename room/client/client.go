@@ -220,7 +220,7 @@ func (c *Client) sendData() {
 	for {
 		message, err := c.queue.Dequeue()
 
-		logger.Debugf("Sending message [%s], to [%d]", message, c.meta.GetUUID())
+		logger.Debugf("Sending message [%d], to [%d]", message, c.meta.GetUUID())
 
 		if err != nil {
 			// the queue has shutdown => server is
@@ -340,18 +340,24 @@ func (c *Client) recvData() {
 		// method returns a non-nil error, all subsequent calls to this method return the same
 		// error
 		if err != nil {
-			if websocket.IsCloseError(err, websocket.CloseNormalClosure) {
-				logger.Infof("Connection to client [%d] was shutdown by client", c.meta.id)
-			} else if websocket.IsCloseError(err, websocket.CloseAbnormalClosure) {
-				logger.Warnf("Client [%d] lost connection, setting to timeout", c.meta.id)
-				// if there was an unexpected close error
-				// then the client has to be set to timeout
-				c.registerTimeout()
+			if errors.Is(err, websocket.ErrCloseSent) {
+				if websocket.IsCloseError(err, websocket.CloseNormalClosure) {
+					logger.Infof("Connection to client [%d] was shutdown by client", c.meta.id)
+				} else if websocket.IsCloseError(err, websocket.CloseAbnormalClosure) {
+					logger.Warnf("Client [%d] lost connection, setting to timeout", c.meta.id)
+					// if there was an unexpected close error
+					// then the client has to be set to timeout
+					c.registerTimeout()
+				} else {
+					logger.Warnf("unexpected web socket closure error received for client [%d] "+
+						"- see https://rfc-editor.org/rfc/rfc6455.html#section-11.7 for more information\n[%s]", c.meta.id, err.Error())
+				}
+				// break out of the endless loop directly to a shutdown
+			} else if errors.Is(err, websocket.ErrReadLimit) {
+				logger.Warnf("issue happend with [%s]", err.Error())
 			} else {
-				logger.Warnf("unexpected web socket closure error received for client [%d] "+
-					"- see https://rfc-editor.org/rfc/rfc6455.html#section-11.7 for more information\n[%s]", c.meta.id, err.Error())
+				logger.Errorf("unexpected error happend [%s]", err.Error())
 			}
-			// break out of the endless loop directly to a shutdown
 			return
 		}
 
