@@ -80,6 +80,7 @@ func NewHubController() *HubController {
 		connections:   make(map[uint8]client.HubQueue),
 		gameState:     NewGameState(),
 		mapController: mapController,
+		semaphore:     utils.NewCountingSemaphore(uint32(helpers.IdCountLimit)),
 		wg:            sync.WaitGroup{},
 		lock:          sync.RWMutex{},
 	}

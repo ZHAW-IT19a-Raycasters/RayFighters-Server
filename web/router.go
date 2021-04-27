@@ -147,6 +147,8 @@ func serveWs(hubs []*room.Hub, w http.ResponseWriter, r *http.Request) {
 		CheckOrigin:     func(r *http.Request) bool { return true },
 	}
 
+	logger.Debug("connection received")
+
 	// upgrade HTTP to Websocket connection
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
@@ -154,6 +156,8 @@ func serveWs(hubs []*room.Hub, w http.ResponseWriter, r *http.Request) {
 		logger.Error(err)
 		return
 	}
+
+	logger.Debug("upgraded the connection")
 
 	// get cookie from request
 	jwtCookie, err := r.Cookie(JWTCOOKIENAME)
@@ -163,7 +167,8 @@ func serveWs(hubs []*room.Hub, w http.ResponseWriter, r *http.Request) {
 	}
 
 	// unmarshal the token
-	token, err := jwt.ParseString(jwtCookie.Value)
+	// error is not needed as it is directly send from here.
+	token, _ := jwt.ParseString(jwtCookie.Value)
 	usernameI, userOk := token.Get(`username`)
 	uuidI, uuidOk := token.Get(`uuid`)
 
@@ -171,7 +176,14 @@ func serveWs(hubs []*room.Hub, w http.ResponseWriter, r *http.Request) {
 		uuid := uuidI.(uuid.UUID)
 		username := fmt.Sprintf("%v", usernameI)
 		cm := client.NewClientMeta(uuid, username, conn)
-		hubs[roomID].RegisterClient(cm)
+		logger.Debug("Created client meta for ID [", cm.GetId(), "]")
+		err = hubs[roomID].RegisterClient(cm)
+		if err != nil {
+			logger.Debug("Hub already filled up")
+			w.WriteHeader(http.StatusForbidden)
+			conn.Close()
+			return
+		}
 		logger.Infof("user %s with uuid %s joined room %d", username, uuid, roomID)
 	}
 

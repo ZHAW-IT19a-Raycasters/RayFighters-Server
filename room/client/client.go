@@ -110,6 +110,7 @@ func (c *Client) registerConn(conn ClientMeta, queue ClientQueue) error {
 	// wait until there are no working connections
 	// in case that there already was a timeout
 	c.wg.Wait()
+	logger.Debugf("registering connecteion [%d]", c.meta.id)
 
 	c.lock.Lock()
 	defer c.lock.Unlock()
@@ -219,6 +220,8 @@ func (c *Client) sendData() {
 	for {
 		message, err := c.queue.Dequeue()
 
+		logger.Debugf("Sending message [%s], to [%d]", message, c.meta.GetUUID())
+
 		if err != nil {
 			// the queue has shutdown => server is
 			// shutting down
@@ -287,7 +290,7 @@ func (c *Client) sendDataHelper(message []byte) bool {
 // recvDataHandler will handle the received data pacakges
 func (c *Client) recvDataHandler(messageType int, message io.Reader) error {
 
-	logger.Debugf("Received message type [%d]", messageType)
+	logger.Debugf("Received message type [%d] from [%d]", messageType, c.meta.id)
 
 	if messageType == websocket.CloseMessage {
 		logger.Infof("the client with the id [%d] closed the connection.", messageType)
