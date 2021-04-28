@@ -23,8 +23,9 @@ import (
 )
 
 const (
-	hubsCount     int           = 3
-	serverTimeout time.Duration = 15 * time.Second
+	hubsCount           int           = 3
+	serverTimeout       time.Duration = 15 * time.Second
+	websocketBufferSize int           = 1024
 )
 
 var logger = log.Log()
@@ -35,7 +36,20 @@ type Server struct {
 }
 
 // ErrRoomIdUnavailable can be thrown when a room is requested that cannot currently be accessed.
-var ErrRoomIdUnavailable = errors.New("No Room available for the given ID")
+var ErrRoomIdUnavailable = errors.New("no Room available for the given ID")
+
+var jwtKey *rsa.PrivateKey = initKey()
+
+func initKey() *rsa.PrivateKey {
+	// generate private key
+	privKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		logger.Warnf("failed to generate private key: %s", err)
+        str := fmt.Sprintf("Was not able to initialize the random key - [%s]", err.Error())
+        panic(str)
+	}
+    return privKey
+}
 
 // NewServer registers routes for all exposed endpoints
 // and attaches the appropriate routehandler functions
@@ -48,22 +62,17 @@ func NewServer(conf *webconfig.WebConfig) *Server {
 		go hubs[i].Run()
 	}
 
-	// generate private key
-	privKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		logger.Warnf("failed to generate private key: %s", err)
-	}
 
 	// init global jwt decoding
 	jwt.RegisterCustomField("uuid", uuid.UUID{})
 
-	amw := authenticationMiddleware{privKey}
+	amw := authenticationMiddleware{jwtKey}
 
 	router := mux.NewRouter()
 
 	// serve /auth without authentication middleware
 	router.Path("/auth").
-		Handler(http.HandlerFunc(ServeAuthWithKey(privKey))).
+		Handler(http.HandlerFunc(ServeAuthWithKey(jwtKey))).
 		Methods(http.MethodPost, http.MethodOptions)
 
 	// create a sub router for the blocked paths
@@ -153,7 +162,8 @@ func serveWs(hubs []*room.Hub, w http.ResponseWriter, r *http.Request) {
 	}
 
 	// unmarshal the token
-	// error is not needed as it is directly send from here.
+	// error is not needed as it is directly send from here
+	// and validated previously.
 	token, _ := jwt.ParseString(jwtCookie.Value)
 	usernameI, userOk := token.Get(`username`)
 	uuidI, uuidOk := token.Get(`uuid`)
@@ -175,9 +185,14 @@ func serveWs(hubs []*room.Hub, w http.ResponseWriter, r *http.Request) {
 
 	// upgrade HTTP to Websocket connection
 	var upgrader = websocket.Upgrader{
-		ReadBufferSize:  1024,
-		WriteBufferSize: 1024,
-		CheckOrigin:     func(r *http.Request) bool { return true },
+		ReadBufferSize:  websocketBufferSize,
+		WriteBufferSize: websocketBufferSize,
+		CheckOrigin: func(r *http.Request) bool {
+			// this is okay, as the CORS origin check is
+			// done before the current connection ever
+			// arrives to this function call
+			return true
+		},
 	}
 
 	logger.Debug("upgraded the connection")

@@ -178,7 +178,9 @@ func TestWsConnection(t *testing.T) {
 	url.Path = "/ws/1"
 
 	// start websocket client
-	ws, resp, err := websocket.DefaultDialer.Dial(url.String(), nil)
+	// create a header with a default JWT token
+	urlPath := url.String()
+	ws, resp, err := websocket.DefaultDialer.Dial(urlPath, nil)
 
 	if err != nil {
 		t.Errorf("there was an error while starting up the websocket [%s]", err.Error())
