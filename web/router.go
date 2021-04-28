@@ -22,7 +22,10 @@ import (
 	webconfig "github.zhaw.ch/raycasters/server/web/config"
 )
 
-const hubsCount int = 3
+const (
+	hubsCount     int           = 3
+	serverTimeout time.Duration = 15 * time.Second
+)
 
 var logger = log.Log()
 
@@ -66,6 +69,7 @@ func NewServer(conf *webconfig.WebConfig) *Server {
 	// create a sub router for the blocked paths
 	api := router.PathPrefix("/").Subrouter()
 	api.Use(amw.Middleware)
+
 	api.HandleFunc("/", serveRoot)
 
 	api.HandleFunc("/ws/{roomID:[0-9]+}", func(w http.ResponseWriter, r *http.Request) {
@@ -96,8 +100,8 @@ func NewServer(conf *webconfig.WebConfig) *Server {
 	httpServer := &http.Server{
 		Handler:      corsHandler.Handler(router),
 		Addr:         conf.String(),
-		WriteTimeout: 15 * time.Second,
-		ReadTimeout:  15 * time.Second,
+		WriteTimeout: serverTimeout,
+		ReadTimeout:  serverTimeout,
 	}
 
 	return &Server{
@@ -129,6 +133,7 @@ func serveRoot(writer http.ResponseWriter, request *http.Request) {
 // and registers the client to the hub
 func serveWs(hubs []*room.Hub, w http.ResponseWriter, r *http.Request) {
 
+	logger.Debug("http connection received")
 	roomID, err := helpers.ParseRoomID(r)
 	if err != nil {
 		logger.Error(err)
@@ -140,25 +145,6 @@ func serveWs(hubs []*room.Hub, w http.ResponseWriter, r *http.Request) {
 		http.Error(w, ErrRoomIdUnavailable.Error(), http.StatusConflict)
 		return
 	}
-
-	var upgrader = websocket.Upgrader{
-		ReadBufferSize:  1024,
-		WriteBufferSize: 1024,
-		CheckOrigin:     func(r *http.Request) bool { return true },
-	}
-
-	logger.Debug("connection received")
-
-	// upgrade HTTP to Websocket connection
-	conn, err := upgrader.Upgrade(w, r, nil)
-	if err != nil {
-		// upgrader itself writes http error response
-		logger.Error(err)
-		return
-	}
-
-	logger.Debug("upgraded the connection")
-
 	// get cookie from request
 	jwtCookie, err := r.Cookie(JWTCOOKIENAME)
 	if err != nil {
@@ -172,19 +158,49 @@ func serveWs(hubs []*room.Hub, w http.ResponseWriter, r *http.Request) {
 	usernameI, userOk := token.Get(`username`)
 	uuidI, uuidOk := token.Get(`uuid`)
 
-	if userOk && uuidOk {
-		uuid := uuidI.(uuid.UUID)
-		username := fmt.Sprintf("%v", usernameI)
-		cm := client.NewClientMeta(uuid, username, conn)
-		logger.Debug("Created client meta for ID [", cm.GetId(), "]")
-		err = hubs[roomID].RegisterClient(cm)
-		if err != nil {
-			logger.Debug("Hub already filled up")
-			w.WriteHeader(http.StatusForbidden)
-			conn.Close()
-			return
-		}
-		logger.Infof("user %s with uuid %s joined room %d", username, uuid, roomID)
+	if !(userOk && uuidOk) {
+		http.Error(w, "incorrect JWT token found in Cookies", http.StatusUnauthorized)
+		return
 	}
+
+	// this check is in theory not threadsafe as there is a lot time happing
+	// until the connection build up is done, but this can handle some
+	// wrong connection creations, especially under heavy load.
+	if hubs[roomID].Full() {
+		w.WriteHeader(http.StatusConflict)
+		return
+	}
+
+	logger.Debug("correct token received upgrading the connection")
+
+	// upgrade HTTP to Websocket connection
+	var upgrader = websocket.Upgrader{
+		ReadBufferSize:  1024,
+		WriteBufferSize: 1024,
+		CheckOrigin:     func(r *http.Request) bool { return true },
+	}
+
+	logger.Debug("upgraded the connection")
+
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		// upgrader itself writes http error response
+		logger.Error(err)
+		return
+	}
+
+	uuid := uuidI.(uuid.UUID)
+	username := fmt.Sprintf("%v", usernameI)
+	cm := client.NewClientMeta(uuid, username, conn)
+	logger.Debug("Created client meta for ID [", cm.GetId(), "]")
+	err = hubs[roomID].RegisterClient(cm)
+
+	if err != nil {
+		logger.Debug("Hub already filled up")
+		w.WriteHeader(http.StatusForbidden)
+		conn.Close()
+		return
+	}
+	logger.Infof("user %s with uuid %s joined room %d", username, uuid, roomID)
 
 }

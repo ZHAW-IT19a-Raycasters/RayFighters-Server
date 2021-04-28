@@ -146,3 +146,64 @@ func TestWSBadProtocol(t *testing.T) {
 			res.StatusCode, http.StatusBadRequest)
 	}
 }
+
+func TestWsConnection(t *testing.T) {
+	const hubId = 0
+	hubs := make([]*room.Hub, 0, 1)
+	hubs = append(hubs, room.NewHub(hubId))
+	err := hubs[hubId].Run()
+
+	if err != nil {
+		t.Error("unable to start up the hub")
+		return
+	}
+
+	// Need to create a router that we can pass the request through so that the vars will be added to the context
+	router := mux.NewRouter()
+
+	router.HandleFunc("/ws/{roomID:[0-9]+}", func(rw http.ResponseWriter, r *http.Request) {
+		serveWs(hubs, rw, r)
+	})
+
+	// setup the server
+	server := httptest.NewServer(router)
+	defer server.Close()
+
+	url, err := url.Parse(server.URL)
+	if err != nil {
+		t.Error("something went wrong with setting up the test server")
+		return
+	}
+	url.Scheme = "ws"
+	url.Path = "/ws/1"
+
+	// start websocket client
+	ws, resp, err := websocket.DefaultDialer.Dial(url.String(), nil)
+
+	if err != nil {
+		t.Errorf("there was an error while starting up the websocket [%s]", err.Error())
+		return
+	}
+	if resp.Status != http.StatusText(http.StatusAccepted) || resp.Status != http.StatusText(http.StatusSwitchingProtocols) {
+		t.Error("incorrect status was used")
+		return
+	}
+
+	// receive the 3 information blocks
+	sendInformation := make([][]byte, 0, 3)
+	for i := 0; i < 3; i += 1 {
+		messageType, data, err := ws.ReadMessage()
+		if err != nil {
+			t.Errorf("There was an error while reading the message [%s]", err.Error())
+			return
+		}
+
+		if messageType != websocket.BinaryMessage {
+			t.Error("incorrect message type used")
+		}
+
+		sendInformation = append(sendInformation, data)
+	}
+
+	// TODO: check out that the system works
+}
