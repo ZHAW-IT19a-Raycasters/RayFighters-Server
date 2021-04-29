@@ -2,8 +2,7 @@ package web
 
 import (
 	"bytes"
-	"crypto/rand"
-	"crypto/rsa"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -51,10 +50,9 @@ func TestAPIRoot(t *testing.T) {
 
 // TestAuthorizedWebsocketEstablishment is the whole shebang in one test!
 func TestAuthorizedWebsocketEstablishment(t *testing.T) {
-	privKey, _ := rsa.GenerateKey(rand.Reader, 2048)
 	// set up a router for auth and ws
 	router := mux.NewRouter()
-	router.HandleFunc("/auth", ServeAuthWithKey(privKey))
+	router.HandleFunc("/auth", authMIddleware.ServeAuthWithKey())
 	router.HandleFunc("/ws/{roomID:[0-9]+}", func(rw http.ResponseWriter, r *http.Request) { serveWs([]*room.Hub{}, rw, r) })
 
 	// Start our server
@@ -152,6 +150,7 @@ func TestWsConnection(t *testing.T) {
 	hubs := make([]*room.Hub, 0, 1)
 	hubs = append(hubs, room.NewHub(hubId))
 	err := hubs[hubId].Run()
+	defer hubs[hubId].Shutdown(context.TODO())
 
 	if err != nil {
 		t.Error("unable to start up the hub")
@@ -175,12 +174,21 @@ func TestWsConnection(t *testing.T) {
 		return
 	}
 	url.Scheme = "ws"
-	url.Path = "/ws/1"
+	url.Path = "/ws/0"
 
 	// start websocket client
 	// create a header with a default JWT token
 	urlPath := url.String()
-	ws, resp, err := websocket.DefaultDialer.Dial(urlPath, nil)
+	const name = "Cookie Smith"
+	cookie, _ := authMIddleware.createCookie(&Credentials{
+		Username: name,
+	})
+
+	// get a JWT token
+	rq := make(http.Header)
+
+	rq.Set("Set-Cookie", cookie.String())
+	ws, resp, err := websocket.DefaultDialer.Dial(urlPath, rq)
 
 	if err != nil {
 		t.Errorf("there was an error while starting up the websocket [%s]", err.Error())

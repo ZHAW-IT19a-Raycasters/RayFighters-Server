@@ -1,6 +1,7 @@
 package web
 
 import (
+	"crypto/rand"
 	"crypto/rsa"
 	"encoding/json"
 	"fmt"
@@ -24,11 +25,28 @@ type Credentials struct {
 	Username string `json:"username"`
 }
 
+// holds information needed for validating provided authentication
+type authenticationMiddleware struct {
+	privateKey *rsa.PrivateKey
+}
+
+func newAuthMiddleware() (*authenticationMiddleware, error) {
+	// generate private key
+	privKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		logger.Error("Failed to create the auth middlwares random key")
+		return nil, err
+	}
+	return &authenticationMiddleware{
+		privateKey: privKey,
+	}, nil
+}
+
 // ServeAuthWithKey creates a closure with the given key and
 // returns a route handler that
 // creates a JWT, signs it with the provided key
 // and adds it to the Response Header via Set-Cookie
-func ServeAuthWithKey(privKey *rsa.PrivateKey) (HandleFunc func(w http.ResponseWriter, r *http.Request)) {
+func (auth *authenticationMiddleware) ServeAuthWithKey() (HandleFunc func(w http.ResponseWriter, r *http.Request)) {
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		var creds Credentials
@@ -40,41 +58,44 @@ func ServeAuthWithKey(privKey *rsa.PrivateKey) (HandleFunc func(w http.ResponseW
 			return
 		}
 
-		// create new client uuid
-		uuidStr := uuid.New().String()
-
-		// create JWT
-		t := jwt.New()
-		t.Set(jwt.IssuedAtKey, time.Now())
-		t.Set(`username`, creds.Username)
-		t.Set(`uuid`, uuidStr)
-
-		// Signing the token (using raw rsa.PrivateKey)
-		// also marshalls to JSON
-		signed, err := jwt.Sign(t, jwa.RS512, privKey)
+		cookie, err := auth.createCookie(&creds)
 		if err != nil {
 			// also wraps a json marshalling error
 			logger.Warnf("failed to sign token: %s", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-
 		// w.Write(signed)
 		// Finally, we request to set the client cookie to the JWT we just generated
-		// TODO expiry time?
-		http.SetCookie(w, &http.Cookie{
-			Name:     JWTCOOKIENAME,
-			Value:    string(signed[:]),
-			Path:     "/",
-			SameSite: http.SameSiteLaxMode,
-		})
+		http.SetCookie(w, cookie)
 
 	}
 }
 
-// holds information needed for validating provided authentication
-type authenticationMiddleware struct {
-	privateKey *rsa.PrivateKey
+func (auth *authenticationMiddleware) createCookie(creds *Credentials) (*http.Cookie, error) {
+	// create new client uuid
+	uuidStr := uuid.New().String()
+
+	// create JWT
+	t := jwt.New()
+	t.Set(jwt.IssuedAtKey, time.Now())
+	t.Set(`username`, creds.Username)
+	t.Set(`uuid`, uuidStr)
+
+	// Signing the token (using raw rsa.PrivateKey)
+	// also marshalls to JSON
+	signed, err := jwt.Sign(t, jwa.RS512, auth.privateKey)
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO expiry time?
+	return &http.Cookie{
+		Name:     JWTCOOKIENAME,
+		Value:    string(signed[:]),
+		Path:     "/",
+		SameSite: http.SameSiteLaxMode,
+	}, nil
 }
 
 // Middleware checks if user is authenticated via valid token

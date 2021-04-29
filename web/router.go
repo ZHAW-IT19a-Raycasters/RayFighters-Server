@@ -38,17 +38,19 @@ type Server struct {
 // ErrRoomIdUnavailable can be thrown when a room is requested that cannot currently be accessed.
 var ErrRoomIdUnavailable = errors.New("no Room available for the given ID")
 
+// TODO: Read this from the configuration
 var jwtKey *rsa.PrivateKey = initKey()
+var authMIddleware = authenticationMiddleware{jwtKey}
 
 func initKey() *rsa.PrivateKey {
 	// generate private key
 	privKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		logger.Warnf("failed to generate private key: %s", err)
-        str := fmt.Sprintf("Was not able to initialize the random key - [%s]", err.Error())
-        panic(str)
+		str := fmt.Sprintf("Was not able to initialize the random key - [%s]", err.Error())
+		panic(str)
 	}
-    return privKey
+	return privKey
 }
 
 // NewServer registers routes for all exposed endpoints
@@ -62,22 +64,19 @@ func NewServer(conf *webconfig.WebConfig) *Server {
 		go hubs[i].Run()
 	}
 
-
 	// init global jwt decoding
 	jwt.RegisterCustomField("uuid", uuid.UUID{})
-
-	amw := authenticationMiddleware{jwtKey}
 
 	router := mux.NewRouter()
 
 	// serve /auth without authentication middleware
 	router.Path("/auth").
-		Handler(http.HandlerFunc(ServeAuthWithKey(jwtKey))).
+		Handler(http.HandlerFunc(authMIddleware.ServeAuthWithKey())).
 		Methods(http.MethodPost, http.MethodOptions)
 
 	// create a sub router for the blocked paths
 	api := router.PathPrefix("/").Subrouter()
-	api.Use(amw.Middleware)
+	api.Use(authMIddleware.Middleware)
 
 	api.HandleFunc("/", serveRoot)
 
@@ -149,7 +148,7 @@ func serveWs(hubs []*room.Hub, w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	if roomID < 0 || roomID >= hubsCount {
+	if roomID < 0 || roomID >= len(hubs) {
 		logger.Error(ErrRoomIdUnavailable)
 		http.Error(w, ErrRoomIdUnavailable.Error(), http.StatusConflict)
 		return
