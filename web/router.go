@@ -172,6 +172,21 @@ func serveWs(hubs []*room.Hub, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	uuidstr, uuidOk := uuidI.(string)
+	username, userOk := usernameI.(string)
+
+	if !(userOk && uuidOk) {
+		http.Error(w, "incorrect JWT token parts found in Cookies", http.StatusBadRequest)
+		return
+	}
+
+	uuid, err := uuid.Parse(uuidstr)
+	if err != nil {
+		logger.Debugf("unable to parse the uuid from [%s]", uuidstr)
+		http.Error(w, "unexpeted error happend", http.StatusInternalServerError)
+		return
+	}
+
 	// this check is in theory not threadsafe as there is a lot time happing
 	// until the connection build up is done, but this can handle some
 	// wrong connection creations, especially under heavy load.
@@ -203,8 +218,6 @@ func serveWs(hubs []*room.Hub, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	uuid := uuidI.(uuid.UUID)
-	username := fmt.Sprintf("%v", usernameI)
 	cm := client.NewClientMeta(uuid, username, conn)
 	logger.Debug("Created client meta for ID [", cm.GetId(), "]")
 	err = hubs[roomID].RegisterClient(cm)

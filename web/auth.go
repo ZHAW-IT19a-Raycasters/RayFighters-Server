@@ -74,7 +74,7 @@ func (auth *authenticationMiddleware) ServeAuthWithKey() (HandleFunc func(w http
 
 func (auth *authenticationMiddleware) createCookie(creds *Credentials) (*http.Cookie, error) {
 	// create new client uuid
-	uuidStr := uuid.New().String()
+	uuidStr := uuid.NewString()
 
 	// create JWT
 	t := jwt.New()
