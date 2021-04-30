@@ -17,7 +17,7 @@ import (
 const (
 	// MaxClientCommand is the prepared length of the opcode data slice
 	// Attention this value has to be changed once the protocol changes.
-	MaxClientCommand    = 17
+	MaxClientCommand    = 25
 	defaultMessageType  = websocket.BinaryMessage
 	shutdownMessageType = websocket.CloseMessage
 )
@@ -220,8 +220,6 @@ func (c *Client) sendData() {
 	for {
 		message, err := c.queue.Dequeue()
 
-		logger.Debugf("Sending message [%d], to [%d]", message, c.meta.GetUUID())
-
 		if err != nil {
 			// the queue has shutdown => server is
 			// shutting down
@@ -240,6 +238,8 @@ func (c *Client) sendData() {
 			}
 			return
 		}
+
+		logger.Debugf("Sending message [% X], to [%d]", message, c.meta.GetUUID())
 
 		if !c.sendDataHelper(message) {
 			return
@@ -263,6 +263,7 @@ func (c *Client) sendDataHelper(message []byte) bool {
 		}
 		return true
 	}
+
 	messageType := defaultMessageType
 	// if there is a disconnect here
 	if message[0] == server.DisconnectOpcode.Value() {
@@ -293,7 +294,7 @@ func (c *Client) recvDataHandler(messageType int, message io.Reader) error {
 	logger.Debugf("Received websocket message type [%d] from [%d]", messageType, c.meta.id)
 
 	if messageType == websocket.CloseMessage {
-		logger.Infof("the client with the id [%d] closed the connection.", messageType)
+		logger.Infof("the client with the id [%d] closed the connection.", c.meta.id)
 		return ErrClosedConnection
 	} else if messageType != websocket.BinaryMessage {
 		err := ErrNonBinaryMessage{
@@ -338,7 +339,7 @@ func (c *Client) recvData() {
 		// the sender will shutdown after getting a disconnect opcode
 		if !c.isActive.Get() {
 			// simply shutdown
-			logger.Debugf("shutting down the receiver of the client [%s]", c.meta.eId.String())
+			logger.Debugf("shutting down the receiver of the client [%d]", c.meta.GetId())
 			return
 		}
 

@@ -474,7 +474,7 @@ func (hc *HubController) handleWhoAmI(t []byte, id uint8) protocol.Bytefy {
 func (hc *HubController) handleMovement(message []byte, id uint8) protocol.Bytefy {
 	movement, err := pclient.NewMovementByte(message)
 	if err != nil {
-		logger.Infof("[%s] - message [%X]", err.Error(), message)
+		logger.Infof("[%s] - message [% X]", err.Error(), message)
 		newUnknown := server.NewUnknown()
 		return newUnknown
 	}
