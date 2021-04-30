@@ -186,7 +186,7 @@ func (mp TeleportPlayer) Bytes() []byte {
 	// using the buffer write interface for simplisity
 	buffer := make([]byte, mp.ByteSize())
 
-	buffer[0] = MovementPlayerOpcode.Value()
+	buffer[0] = TeleportPlayerOpcode.Value()
 	buffer[1] = mp.UserId()
 
 	// write floats into the bytes buffer

@@ -210,7 +210,7 @@ func TestTeleportPlayer(t *testing.T) {
 	var coorY float64 = 0.2
 
 	expectedData := [...]byte{
-		server.MovementPlayerOpcode.Value(),
+		server.TeleportPlayerOpcode.Value(),
 		userId,
 		// 0x3F 0xB9 0x99 0x99 0x99 0x99 0x99 0x9A
 		0x9A, 0x99, 0x99, 0x99, 0x99, 0x99, 0xB9, 0x3F,
@@ -231,7 +231,7 @@ func TestTeleportPlayer(t *testing.T) {
 		t.Error("CoorX has been wrongly set")
 	} else if coorY != mp.CoorY() {
 		t.Error("CoorY has been wrongly set")
-	} 
+	}
 }
 
 func TestShootingPlayer(t *testing.T) {
