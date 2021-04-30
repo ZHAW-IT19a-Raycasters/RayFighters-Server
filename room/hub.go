@@ -110,6 +110,8 @@ func (h *Hub) RegisterClient(meta client.ClientMeta) error {
 		if err != nil {
 			return ErrHubIsFull
 		}
+
+		logger.Debugf("adding client to hub [%d]", h.id)
 	}
 
 	// add the client to the queue to be added into the system

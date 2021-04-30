@@ -78,7 +78,7 @@ func (o ClientOpcode) ByteSize() int {
 		// Opcode
 		return 1
 	case MovementOpcode:
-		// Opcode + 2 * Float64
+		// Opcode + 3 * Float64
 		return 1 + 3*8
 	case ShootingOpcode:
 		// Opcode + Flaot64
