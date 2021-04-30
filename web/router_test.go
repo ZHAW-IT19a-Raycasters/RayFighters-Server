@@ -16,6 +16,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
+	oServer "github.zhaw.ch/raycasters/server/protocol/server"
 	"github.zhaw.ch/raycasters/server/room"
 	"golang.org/x/net/publicsuffix"
 )
@@ -206,7 +207,7 @@ func TestWSBadProtocol(t *testing.T) {
 	}
 }
 
-func TestWsConnection(t *testing.T) {
+func TestWsFirstOpcodes(t *testing.T) {
 	_, server, err := setupTestServer(t)
 	if err != nil {
 		return
@@ -238,9 +239,9 @@ func TestWsConnection(t *testing.T) {
 		return
 	}
 
-	// receive the 3 information blocks
-	sendInformation := make([][]byte, 0, 3)
-	for i := 0; i < 3; i += 1 {
+	// receive the 4 spawn information blocks
+	sendInformation := make([][]byte, 0, 4)
+	for i := 0; i < 4; i += 1 {
 		messageType, data, err := ws.ReadMessage()
 		if err != nil {
 			t.Errorf("There was an error while reading the message [%s]", err.Error())
@@ -254,5 +255,20 @@ func TestWsConnection(t *testing.T) {
 		sendInformation = append(sendInformation, data)
 	}
 
-	// TODO: check out that the system works
+	expOpcodes := map[byte]struct{}{
+		oServer.YouAreCalledOpcode.Value():      {},
+		oServer.SendAllPlayerInfoOpcode.Value(): {},
+		oServer.SendAllPlayerKDOpcode.Value():   {},
+		oServer.TeleportPlayerOpcode.Value():    {},
+	}
+
+	// check that the correct opcodes, where received
+	for _, infoSend := range sendInformation {
+		opcode := infoSend[0]
+		_, ok := expOpcodes[opcode]
+		if !ok {
+			t.Errorf("Wrong opcode send [0x%X]", opcode)
+			return
+		}
+	}
 }
