@@ -175,23 +175,31 @@ func serveWs(hubs []*room.Hub, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	uuidstr, uuidOk := uuidI.(string)
 	username, userOk := usernameI.(string)
 
-	if !(userOk && uuidOk) {
-		if !userOk {
-			logger.Debugf("unable to string convert the user name")
-		}
-		if !uuidOk {
-			logger.Debugf("unable to string convert the user uuid")
-		}
+	if !userOk {
+		logger.Debugf("unable to string convert the user name")
 		http.Error(w, "unexpeted error happend", http.StatusInternalServerError)
 		return
 	}
 
-	uuid, err := uuid.Parse(uuidstr)
-	if err != nil {
-		logger.Debugf("unable to parse the uuid from [%s]", uuidstr)
+	// as the uuid might be both a string as well as a uuid unit
+	// using e type switch here to figure its type out
+
+	var uuidVal uuid.UUID
+
+	switch parserd := uuidI.(type) {
+	case string:
+		uuidVal, err = uuid.Parse(parserd)
+		if err != nil {
+			logger.Debugf("unable to parse the uuid from [%s]", parserd)
+			http.Error(w, "unexpeted error happend", http.StatusInternalServerError)
+			return
+		}
+	case uuid.UUID:
+		uuidVal = parserd
+	default:
+		logger.Debugf("unable to string convert the user uuid")
 		http.Error(w, "unexpeted error happend", http.StatusInternalServerError)
 		return
 	}
@@ -227,7 +235,7 @@ func serveWs(hubs []*room.Hub, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cm := client.NewClientMeta(uuid, username, conn)
+	cm := client.NewClientMeta(uuidVal, username, conn)
 	logger.Debug("Created client meta for ID [", cm.GetId(), "]")
 	err = hubs[roomID].RegisterClient(cm)
 
@@ -237,5 +245,5 @@ func serveWs(hubs []*room.Hub, w http.ResponseWriter, r *http.Request) {
 		conn.Close()
 		return
 	}
-	logger.Infof("user %s with uuid %s joined room %d", username, uuid, roomID)
+	logger.Infof("user %s with uuid %s joined room %d", username, uuidVal, roomID)
 }

@@ -67,7 +67,7 @@ func (auth *authenticationMiddleware) ServeAuthWithKey() (HandleFunc func(w http
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		// w.Write(signed)
+
 		// Finally, we request to set the client cookie to the JWT we just generated
 		http.SetCookie(w, cookie)
 
@@ -91,7 +91,7 @@ func (auth *authenticationMiddleware) createCookie(creds *Credentials) (*http.Co
 		return nil, err
 	}
 
-	// TODO expiry time?
+	// TODO: expiry time?
 	return &http.Cookie{
 		Name:     JwtCookieName,
 		Value:    string(signed[:]),
@@ -114,6 +114,7 @@ func (amw *authenticationMiddleware) Middleware(next http.Handler) http.Handler 
 		logger.Debug(*jwtCookie)
 
 		token, err := jwt.ParseString(jwtCookie.Value, jwt.WithVerify(jwa.RS512, amw.privateKey.PublicKey))
+
 		if err != nil {
 			logger.Warnf("unauthenticated request %s", err)
 			http.Error(w, err.Error(), http.StatusUnauthorized)
