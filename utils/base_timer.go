@@ -111,7 +111,7 @@ func (t *BaseTimer) runTimer() {
 			// set the timer to only wait for a moment
 			diff := time.Until(currentWaiter.GetTime().Add(t.GetTimeout()))
 
-			// stop here
+			// stop the timer here
 			timerHandler.Stop()
 
 			// reset will always return true here as
