@@ -16,8 +16,11 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
+	"github.zhaw.ch/raycasters/server/gamemap"
+	"github.zhaw.ch/raycasters/server/protocol/client"
 	oServer "github.zhaw.ch/raycasters/server/protocol/server"
 	"github.zhaw.ch/raycasters/server/room"
+	"github.zhaw.ch/raycasters/server/utils"
 	"golang.org/x/net/publicsuffix"
 )
 
@@ -271,4 +274,57 @@ func TestWsFirstOpcodes(t *testing.T) {
 			return
 		}
 	}
+}
+
+func TestWsMovement(t *testing.T) {
+	_, server, err := setupTestServer(t)
+	if err != nil {
+		return
+	}
+
+	url, err := url.Parse(server.URL)
+	if err != nil {
+		t.Error("something went wrong with setting up the test server")
+		return
+	}
+
+	dialer := setupDialer(url, t)
+
+	url.Scheme = "ws"
+	url.Path = "/ws/0"
+	urlPath := url.String()
+
+	t.Logf("connecting to %s\n", url.String())
+
+	ws, resp, err := dialer.Dial(urlPath, nil)
+
+	if resp.StatusCode != http.StatusSwitchingProtocols {
+		t.Errorf("incorrect status was used exp : [%d] got: [%d]", http.StatusAccepted, resp.StatusCode)
+		return
+	}
+
+	if err != nil {
+		t.Errorf("there was an error while starting up the websocket [%s]", err.Error())
+		return
+	}
+
+	// receive the 4 spawn information blocks
+	for i := 0; i < 4; i += 1 {
+		_, _, err := ws.ReadMessage()
+		if err != nil {
+			t.Errorf("There was an error while reading the message [%s]", err.Error())
+			return
+		}
+	}
+
+	// send the move message
+	coord := gamemap.NewCoordinate(0.69, 1.111, 6.9)
+	data := [3*8 + 1]byte{
+		client.MovementOpcode.Value(),
+	}
+	for i, val := range [...]float64{coord.X(), coord.Y(), coord.Y()} {
+		utils.FloatToBinary(val, data[1+i*8:1+i*8+8])
+	}
+
+	ws.WriteMessage(websocket.BinaryMessage, data[:])
 }

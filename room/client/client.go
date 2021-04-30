@@ -290,7 +290,7 @@ func (c *Client) sendDataHelper(message []byte) bool {
 // recvDataHandler will handle the received data pacakges
 func (c *Client) recvDataHandler(messageType int, message io.Reader) error {
 
-	logger.Debugf("Received message type [%d] from [%d]", messageType, c.meta.id)
+	logger.Debugf("Received websocket message type [%d] from [%d]", messageType, c.meta.id)
 
 	if messageType == websocket.CloseMessage {
 		logger.Infof("the client with the id [%d] closed the connection.", messageType)
@@ -334,6 +334,14 @@ func (c *Client) recvData() {
 		// as in case of an error the messageType and
 		// message will be their nulled values.
 
+		// first check if client is still active, as there is the case where
+		// the sender will shutdown after getting a disconnect opcode
+		if !c.isActive.Get() {
+			// simply shutdown
+			logger.Debugf("shutting down the receiver of the client [%s]", c.meta.eId.String())
+			return
+		}
+
 		// as per definition
 		// Applications must break out of the application's read loop when this method returns
 		// a non-nil error value. Errors returned from this method are permanent. Once this
@@ -350,7 +358,8 @@ func (c *Client) recvData() {
 					c.registerTimeout()
 				} else {
 					logger.Warnf("unexpected web socket closure error received for client [%d] "+
-						"- see https://rfc-editor.org/rfc/rfc6455.html#section-11.7 for more information\n[%s]", c.meta.id, err.Error())
+						"- see https://rfc-editor.org/rfc/rfc6455.html#section-11.7 for more "+
+						"information\n[%s]", c.meta.id, err.Error())
 				}
 				// break out of the endless loop directly to a shutdown
 			} else if errors.Is(err, websocket.ErrReadLimit) {
