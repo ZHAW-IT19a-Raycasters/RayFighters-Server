@@ -172,6 +172,7 @@ func (hc *HubController) ClientExists(meta client.ClientMeta) bool {
 // RegisterClient will add the client to the controller
 func (hc *HubController) RegisterClient(meta client.ClientMeta) error {
 	// TODO: register in the game state (if it is a new connection)
+	logger.Debugf("registering client in hub [%s]", meta.GetId().String())
 
 	// prepare the queues
 	cqueue, hqueue := client.NewWorkQueue()

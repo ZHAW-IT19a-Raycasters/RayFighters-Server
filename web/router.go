@@ -149,13 +149,15 @@ func serveWs(hubs []*room.Hub, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if roomID < 0 || roomID >= len(hubs) {
-		logger.Error(ErrRoomIdUnavailable)
-		http.Error(w, ErrRoomIdUnavailable.Error(), http.StatusConflict)
+		logger.Debugf("Room [%d] not available", roomID)
+		http.Error(w, ErrRoomIdUnavailable.Error(), http.StatusBadRequest)
 		return
 	}
+
 	// get cookie from request
-	jwtCookie, err := r.Cookie(JWTCOOKIENAME)
+	jwtCookie, err := r.Cookie(JwtCookieName)
 	if err != nil {
+		logger.Debugf("no JWT token found in cookie")
 		http.Error(w, "no JWT found in Cookies", http.StatusForbidden)
 		return
 	}
@@ -164,10 +166,11 @@ func serveWs(hubs []*room.Hub, w http.ResponseWriter, r *http.Request) {
 	// error is not needed as it is directly send from here
 	// and validated previously.
 	token, _ := jwt.ParseString(jwtCookie.Value)
-	usernameI, userOk := token.Get(`username`)
-	uuidI, uuidOk := token.Get(`uuid`)
+	usernameI, userOk := token.Get(JwtUserName)
+	uuidI, uuidOk := token.Get(JwtUUID)
 
 	if !(userOk && uuidOk) {
+		logger.Debug("incorrect JWT token found in token cookie")
 		http.Error(w, "incorrect JWT token found in Cookies", http.StatusBadRequest)
 		return
 	}
@@ -176,7 +179,13 @@ func serveWs(hubs []*room.Hub, w http.ResponseWriter, r *http.Request) {
 	username, userOk := usernameI.(string)
 
 	if !(userOk && uuidOk) {
-		http.Error(w, "incorrect JWT token parts found in Cookies", http.StatusBadRequest)
+		if !userOk {
+			logger.Debugf("unable to string convert the user name")
+		}
+		if !uuidOk {
+			logger.Debugf("unable to string convert the user uuid")
+		}
+		http.Error(w, "unexpeted error happend", http.StatusInternalServerError)
 		return
 	}
 
@@ -229,5 +238,4 @@ func serveWs(hubs []*room.Hub, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	logger.Infof("user %s with uuid %s joined room %d", username, uuid, roomID)
-
 }

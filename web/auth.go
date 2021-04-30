@@ -17,7 +17,9 @@ import (
 )
 
 const (
-	JWTCOOKIENAME = "token"
+	JwtCookieName string = "token"
+	JwtUserName   string = "username"
+	JwtUUID       string = "uuid"
 )
 
 // Create a struct to read the username and password from the request body
@@ -79,8 +81,8 @@ func (auth *authenticationMiddleware) createCookie(creds *Credentials) (*http.Co
 	// create JWT
 	t := jwt.New()
 	t.Set(jwt.IssuedAtKey, time.Now())
-	t.Set(`username`, creds.Username)
-	t.Set(`uuid`, uuidStr)
+	t.Set(JwtUserName, creds.Username)
+	t.Set(JwtUUID, uuidStr)
 
 	// Signing the token (using raw rsa.PrivateKey)
 	// also marshalls to JSON
@@ -91,7 +93,7 @@ func (auth *authenticationMiddleware) createCookie(creds *Credentials) (*http.Co
 
 	// TODO expiry time?
 	return &http.Cookie{
-		Name:     JWTCOOKIENAME,
+		Name:     JwtCookieName,
 		Value:    string(signed[:]),
 		Path:     "/",
 		SameSite: http.SameSiteLaxMode,
@@ -103,10 +105,10 @@ func (amw *authenticationMiddleware) Middleware(next http.Handler) http.Handler 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		logger.Debug(r.Cookies())
 		// get cookie from request
-		jwtCookie, err := r.Cookie(JWTCOOKIENAME)
+		jwtCookie, err := r.Cookie(JwtCookieName)
 		if err != nil {
-			http.Error(w, "no JWT found in Cookies", http.StatusUnauthorized)
 			logger.Warnf("no JWT found in request Cookies %s", err)
+			http.Error(w, "no JWT found in Cookies", http.StatusUnauthorized)
 			return
 		}
 		logger.Debug(*jwtCookie)
@@ -118,10 +120,10 @@ func (amw *authenticationMiddleware) Middleware(next http.Handler) http.Handler 
 			return
 		}
 
-		user, userOk := token.Get(`username`)
-		uuid, uuidOk := token.Get(`uuid`)
+		user, userOk := token.Get(JwtUserName)
+		uuid, uuidOk := token.Get(JwtUUID)
 		if userOk && uuidOk {
-			logger.Infof("user %s with uuid %s authenticated. proceeding to %s", user, uuid, r.URL)
+			logger.Debugf("user %s with uuid %s authenticated. proceeding to %s", user, uuid, r.URL)
 		}
 		next.ServeHTTP(w, r)
 	})

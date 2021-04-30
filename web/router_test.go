@@ -142,7 +142,7 @@ func TestWSBadRoomID(t *testing.T) {
 	router.ServeHTTP(rr, req)
 	res := rr.Result()
 	io.ReadAll(res.Body)
-	if res.StatusCode != http.StatusConflict {
+	if res.StatusCode != http.StatusBadRequest {
 		t.Errorf("handler returned wrong status code for bad request: got %v want %v",
 			res.StatusCode, http.StatusConflict)
 	}
