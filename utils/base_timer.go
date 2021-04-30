@@ -94,6 +94,10 @@ func (t *BaseTimer) runTimer() {
 	defer t.wg.Done()
 	// create the timer without any time to wait
 	timerHandler := time.NewTimer(0)
+
+	// make sure the timer is expired
+	<-timerHandler.C
+
 	// temporily save the current client to wait for
 	var currentWaiter ElementInterface
 
@@ -106,6 +110,13 @@ func (t *BaseTimer) runTimer() {
 		case currentWaiter = <-t.queue:
 			// set the timer to only wait for a moment
 			diff := time.Until(currentWaiter.GetTime().Add(t.GetTimeout()))
+
+			// stop here
+			timerHandler.Stop()
+
+			// reset will always return true here as
+			// we are waiting every time for just a single
+			// event
 			timerHandler.Reset(diff)
 		}
 
