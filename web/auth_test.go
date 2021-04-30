@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -52,10 +51,8 @@ func TestAuthTokenIssueing(t *testing.T) {
 			t.Errorf("failed to generate JSON: %s\n", err)
 			return
 		}
-		fmt.Printf("%s\n", buf)
+		t.Logf("%s", buf)
 	}
-
-	//
 }
 
 func TestAuthRequestWithValidJson(t *testing.T) {
@@ -78,7 +75,6 @@ func TestAuthRequestWithValidJson(t *testing.T) {
 		t.Errorf("handler returned wrong status code: got %v want %v",
 			res.StatusCode, http.StatusOK)
 	}
-
 }
 
 func TestAuthTokenResponseVaild(t *testing.T) {

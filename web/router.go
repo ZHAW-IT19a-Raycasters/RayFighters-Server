@@ -156,7 +156,7 @@ func serveWs(hubs []*room.Hub, w http.ResponseWriter, r *http.Request) {
 	// get cookie from request
 	jwtCookie, err := r.Cookie(JWTCOOKIENAME)
 	if err != nil {
-		http.Error(w, "no JWT found in Cookies", http.StatusUnauthorized)
+		http.Error(w, "no JWT found in Cookies", http.StatusForbidden)
 		return
 	}
 
@@ -168,7 +168,7 @@ func serveWs(hubs []*room.Hub, w http.ResponseWriter, r *http.Request) {
 	uuidI, uuidOk := token.Get(`uuid`)
 
 	if !(userOk && uuidOk) {
-		http.Error(w, "incorrect JWT token found in Cookies", http.StatusUnauthorized)
+		http.Error(w, "incorrect JWT token found in Cookies", http.StatusBadRequest)
 		return
 	}
 

@@ -4,13 +4,13 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/gorilla/mux"
@@ -18,6 +18,23 @@ import (
 	"github.zhaw.ch/raycasters/server/room"
 	"golang.org/x/net/publicsuffix"
 )
+
+func hubHelper(t *testing.T) []*room.Hub {
+	hubs := make([]*room.Hub, 0, hubsCount)
+	for i := 0; i < hubsCount; i += 1 {
+		hub := room.NewHub(i)
+		err := hub.Run()
+		if err != nil {
+			t.Errorf("unable to start up a hub [%s]", err.Error())
+			return nil
+		}
+		t.Cleanup(func() {
+			hub.Shutdown(context.TODO())
+		})
+		hubs = append(hubs, hub)
+	}
+	return hubs
+}
 
 func TestAPIRoot(t *testing.T) {
 	// Create a request to pass to our handler. We don't have any query parameters for now, so we'll
@@ -52,8 +69,15 @@ func TestAPIRoot(t *testing.T) {
 func TestAuthorizedWebsocketEstablishment(t *testing.T) {
 	// set up a router for auth and ws
 	router := mux.NewRouter()
+	hubs := hubHelper(t)
+	if hubs == nil {
+		return
+	}
+
 	router.HandleFunc("/auth", authMIddleware.ServeAuthWithKey())
-	router.HandleFunc("/ws/{roomID:[0-9]+}", func(rw http.ResponseWriter, r *http.Request) { serveWs([]*room.Hub{}, rw, r) })
+	router.HandleFunc("/ws/{roomID:[0-9]+}", func(rw http.ResponseWriter, r *http.Request) {
+		serveWs(hubs, rw, r)
+	})
 
 	// Start our server
 	ts := httptest.NewServer(router)
@@ -62,7 +86,6 @@ func TestAuthorizedWebsocketEstablishment(t *testing.T) {
 	u, err := url.Parse(ts.URL)
 	if err != nil {
 		log.Fatal(err)
-
 	}
 
 	// All users of cookiejar should import "golang.org/x/net/publicsuffix"
@@ -86,24 +109,25 @@ func TestAuthorizedWebsocketEstablishment(t *testing.T) {
 	}
 
 	// we should have the auth token as cookie in the jar, mmmmmhhh cookies :)
-	fmt.Println("After 1st request:")
+	t.Log("After 1st request:")
 	for _, cookie := range jar.Cookies(u) {
-		fmt.Printf("  %s: %s\n", cookie.Name, cookie.Value)
+		t.Logf("  %s: %s\n", cookie.Name, cookie.Value)
 	}
 
 	// add our jar to the default dialer
-	websocket.DefaultDialer.Jar = jar
+	websocketDialer := websocket.DefaultDialer
+	websocketDialer.Jar = jar
 
 	// change url to ws endpoint for same host
 	u.Scheme = "ws"
 	u.Path = "/ws/1"
 
-	fmt.Printf("connecting to %s\n", u.String())
+	t.Logf("connecting to %s\n", u.String())
 
-	c, res, err := websocket.DefaultDialer.Dial(u.String(), nil)
+	c, res, err := websocketDialer.Dial(u.String(), nil)
 
 	if err != nil {
-		fmt.Print("Error during handshake", err)
+		t.Logf("Error during handshake [%s]", err.Error())
 	}
 	defer c.Close()
 
@@ -117,8 +141,15 @@ func TestWSBadRoomID(t *testing.T) {
 	req := httptest.NewRequest("GET", "/ws/123", nil)
 	rr := httptest.NewRecorder()
 	// Need to create a router that we can pass the request through so that the vars will be added to the context
+
+	hubs := hubHelper(t)
+	if hubs == nil {
+		return
+	}
 	router := mux.NewRouter()
-	router.HandleFunc("/ws/{roomID:[0-9]+}", func(rw http.ResponseWriter, r *http.Request) { serveWs([]*room.Hub{}, rw, r) })
+	router.HandleFunc("/ws/{roomID:[0-9]+}", func(rw http.ResponseWriter, r *http.Request) {
+		serveWs(hubs, rw, r)
+	})
 	router.ServeHTTP(rr, req)
 	res := rr.Result()
 	io.ReadAll(res.Body)
@@ -132,31 +163,36 @@ func TestWSBadProtocol(t *testing.T) {
 	req := httptest.NewRequest("GET", "/ws/1", nil)
 	rr := httptest.NewRecorder()
 	// Need to create a router that we can pass the request through so that the vars will be added to the context
+	hubs := hubHelper(t)
+	if hubs == nil {
+		return
+	}
 	router := mux.NewRouter()
-	router.HandleFunc("/ws/{roomID:[0-9]+}", func(rw http.ResponseWriter, r *http.Request) { serveWs([]*room.Hub{}, rw, r) })
+	router.HandleFunc("/ws/{roomID:[0-9]+}", func(rw http.ResponseWriter, r *http.Request) {
+		serveWs(hubs, rw, r)
+	})
 	router.ServeHTTP(rr, req)
 
 	res := rr.Result()
 	body, _ := io.ReadAll(res.Body)
-	t.Log(string(body))
-	if res.StatusCode != http.StatusBadRequest {
+
+	sbody := string(body)
+
+	if res.StatusCode != http.StatusForbidden {
 		t.Errorf("handler returned wrong status code for bad request: got %v want %v",
-			res.StatusCode, http.StatusBadRequest)
+			res.StatusCode, http.StatusForbidden)
+	} else if !strings.Contains(sbody, "no JWT found in Cookies") {
+		t.Error("incorrect error body returned")
 	}
 }
 
 func TestWsConnection(t *testing.T) {
 	const hubId = 0
-	hubs := make([]*room.Hub, 0, 1)
-	hubs = append(hubs, room.NewHub(hubId))
-	err := hubs[hubId].Run()
-	defer hubs[hubId].Shutdown(context.TODO())
+	hubs := hubHelper(t)
 
-	if err != nil {
-		t.Error("unable to start up the hub")
+	if hubs == nil {
 		return
 	}
-
 	// Need to create a router that we can pass the request through so that the vars will be added to the context
 	router := mux.NewRouter()
 
@@ -187,15 +223,19 @@ func TestWsConnection(t *testing.T) {
 	// get a JWT token
 	rq := make(http.Header)
 
-	rq.Set("Set-Cookie", cookie.String())
-	ws, resp, err := websocket.DefaultDialer.Dial(urlPath, rq)
+	rq.Set("Cookie", cookie.String())
+	dialer := websocket.DefaultDialer
+	dialer.Jar.SetCookies(url, []*http.Cookie{cookie})
+
+	ws, resp, err := dialer.Dial(urlPath, rq)
 
 	if err != nil {
 		t.Errorf("there was an error while starting up the websocket [%s]", err.Error())
 		return
 	}
-	if resp.Status != http.StatusText(http.StatusAccepted) || resp.Status != http.StatusText(http.StatusSwitchingProtocols) {
-		t.Error("incorrect status was used")
+
+	if resp.StatusCode != http.StatusSwitchingProtocols {
+		t.Errorf("incorrect status was used exp : [%d] got: [%d]", http.StatusAccepted, resp.StatusCode)
 		return
 	}
 
