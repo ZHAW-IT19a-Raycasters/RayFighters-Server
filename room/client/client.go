@@ -284,7 +284,7 @@ func (c *Client) sendDataHelper(message []byte) bool {
 	// flush the message to the network
 	err = cw.Close()
 
-	return !checkErr(err) && messageType == defaultMessageType
+	return checkErr(err) && messageType == defaultMessageType
 }
 
 // recvDataHandler will handle the received data pacakges
