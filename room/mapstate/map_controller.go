@@ -191,7 +191,7 @@ func (mc *MapController) CheckShooting(shooterId uint8, shotAngle float64) (bool
 	}
 
 	// STEP2: CHECK if there is any obstacle in between
-
+	// STEP2.1.1: Init step
 	// current position on map
 	mapX, mapY, _ := mc.GetMapCoordinates(shooterId)
 	// projections of direction ray vector on x(or y) axes
@@ -210,7 +210,7 @@ func (mc *MapController) CheckShooting(shooterId uint8, shotAngle float64) (bool
 	// we always walk 1 unit in the same x(und y) direction
 	var stepX int
 	var stepY int
-	// calculate step and the ray length
+	//  STEP2.1.2: Init step: calculate steps and the ray length
 	// until the first intersection with x-(or y-)grid line
 	if rayDirX < 0 {
 		// ray directed reversed to y-direction
@@ -232,10 +232,12 @@ func (mc *MapController) CheckShooting(shooterId uint8, shotAngle float64) (bool
 		stepY = 1
 		rayLengthY = (float64(mapY+1.0) - rayStartY) * rayLengthScaleFactorStepInY
 	}
+	// STEP2.2: loop through cells
 	// get coordinates of obstacle
 	// check if some is hit
 	// compare coords of abstraction an player
 	for {
+		// end condition is given by isMapBound()
 		if rayLengthX < rayLengthY {
 			// walk along x axis
 			mapX += stepX
@@ -250,8 +252,7 @@ func (mc *MapController) CheckShooting(shooterId uint8, shotAngle float64) (bool
 			rayLengthY += rayLengthScaleFactorStepInY
 		}
 
-		// After each iteration check if there is obstacle
-
+		// After each iteration check map bound was reached
 		if mc.IsMapBound(mapX, mapY) {
 			// we reached the map bound
 			// found no obstacle was on the way to candidate, therefore
@@ -259,6 +260,7 @@ func (mc *MapController) CheckShooting(shooterId uint8, shotAngle float64) (bool
 			return true, candidateId
 		}
 
+		// After each iteration check if any obstacle is on the way
 		if !mc.IsPenetrable(mapX, mapY) {
 			// found some obstacle
 			// the victim is safe
