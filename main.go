@@ -62,7 +62,7 @@ func main() {
 		case <-done:
 			return
 		}
-		// TODO: global channel shutdown
+
 		server.ServerStop(ctx)
 		close(done)
 	}()

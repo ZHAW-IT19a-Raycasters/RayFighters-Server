@@ -177,9 +177,11 @@ func serveWs(hubs []*room.Hub, w http.ResponseWriter, r *http.Request) {
 
 	username, userOk := usernameI.(string)
 
+	const unexpectedError = "unexpected error happened - please contact the service administrator"
+
 	if !userOk {
 		logger.Debugf("unable to string convert the user name")
-		http.Error(w, "unexpeted error happend", http.StatusInternalServerError)
+		http.Error(w, unexpectedError, http.StatusInternalServerError)
 		return
 	}
 
@@ -193,14 +195,14 @@ func serveWs(hubs []*room.Hub, w http.ResponseWriter, r *http.Request) {
 		uuidVal, err = uuid.Parse(parserd)
 		if err != nil {
 			logger.Debugf("unable to parse the uuid from [%s]", parserd)
-			http.Error(w, "unexpeted error happend", http.StatusInternalServerError)
+			http.Error(w, unexpectedError, http.StatusInternalServerError)
 			return
 		}
 	case uuid.UUID:
 		uuidVal = parserd
 	default:
 		logger.Debugf("unable to string convert the user uuid")
-		http.Error(w, "unexpeted error happend", http.StatusInternalServerError)
+		http.Error(w, unexpectedError, http.StatusInternalServerError)
 		return
 	}
 
