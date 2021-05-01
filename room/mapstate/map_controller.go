@@ -127,18 +127,137 @@ func (mc *MapController) IsPenetrable(x int, y int) bool {
 }
 
 // returns uid of the client which will be hit by the ray
-func (mc *MapController) GetClientID(angle float64, rayStartX float64, rayStartY float64) (bool, uint8) {
+func (mc *MapController) GetHit(angle, rayStartX, rayStartY float64) (bool, uint8) {
 	a := -math.Tan(angle)
 	b := 1.0
 	c := math.Tan(angle)*rayStartX - rayStartY
 	margine := 0.00001
+	hit := false
+	victimId := uint8(0)
+	distance := 0.0
+
+	// We don't need lock because,
+	// The iteration order over maps is not specified and is not guaranteed to be the same from one iteration
+	// to the next. If a map entry that has not yet been reached is removed during iteration, the corresponding
+	// iteration value will not be produced.
+	// CHECK: https://golang.org/ref/spec#For_statements
 	for id, coord := range mc.clients {
-		if math.Abs(calculateDistance(a, b, c, coord.X(), coord.Y())) < margine {
-			return true, id
+		userX := coord.X()
+		userY := coord.Y()
+		// TODO: Check if victim is behind shooter
+		if math.Abs(calculateDistance(a, b, c, userX, userY)) < margine {
+			// TODO: I DON'T LIKE THIS FIND BETTER SOLUTION!!!!!
+			if !hit {
+				hit = true
+				victimId = id
+				distance = math.Sqrt(math.Abs(rayStartX - userX) * math.Abs(rayStartX - userX) +
+					math.Abs(rayStartY - userY) * math.Abs(rayStartY - userY))
+				continue
+			}
+
+			if distance > math.Sqrt(math.Abs(rayStartX - userX) * math.Abs(rayStartX - userX) +
+				math.Abs(rayStartY - userY) * math.Abs(rayStartY - userY)) {
+				victimId = id
+				distance = math.Sqrt(math.Abs(rayStartX - userX) * math.Abs(rayStartX - userX) +
+					math.Abs(rayStartY - userY) * math.Abs(rayStartY - userY))
+			}
 		}
 	}
-	return false, 0
+	return hit, victimId
 }
+
+// returns uid of the client which will be hit by the ray
+func (mc *MapController) IsClientThere(angle, rayStartX, rayStartY float64) (bool, uint8) {
+
+}
+
 func calculateDistance(a float64, b float64, c float64, x float64, y float64) float64 {
 	return math.Abs(a*x+b*y+c) / math.Sqrt(a*a+b*b)
+}
+
+
+// raycasting return true if some player was hit and uid of victim, else (false, 0) is returned
+// shotAngle is in radians
+func (mc *MapController) CheckShooting(shooterId uint8, shotAngle float64) (bool, uint8) {
+	// y axes directed vertically downwards
+	// x axes directed horizontally to the right
+	hit, id := mc.GetHit(shotAngle, mc.clients[shooterId].X(), mc.clients[shooterId].Y())
+	if !hit {
+		return false, 0
+	}
+	// ray origin coordinates
+	rayStartX, rayStartY, _ := mc.GetPosition(shooterId)
+	// current position on map
+	mapX, mapY, _ := mc.GetMapCoordinates(shooterId)
+	// projections of direction ray vector on x(or y) axes
+	rayDirX := math.Sin(shotAngle) // vs. cosinus???
+	rayDirY := math.Cos(shotAngle)
+
+	// calculate ray length scaling factor when taking step in x(or y) direction
+	//rayLengthScaleFactorStepInX := math.Sqrt(1  + (rayDirY/rayDirX) *(rayDirY/rayDirX))
+	rayLengthScaleFactorStepInX := 1 / math.Abs(math.Cos(shotAngle))
+	//rayLengthScaleFactorStepInY :=  math.Sqrt(1  + (rayDirX/rayDirY) *(rayDirX/rayDirY))
+	rayLengthScaleFactorStepInY := 1 / math.Abs(math.Sin(shotAngle))
+	// ray length in in x(or y) direction
+	rayLengthX := 0.0 // if we make step in x direction
+	rayLengthY := 0.0 // if we make step in y direction
+
+	// we always walk 1 unit in the same x(und y) direction
+	var stepX int
+	var stepY int
+	// calculate step and the ray length
+	// until the first intersection with x-(or y-)grid line
+	if rayDirX < 0 {
+		// ray directed reversed to y-direction
+		stepX = -1 // we go in negative x direction
+		// (player posit. - curr cell coord ) x scaleFactor
+		rayLengthX = (rayStartX - float64(mapX)) * rayLengthScaleFactorStepInX
+	} else {
+		// ray co-directed with y-direction
+		stepX = 1 // we go in positive x direction
+		// (coord of next cell - player posit.) x step
+		rayLengthX = (float64(mapX+1.0) - rayStartX) * rayLengthScaleFactorStepInX
+	}
+	if rayDirY < 0 {
+		// ray directed reversed to y-direction
+		stepY = -1
+		rayLengthY = (rayStartY - float64(mapY)) * rayLengthScaleFactorStepInY
+	} else {
+		// ray co-directed with y-direction
+		stepY = 1
+		rayLengthY = (float64(mapY+1.0) - rayStartY) * rayLengthScaleFactorStepInY
+	}
+	// get coordinates of absraction
+	// check if some is hit
+	// compare coords of abstraction an player
+	for {
+		if rayLengthX < rayLengthY {
+			// walk along x axis
+			mapX += stepX
+			// we move 1 unit
+			// add to length 1 x scalingFactor
+			rayLengthX += rayLengthScaleFactorStepInX
+		} else {
+			// walk along y axis
+			mapY += stepY
+			// we move 1 unit
+			// add to length 1 x scalingFactor
+			rayLengthY += rayLengthScaleFactorStepInY
+		}
+
+		// check if the ray hit someone?
+		// A check distances to all players if smaller than some value -> true
+		// B go to cell get clients around check there distances to the line
+		// you need line equation
+
+		// for each client check if potentially it could be hit
+		if mc.IsClientThere(mapX, mapY) {
+			// calculate pricise distance
+			return true, id
+		}
+
+		if mc.IsMapBound(mapX, mapY) || !mc.IsPenetrable(mapX, mapY) {
+			return false, 0
+		}
+	}
 }

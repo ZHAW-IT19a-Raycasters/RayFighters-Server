@@ -495,6 +495,34 @@ func (hc *HubController) handleMovement(t []byte, id uint8) protocol.Bytefy {
 	return nil
 }
 
+func (hc *HubController) handleShooting(t []byte, shooterId uint8) protocol.Bytefy {
+	shot, err := pclient.NewShootingBytes(t)
+	shotAngle := shot.AngPl()
+	if err != nil {
+		logger.Info(err)
+		newUnknown := server.NewUnknown()
+		return newUnknown
+	}
+	hit, victimId := hc.mapController.CheckShooting(shooterId, shotAngle)
+	var death server.PlayerDeath
+	aShot := server.NewShootingPlayer(shooterId, shotAngle)
+	// add id's to be ignored by broadcasting
+	ignoreId := helpers.NewIdSet()
+	ignoreId.Add(shooterId)
+	// inform the police and players about shooting
+	hc.broadCast(aShot, ignoreId)
+	// someone is dead :(
+	if hit {
+		death = server.NewPlayerDeath(shooterId, victimId)
+		// broadcast the death to all players
+		// ??? if i understand correctly everyone should be informed
+		hc.broadCast(death, helpers.NewIdSet())
+	}
+	// As the shooting opcode does not require an answer to be sent back
+	return nil
+}
+
+
 func (hc *HubController) handleRequestOtherPlayer(t []byte) protocol.Bytefy {
 	_, err := pclient.NewRequestOtherPlayersBytes(t)
 	if err != nil {
