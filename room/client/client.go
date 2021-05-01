@@ -229,8 +229,6 @@ func (c *Client) checkOffline() bool {
 // condition this function will only ever be called a single time
 // per run.
 func (c *Client) sendData() {
-	defer c.shutdownHandler()
-
 	// No checks for activation are needed
 	// due to that this function will only
 	// be called from the run function
@@ -347,13 +345,13 @@ func (c *Client) recvDataHandler(messageType int, message io.Reader) error {
 // recvConnectionErrHandler will handle the different error cases
 // possibly received by the server from the front end
 func (c *Client) recvConnectionErrHandler(err error) {
-	if websocket.IsUnexpectedCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
+	if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
 		// the case that either
 		// - the connection was correctly closed by the client side web socket
 		// - the connection was incorrectly closed by a closed browser instance
 		//   or the browser having navigated away from the page withe the connection.
 		logger.Infof("Connection to client [%d] was shutdown by client", c.meta.id)
-	} else if websocket.IsUnexpectedCloseError(err, websocket.CloseAbnormalClosure) {
+	} else if websocket.IsCloseError(err, websocket.CloseAbnormalClosure) {
 		// the case that there was an unexpected close event
 		// such as internet connection problems and similar.
 		// Given that case the client has to be set into its
