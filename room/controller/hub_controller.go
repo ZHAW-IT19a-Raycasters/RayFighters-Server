@@ -406,6 +406,7 @@ func (hc *HubController) Shutdown(cxt context.Context) {
 }
 
 // handleRead will as the name implies handle all the given reads.
+// id - client id
 func (hc *HubController) handleRead(data []byte, id uint8) protocol.Bytefy {
 	// we can omit the nil check here
 	// as a len for a nil slice if
@@ -491,29 +492,6 @@ func (hc *HubController) handleMovement(t []byte, id uint8) protocol.Bytefy {
 
 	// As the movement opcode does not actually require
 	// an answer send nothing back.
-	return nil
-}
-
-func (hc *HubController) handleShooting(t []byte, id uint8) protocol.Bytefy {
-	shot, err := pclient.NewShootingBytes(t)
-	if err != nil {
-		logger.Info(err)
-		newUnknown := server.NewUnknown()
-		return newUnknown
-	}
-	// TODO: IMPLEMENT SHOOTING FUNCTION WITH RAYCASTING
-	// newAnotherPlayerKilled := server.NewPlayerDeath(id, id)
-
-	// dues to the not yet implemented raycasting feature
-	// checking, who died is not possible, so simply propagade
-	// the information.
-	aShot := server.NewShootingPlayer(id, shot.AngPl())
-
-	// broadcast the death to all players
-	except := helpers.NewIdSet()
-	except.Add(id)
-	hc.broadCast(aShot, except)
-
 	return nil
 }
 

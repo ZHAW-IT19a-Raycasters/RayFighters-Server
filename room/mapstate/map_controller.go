@@ -1,6 +1,7 @@
 package mapstate
 
 import (
+	"math"
 	"math/rand"
 	"sync"
 
@@ -8,11 +9,11 @@ import (
 )
 
 type MapController struct {
-	clients map[uint8]gamemap.Coordinate
+	clients     map[uint8]gamemap.Coordinate
 	spawingarea []gamemap.Coordinate
-	map2d   gamemap.Map2d
-	getNextInt func(int) int
-	lock    *sync.RWMutex
+	map2d       gamemap.Map2d
+	getNextInt  func(int) int
+	lock        *sync.RWMutex
 }
 
 func NewMapController(filePath string) (MapController, error) {
@@ -23,10 +24,10 @@ func NewMapController(filePath string) (MapController, error) {
 	}
 	return MapController{
 		spawingarea: map2d.GetLegalSpawns(),
-		map2d:   map2d,
-		clients: make(map[uint8]gamemap.Coordinate),
-		getNextInt: rand.Intn,
-		lock:    &sync.RWMutex{},
+		map2d:       map2d,
+		clients:     make(map[uint8]gamemap.Coordinate),
+		getNextInt:  rand.Intn,
+		lock:        &sync.RWMutex{},
 	}, nil
 }
 
@@ -98,4 +99,46 @@ func (mc *MapController) getClient(id uint8) (gamemap.Coordinate, bool) {
 		return gamemap.Coordinate{}, ok
 	}
 	return c, ok
+}
+
+func (mc *MapController) GetPosition(userId uint8) (x float64, y float64, ok bool) {
+	c, ok := mc.getClient(userId)
+	if !ok {
+		return 0, 0, ok
+	}
+	return c.Y(), c.Y(), ok
+}
+
+func (mc *MapController) GetMapCoordinates(userId uint8) (x int, y int, ok bool) {
+	c, ok := mc.getClient(userId)
+	if !ok {
+		return 0, 0, ok
+	}
+	return c.GetMapCoordinate().X(), c.GetMapCoordinate().Y(), ok
+}
+
+func (mc *MapController) IsMapBound(x int, y int) bool {
+	return mc.map2d.IsMapBoundary(x, y)
+}
+
+// IsPenetrable true if a bullet can pass through it
+func (mc *MapController) IsPenetrable(x int, y int) bool {
+	return mc.map2d.IsPenetrable(x, y)
+}
+
+// returns uid of the client which will be hit by the ray
+func (mc *MapController) GetClientID(angle float64, rayStartX float64, rayStartY float64) (bool, uint8) {
+	a := -math.Tan(angle)
+	b := 1.0
+	c := math.Tan(angle)*rayStartX - rayStartY
+	margine := 0.00001
+	for id, coord := range mc.clients {
+		if math.Abs(calculateDistance(a, b, c, coord.X(), coord.Y())) < margine {
+			return true, id
+		}
+	}
+	return false, 0
+}
+func calculateDistance(a float64, b float64, c float64, x float64, y float64) float64 {
+	return math.Abs(a*x+b*y+c) / math.Sqrt(a*a+b*b)
 }

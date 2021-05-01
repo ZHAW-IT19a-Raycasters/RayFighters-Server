@@ -59,16 +59,16 @@ func (map2d *Map2d) Compare(other *Map2d) bool {
 
 func (map2d *Map2d) GetLegalSpawns() []Coordinate {
 	counter := 0
-	for _, x := range map2d.map2d  {
+	for _, x := range map2d.map2d {
 		for _, y := range x {
 			if y != Wall {
-				counter+=1
+				counter += 1
 			}
 		}
 	}
 
 	res := make([]Coordinate, 0, counter)
-	for i, x := range map2d.map2d  {
+	for i, x := range map2d.map2d {
 		for j, y := range x {
 			if y != Wall {
 				res = append(res, NewCoordinate(float64(i), float64(j), 0))
@@ -76,4 +76,13 @@ func (map2d *Map2d) GetLegalSpawns() []Coordinate {
 		}
 	}
 	return res
+}
+
+func (map2d *Map2d) IsMapBoundary(x int, y int) bool {
+	return x == (map2d.dim-1) || y == (map2d.dim-1)
+}
+
+// IsPenetrable true if a bullet can pass through it
+func (map2d *Map2d) IsPenetrable(x int, y int) bool {
+	return map2d.MapElementAt(x, y) != Wall
 }
