@@ -279,13 +279,14 @@ func (hc *HubController) runClientConnection(hqueue client.HubQueue, id uint8) {
 			defer wg.Done()
 
 			gotten := hc.handleRead(data, id)
-			toSend := gotten.Bytes()
 			// this means that the given opcode will not actually
 			// result in a direct return message, this happens
 			// with broadcast commands.
 			if gotten == nil {
 				return
 			}
+
+			toSend := gotten.Bytes()
 			hqueue.Enqueue(toSend)
 
 			if toSend[0] == server.UnknownOpcode.Value() {
