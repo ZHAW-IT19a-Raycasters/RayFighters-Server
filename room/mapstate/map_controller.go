@@ -253,11 +253,16 @@ func (mc *MapController) CheckShooting(shooterId uint8, shotAngle float64) (bool
 		// After each iteration check if there is obstacle
 
 		if mc.IsMapBound(mapX, mapY) {
-			// we hit a map bound, the candidate is dead
+			// we reached the map bound
+			// found no obstacle was on the way to candidate, therefore
+			// the candidate is dead
 			return true, candidateId
 		}
 
 		if !mc.IsPenetrable(mapX, mapY) {
+			// found some obstacle
+			// the victim is safe
+			// for now
 			break
 		}
 	}
