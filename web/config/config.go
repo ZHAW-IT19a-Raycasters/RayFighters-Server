@@ -29,3 +29,8 @@ func (wc *WebConfig) CheckConfiguration() error {
 	}
 	return invalidPortError{fmt.Sprintf("%d", wc.Port), true}
 }
+
+type JwtConfig struct {
+	// RsaPrivateKeyLocation is the location where the rsa key lives in.
+	RsaPrivateKeyLocation string
+}
