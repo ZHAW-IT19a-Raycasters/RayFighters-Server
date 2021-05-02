@@ -79,3 +79,7 @@ func CheckIfIpValid(addr string) error {
 	}
 	return invalidIpError{falseIp: addr}
 }
+
+func CheckIfJWTValid(path string) error {
+
+}
