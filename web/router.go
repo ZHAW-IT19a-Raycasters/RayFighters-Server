@@ -80,7 +80,9 @@ func NewServer(conf *webconfig.WebConfig) *Server {
 
 	api.HandleFunc("/", serveRoot)
 
-	api.HandleFunc("/ws/{roomID:[0-9]+}", func(w http.ResponseWriter, r *http.Request) {
+	wsPath := fmt.Sprintf("/ws/{%s:[0-9]+}", helpers.RoomIdParameter)
+
+	api.HandleFunc(wsPath, func(w http.ResponseWriter, r *http.Request) {
 		// TODO: get a hub reference from handler function via HubManager
 		// handle with a wrapper lambda for now
 		serveWs(hubs[:], w, r)
@@ -143,6 +145,7 @@ func serveWs(hubs []*room.Hub, w http.ResponseWriter, r *http.Request) {
 
 	logger.Debug("http connection received")
 	roomID, err := helpers.ParseRoomID(r)
+
 	if err != nil {
 		logger.Error(err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
