@@ -63,11 +63,11 @@ func checkIfConfigCaseStruct(valRaw reflect.Value, valInt interface{}) error {
 
 	// try it with the pointer version
 	// do some black magic
-	cp := reflect.New(reflect.TypeOf(valInt))
-	cp.Elem().Set(reflect.ValueOf(valInt))
+	valRawPtr := reflect.New(reflect.TypeOf(valInt))
+	valRawPtr.Elem().Set(reflect.ValueOf(valInt))
 
-	valIntPrt := cp.Interface()
-	checkAble, ok = valIntPrt.(CheckConfig)
+	valIntPtr := valRawPtr.Interface()
+	checkAble, ok = valIntPtr.(CheckConfig)
 	// neither the pointer nor the struct implement
 	// the CheckConfig interface so this has to
 	// crash.
