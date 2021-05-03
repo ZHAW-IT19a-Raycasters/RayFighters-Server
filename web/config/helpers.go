@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"math"
 	"net"
 	"os"
 	"path/filepath"
@@ -103,7 +104,7 @@ func CheckIfPortIsAllowed(val int, allowed []int) bool {
 		}
 	}
 	// check if
-	return isAllowed || val > 0
+	return isAllowed || (val >= 0 && val <= math.MaxUint16)
 }
 
 // CheckIfIpValid will check as the name implies

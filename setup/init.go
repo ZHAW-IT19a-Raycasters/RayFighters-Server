@@ -31,7 +31,7 @@ func writeArgsToConfig(conf *Configuration, args *commandlineArguments) {
 	}
 
 	if *args.Port > -1 {
-		conf.Web.Port = uint16(*args.Port)
+		conf.Web.Port = *args.Port
 	}
 }
 

@@ -109,7 +109,7 @@ func NewServer(conf *webconfig.WebConfig) *Server {
 
 	httpServer := &http.Server{
 		Handler:      corsHandler.Handler(router),
-		Addr:         conf.String(),
+		Addr:         conf.Address(),
 		WriteTimeout: serverTimeout,
 		ReadTimeout:  serverTimeout,
 	}

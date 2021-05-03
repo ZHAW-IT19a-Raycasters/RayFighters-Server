@@ -7,13 +7,13 @@ type WebConfig struct {
 	// Is the given ip, this may be either localhost or any ip4 / ip6 value.
 	Ip string
 	// Is the given port, it is a unint16 as the largest possible port is 65,535.
-	Port uint16
+	Port int
 	// the keys
 	JWTConfig JwtConfig
 }
 
 // The stringify interface
-func (wc *WebConfig) String() string {
+func (wc *WebConfig) Address() string {
 	return fmt.Sprintf("%s:%d", wc.Ip, wc.Port)
 }
 
@@ -26,9 +26,11 @@ func (wc *WebConfig) CheckConfiguration() error {
 	}
 
 	allowed := []int{}
+
 	if CheckIfPortIsAllowed(int(wc.Port), allowed) {
 		return nil
 	}
+
 	return InvalidPortError{
 		port:        fmt.Sprintf("%d", wc.Port),
 		blackListed: true,
