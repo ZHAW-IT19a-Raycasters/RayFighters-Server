@@ -1,15 +1,15 @@
-package webconfig_test
+package webconfig
 
 import (
+	"errors"
 	"io/ioutil"
 	"os"
+	"strings"
 	"testing"
-
-	webconfig "github.zhaw.ch/raycasters/server/web/config"
 )
 
 func tmpFileSetup(t *testing.T) string {
-	tmpFile, err := ioutil.TempFile("", "*")
+	tmpFile, err := ioutil.TempFile("", "*GoTest.txt")
 
 	if err != nil {
 		t.Errorf("unable to create the tmp file [%s]", err.Error())
@@ -21,10 +21,23 @@ func tmpFileSetup(t *testing.T) string {
 	return tmpFile.Name()
 }
 
+func tmpDirSetup(t *testing.T) string {
+	tmpDir, err := ioutil.TempDir("", "*GoTest")
+
+	if err != nil {
+		t.Errorf("unable to create the tmp file [%s]", err.Error())
+		t.SkipNow()
+	}
+	t.Cleanup(func() {
+		os.Remove(tmpDir)
+	})
+	return tmpDir
+}
+
 func TestIpValid(t *testing.T) {
-	ips := [...]string{"localhost", "127.0.0.1", "::1", "0.0.0.0"}
+	ips := [...]string{"127.0.0.1", "::1", "0.0.0.0"}
 	for _, ip := range ips {
-		got := webconfig.CheckIfIpValid(ip)
+		got := CheckIfIpValid(ip)
 		if got != nil {
 			t.Errorf("ip validation failed for [%s]", ip)
 		}
@@ -35,10 +48,22 @@ func TestIpInvalid(t *testing.T) {
 	ips := [...]string{"1.2.3", "333", "loclhost"}
 
 	for _, ip := range ips {
-		got := webconfig.CheckIfIpValid(ip)
-		if got == nil {
+		err := CheckIfIpValid(ip)
+		if err == nil {
 			t.Errorf("ip invalidation failed for [%s]", ip)
+			return
+		} else if !strings.Contains(err.Error(), "is not a valid IP") {
+			t.Error("incorrect error message used")
+			return
 		}
+	}
+
+	// use speciall case to the localhost address
+	err := CheckIfIpValid("localhost")
+	if err == nil {
+		t.Error("this is not a valid ip")
+	} else if !errors.Is(err, ErrLocalhostNotValidIp) {
+		t.Error("wrong error message used here")
 	}
 }
 
@@ -46,8 +71,8 @@ func TestPortValid(t *testing.T) {
 	allowed := [...]int{-1}
 	ports := [...]string{"111", "-1", "666", "66"}
 	for _, port := range ports {
-		got := webconfig.CheckIfPortValid(port, allowed[:])
-		if got != nil {
+		err := CheckIfPortValid(port, allowed[:])
+		if err != nil {
 			t.Errorf("port validation failed for [%s]", port)
 		}
 	}
@@ -55,12 +80,27 @@ func TestPortValid(t *testing.T) {
 
 func TestPortInvalid(t *testing.T) {
 	allowed := [...]int{-1}
-	ports := [...]string{"-5", "-666", "aa"}
-	for _, port := range ports {
-		got := webconfig.CheckIfPortValid(port, allowed[:])
-		if got == nil {
-			t.Errorf("port invalidation failed for [%s]", port)
+	check := func(subStr string, ports []string) bool {
+		for _, port := range ports {
+			err := CheckIfPortValid(port, allowed[:])
+			if err == nil {
+				t.Errorf("port invalidation failed for [%s]", port)
+				return false
+			} else if !strings.Contains(err.Error(), subStr) {
+				t.Error("wrong error message used")
+				return false
+			}
 		}
+		return true
+	}
+	port := []string{"-5", "-666"}
+	if !check("Invalid value", port) {
+		return
+	}
+
+	port = []string{"aa"}
+	if !check("bad port value", port) {
+		return
 	}
 }
 
@@ -104,8 +144,7 @@ AgMBAAE=
 -----END PUBLIC KEY-----`
 )
 
-func TestJWTValid(t *testing.T) {
-	// check empty, but valid file
+func TestRSAValidatorValid(t *testing.T) {
 	priKeyFile := tmpFileSetup(t)
 	err := ioutil.WriteFile(priKeyFile, []byte(RsaPrivateKey), 0666)
 	if err != nil {
@@ -113,8 +152,70 @@ func TestJWTValid(t *testing.T) {
 		return
 	}
 
-	err = webconfig.CheckIfRSAValid(priKeyFile)
+	err = CheckIfRSAValid(priKeyFile)
 	if err != nil {
 		t.Error("there should not be an error here")
+	}
+}
+
+func TestRSAValidatorEmptryFile(t *testing.T) {
+	// check empty, but valid file
+	priKeyFile := tmpFileSetup(t)
+	err := CheckIfRSAValid(priKeyFile)
+
+	if err == nil {
+		t.Error("there should not be an error here")
+	} else if !errors.Is(err, InvalidRSAKeyPath{}) {
+		t.Error("incorrect rsa key")
+	} else if !strings.Contains(err.Error(), "is not a valid RSA private key") {
+		t.Error("incorrect rsa error message")
+	}
+}
+
+func TestRSAValidatorNotAPath(t *testing.T) {
+	// Attention this test does not test anything
+	// of value, it only is for coverage
+	orgAbs := getAbsPath
+	getAbsPath = func(path string) (string, error) {
+		return "", errors.New("some weird issue")
+	}
+	t.Cleanup(func() {
+		getAbsPath = orgAbs
+	})
+
+	err := CheckIfRSAValid(".")
+
+	if err == nil {
+		t.Error("there should not be an error here")
+	}
+}
+
+func TestRSAValidatorNoFile(t *testing.T) {
+	priKeyDir := tmpDirSetup(t)
+	// make sure it does not exist
+	priKeyFile := priKeyDir + "/SomeNotExistingFile.txt"
+	err := CheckIfRSAValid(priKeyFile)
+
+	if err == nil {
+		t.Error("there should not be an error here")
+	} else if !errors.Is(err, InvalidRSAKeyPath{}) {
+		t.Error("incorrect rsa key")
+	} else if !strings.Contains(err.Error(), "is not a valid RSA private key") {
+		t.Error("incorrect rsa error message")
+	}
+}
+
+func TestRSAValidatorIsDirectory(t *testing.T) {
+	priKeyDir := tmpDirSetup(t)
+	err := CheckIfRSAValid(priKeyDir)
+
+	if err == nil {
+		t.Error("there should not be an error here")
+	} else if !errors.Is(err, InvalidRSAKeyPath{}) {
+		t.Error("incorrect rsa key")
+	} else if !strings.Contains(err.Error(), "is not a valid RSA private key") {
+		t.Error("incorrect rsa error message")
+	} else if !errors.Is(errors.Unwrap(err), ErrIsDirectory) {
+		t.Error("it is a folder and the error should say that")
 	}
 }

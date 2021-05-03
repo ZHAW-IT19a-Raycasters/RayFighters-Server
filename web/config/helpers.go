@@ -17,9 +17,19 @@ const (
 	localhost string = "localhost"
 )
 
-// ErrISDirectory is the error called if the file is a
+// getAbsPath is the function to get the
+// absolute file path from an initial string.
+// Attention this is for mocking only so as
+// for force an error here.
+var getAbsPath = filepath.Abs
+
+// ErrIsDirectory is the error called if the file is a
 // directory instead of a file.
-var ErrISDirectory = errors.New("file is a directory")
+var ErrIsDirectory = errors.New("file is a directory")
+
+// ErrLocalhostNotValidIp is the exception to the rule
+// of valid ip addresses for golang.
+var ErrLocalhostNotValidIp = errors.New("localhost is not an allowed ip, please use 127.0.0.1 instead")
 
 // Represents an invalid port
 type InvalidPortError struct {
@@ -52,7 +62,7 @@ type InvalidRSAKeyPath struct {
 }
 
 func (err InvalidRSAKeyPath) Error() string {
-	return fmt.Sprintf("file does not exist [%s] or [%s]", err.path, err.internal.Error())
+	return fmt.Sprintf("file [%s] is not a valid RSA private key -> [%s]", err.path, err.internal.Error())
 }
 
 func (err InvalidRSAKeyPath) Is(target error) bool {
@@ -98,9 +108,12 @@ func CheckIfPortIsAllowed(val int, allowed []int) bool {
 
 // CheckIfIpValid will check as the name implies
 // if the ip is valid.
+// Attention as "localhost" is not a valid
+// ip as of golang it is not allowed to be
+// used.
 func CheckIfIpValid(addr string) error {
 	if addr == localhost {
-		return nil
+		return ErrLocalhostNotValidIp
 	}
 
 	parsed := net.ParseIP(addr)
@@ -115,7 +128,7 @@ func CheckIfIpValid(addr string) error {
 func CheckIfRSAValid(path string) error {
 
 	// check if there are invalid path elements
-	absPath, err := filepath.Abs(path)
+	absPath, err := getAbsPath(path)
 	if err != nil {
 		return InvalidRSAKeyPath{
 			path:     path,
@@ -136,7 +149,7 @@ func CheckIfRSAValid(path string) error {
 	if fileInfo.IsDir() {
 		return InvalidRSAKeyPath{
 			path:     path,
-			internal: ErrISDirectory,
+			internal: ErrIsDirectory,
 		}
 	}
 
