@@ -42,7 +42,7 @@ func setupParsers(t *testing.T) (*Setup, *argParser, *bytes.Buffer, *configParse
 }
 
 func TestSetupSuccess(t *testing.T) {
-	setupEnvironment([]string{"progname", "-p", "88", "-i", "localhost"}, t)
+	setupEnvironment([]string{"progname", "-p", "88", "-i", "127.0.0.1"}, t)
 
 	setup, _, _, confParser, err := setupParsers(t)
 
@@ -59,7 +59,7 @@ func TestSetupSuccess(t *testing.T) {
 	}
 
 	// fix the expected
-	exp.Web.Ip = "localhost"
+	exp.Web.Ip = "127.0.0.1"
 	exp.Web.Port = 88
 
 	configuration := setup.Configuration()
@@ -68,7 +68,7 @@ func TestSetupSuccess(t *testing.T) {
 }
 
 func TestSetupArgsFailed(t *testing.T) {
-	setupEnvironment([]string{"progname", "-p", "88", "-i", "localhost"}, t)
+	setupEnvironment([]string{"progname", "-p", "88", "-i", "127.0.0.1"}, t)
 
 	setup, aParser, buffer, _, err := setupParsers(t)
 
@@ -100,7 +100,7 @@ func TestSetupArgsFailed(t *testing.T) {
 }
 
 func TestSetupConfFailed(t *testing.T) {
-	setupEnvironment([]string{"progname", "-p", "88", "-i", "localhost"}, t)
+	setupEnvironment([]string{"progname", "-p", "88", "-i", "127.0.0.1"}, t)
 
 	setup, _, buffer, confParser, err := setupParsers(t)
 
