@@ -43,5 +43,5 @@ type JwtConfig struct {
 // CheckConfiguration checks if the Jwt configuration is
 // valid.
 func (j *JwtConfig) CheckConfiguration() error {
-	return CheckIfJWTValid(j.RsaPrivateKey)
+	return CheckIfRSAValid(j.RsaPrivateKey)
 }

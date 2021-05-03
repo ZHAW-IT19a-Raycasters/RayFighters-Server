@@ -112,7 +112,7 @@ func CheckIfIpValid(addr string) error {
 	return InvalidIpError{falseIp: addr}
 }
 
-func CheckIfJWTValid(path string) error {
+func CheckIfRSAValid(path string) error {
 
 	// check if there are invalid path elements
 	absPath, err := filepath.Abs(path)
