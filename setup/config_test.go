@@ -19,8 +19,9 @@ func (c *ConfigHelperOuterValid) CheckConfiguration() error {
 }
 
 type ConfigHelperInnerValid struct {
-	Num int
-	val *int
+	Num        int
+	val        *int
+	AnOtherVal *int
 }
 
 func (c ConfigHelperInnerValid) CheckConfiguration() error {
@@ -44,6 +45,7 @@ func TestCheckIfConfigValidStruct(t *testing.T) {
 		Web: ConfigHelperInnerValid{
 			42,
 			&val,
+			&val,
 		},
 	}
 
@@ -63,6 +65,7 @@ func TestCheckIfConfigInvalidStruct(t *testing.T) {
 		Web: ConfigHelperInnerValid{
 			0,
 			&val,
+			&val,
 		},
 	}
 
@@ -81,6 +84,7 @@ func TestCheckIfConfigValidPtr(t *testing.T) {
 	cho := Config{
 		Web: &ConfigHelperInnerValid{
 			42,
+			&val,
 			&val,
 		},
 	}
@@ -139,6 +143,7 @@ func TestCheckIfConfigRecurseValid(t *testing.T) {
 			Inner: ConfigHelperInnerValid{
 				42,
 				&val,
+				&val,
 			},
 		},
 	}
@@ -160,6 +165,7 @@ func TestCheckIfConfigRecurseInValuid(t *testing.T) {
 			Ip: "127.0.0.1",
 			Inner: ConfigHelperInnerValid{
 				0,
+				&val,
 				&val,
 			},
 		},
