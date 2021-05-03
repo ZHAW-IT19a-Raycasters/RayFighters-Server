@@ -20,6 +20,16 @@ type Configuration struct {
 	Web webconfig.WebConfig `toml:"Webconfig"`
 }
 
+// CheckIfConfigIsLegal will check that the configurated values are legal
+// Attention this function uses reflextion in a recursive loop and will
+// panic if any struct inside of configuration do not implement
+// the CheckConfig interface.
+func CheckIfConfigIsLegal(conf *Configuration) error {
+	// as config it self does not implement the check
+	// ignore that part
+	return checkIfConfigRecurse(conf)
+}
+
 // checkIfConfigRunCheck will do the actual check for the correctness state
 // of the toCheck value.
 func checkIfConfigRunCheck(toCheck CheckConfig, valRaw reflect.Value) error {
@@ -62,12 +72,17 @@ func checkIfConfigCaseStruct(valRaw reflect.Value, valInt interface{}) error {
 	}
 
 	// try it with the pointer version
-	// do some black magic
+	// do some black magic to get a pointer version
+
+	// first make a copy of the object type (fake pointer)
 	valRawPtr := reflect.New(reflect.TypeOf(valInt))
+	// second add to the object the subobject
+	// (makes a pointer out of the raw object type)
 	valRawPtr.Elem().Set(reflect.ValueOf(valInt))
 
 	valIntPtr := valRawPtr.Interface()
 	checkAble, ok = valIntPtr.(CheckConfig)
+
 	// neither the pointer nor the struct implement
 	// the CheckConfig interface so this has to
 	// crash.
@@ -140,14 +155,4 @@ func checkIfConfigRecurse(val interface{}) error {
 		}
 	}
 	return nil
-}
-
-// CheckIfConfigIsLegal will check that the configurated values are legal
-// Attention this function uses reflextion in a recursive loop and will
-// panic if any struct inside of configuration do not implement
-// the CheckConfig interface.
-func CheckIfConfigIsLegal(conf *Configuration) error {
-	// as config it self does not implement the check
-	// ignore that part
-	return checkIfConfigRecurse(conf)
 }

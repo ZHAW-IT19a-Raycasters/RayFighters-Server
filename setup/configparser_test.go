@@ -31,6 +31,9 @@ func newConfigurationLegal() Configuration {
 		Web: webconfig.WebConfig{
 			Ip:   "127.0.0.1",
 			Port: 44,
+			JWTConfig: webconfig.JwtConfig{
+				RsaPrivateKey: ".",
+			},
 		},
 	}
 }

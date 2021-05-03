@@ -9,7 +9,7 @@ type WebConfig struct {
 	// Is the given port, it is a unint16 as the largest possible port is 65,535.
 	Port uint16
 	// the keys
-	RsaKeyLocation JwtConfig
+	JWTConfig JwtConfig
 }
 
 // The stringify interface
@@ -29,16 +29,19 @@ func (wc *WebConfig) CheckConfiguration() error {
 	if CheckIfPortIsAllowed(int(wc.Port), allowed) {
 		return nil
 	}
-	return invalidPortError{fmt.Sprintf("%d", wc.Port), true}
+	return InvalidPortError{
+		port:        fmt.Sprintf("%d", wc.Port),
+		blackListed: true,
+	}
 }
 
 type JwtConfig struct {
 	// RsaPrivateKeyLocation is the location where the rsa key lives in.
-	RsaPrivateKeyLocation string
+	RsaPrivateKey string
 }
 
 // CheckConfiguration checks if the Jwt configuration is
 // valid.
 func (j *JwtConfig) CheckConfiguration() error {
-	return CheckIfJWTValid(j.RsaPrivateKeyLocation)
+	return CheckIfJWTValid(j.RsaPrivateKey)
 }
