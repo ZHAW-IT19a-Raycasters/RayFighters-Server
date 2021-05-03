@@ -10,7 +10,9 @@ import (
 
 // ErrInvalidRSAData is the state that happens, when the rsa data
 // is not valid PEM encoding.
-var ErrInvalidPEMData = errors.New("data is valid pem encoding")
+var ErrInvalidPEMData = errors.New("data is not valid pem encoding")
+
+var ErrInvalidPEMHeader = errors.New("invalid PEM header please use `RSA PRIVATE KEY` instead")
 
 // ErrInvalidRSAKey is returned when there was an invalid
 // parsing of the input data.
@@ -45,6 +47,12 @@ func ParseRSA(data []byte) (*rsa.PrivateKey, error) {
 			internal: ErrInvalidPEMData,
 		}
 	}
+
+	// we only support a single RSA scheme
+	if block.Type != "RSA PRIVATE KEY" {
+		return nil, ErrInvalidPEMHeader
+	}
+
 	pKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
 
 	if err != nil {

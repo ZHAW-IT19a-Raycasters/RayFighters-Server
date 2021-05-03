@@ -93,7 +93,7 @@ func TestParseRSAInvalidPEM(t *testing.T) {
 	}
 }
 
-func TestParseRSAInvalidRSA(t *testing.T) {
+func TestParseRSAInvalidPEMHeader(t *testing.T) {
 	const text = `ǸO such text here.`
 
 	parsed := pem.EncodeToMemory(&pem.Block{
@@ -107,10 +107,28 @@ func TestParseRSAInvalidRSA(t *testing.T) {
 	} else if err == nil {
 		t.Error("this is not valid PEM information")
 		return
+	} else if !errors.Is(err, utils.ErrInvalidPEMHeader) {
+		t.Error("wrong error type returned")
+		return
+	}
+}
+
+func TestParseRSAInvalidRSA(t *testing.T) {
+	const text = `ǸO such text here.`
+
+	parsed := pem.EncodeToMemory(&pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: []byte(text),
+	})
+
+	privKey, err := utils.ParseRSA(parsed)
+	if privKey != nil {
+		t.Error("there should not be a return after an error")
+	} else if err == nil {
+		t.Error("this is not valid PEM information")
+		return
 	} else if !errors.Is(err, utils.ErrInvalidRSAKey{}) {
 		t.Error("wrong error type returned")
 		return
-	} else if !strings.Contains(err.Error(), "not valid RSA") {
-		t.Error("incorrect error string used")
 	}
 }

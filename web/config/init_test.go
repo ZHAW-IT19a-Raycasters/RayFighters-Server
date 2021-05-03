@@ -2,6 +2,8 @@ package webconfig
 
 import (
 	"os"
+	"os/user"
+	"path/filepath"
 	"testing"
 )
 
@@ -67,4 +69,51 @@ func TestCheckJwtConf(t *testing.T) {
 	if err != nil {
 		t.Error("there should not be an error here, as the example is valid")
 	}
+}
+
+func TestFixLinuxPaths(t *testing.T) {
+	const hiddenDirName = ".ssh"
+	const rawfileName = "id_rsa"
+	const file = "~/.ssh/id_rsa"
+
+	tmpDir := tmpDirSetup(t)
+	dirName := filepath.Join(tmpDir, hiddenDirName)
+	// create the sub dir
+	err := os.Mkdir(dirName, 0777)
+
+	if err != nil {
+		t.Errorf("error happend while creating the custom directory, [%s]", err.Error())
+		return
+	}
+
+	fileName := filepath.Join(dirName, rawfileName)
+	err = os.WriteFile(fileName, []byte(RsaPrivateKey), 0666)
+
+	if err != nil {
+		t.Errorf("error happend while writting to the rsa file [%s]", err.Error())
+		return
+	}
+
+	orgGetCurrUser := getCurrentUser
+
+	t.Cleanup(func() {
+		getCurrentUser = orgGetCurrUser
+	})
+
+	getCurrentUser = func() (*user.User, error) {
+		us := &user.User{
+			HomeDir: tmpDir,
+		}
+		return us, nil
+	}
+
+	conf := JwtConfig{
+		RsaPrivateKey: file,
+	}
+
+	err = conf.CheckConfiguration()
+	if err != nil {
+		t.Errorf("there should not be an error here, as the example is valid -> [%s]", err.Error())
+	}
+
 }

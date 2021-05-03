@@ -7,8 +7,10 @@ import (
 	"math"
 	"net"
 	"os"
+	"os/user"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.zhaw.ch/raycasters/server/utils"
 )
@@ -17,6 +19,11 @@ const (
 	// Is the 127.0.0.1 valid alternative
 	localhost string = "localhost"
 )
+
+// getCurrentUser is extracted so that
+// it can get mocked in tests to achive
+// always the same result.
+var getCurrentUser = user.Current
 
 // getAbsPath is the function to get the
 // absolute file path from an initial string.
@@ -31,6 +38,31 @@ var ErrIsDirectory = errors.New("file is a directory")
 // ErrLocalhostNotValidIp is the exception to the rule
 // of valid ip addresses for golang.
 var ErrLocalhostNotValidIp = errors.New("localhost is not an allowed ip, please use 127.0.0.1 instead")
+
+// ErrUnableToParseUserHome is the error that
+// is returned in the case that something went
+// wrong while parsing a complicated user home
+// path.
+type ErrUnableToParseUserHome struct {
+	path     string
+	internal error
+}
+
+// Error satisfies the errorri equirements.
+func (err ErrUnableToParseUserHome) Error() string {
+	return fmt.Sprintf("unable to parse the path [%s] because of [%s]", err.path, err.internal)
+}
+
+// Is satisfies the errors.Is requirements.
+func (err ErrUnableToParseUserHome) Is(target error) bool {
+	_, ok := target.(ErrUnableToParseUserHome)
+	return ok
+}
+
+// Unwrap satisfies the errors.Unrap requirements.
+func (err ErrUnableToParseUserHome) Unwrap() error {
+	return err.internal
+}
 
 // Represents an invalid port
 type InvalidPortError struct {
@@ -126,7 +158,47 @@ func CheckIfIpValid(addr string) error {
 	return InvalidIpError{falseIp: addr}
 }
 
+// fixUserHomePath will fix the given path
+// in case that the path starts with a `~`
+// Attention this function assumes a trimmed
+// path.
+func fixUserHomePath(path string) (string, error) {
+	// check if we are talking to a home user
+	if !strings.HasPrefix(path, "~") {
+		return path, nil
+	}
+
+	usr, err := getCurrentUser()
+	if err != nil {
+		return "", ErrUnableToParseUserHome{
+			path:     path,
+			internal: err,
+		}
+	}
+
+	dir := usr.HomeDir
+	res := dir
+
+	if strings.HasPrefix(path, "~/") {
+		res = filepath.Join(res, path[2:])
+	}
+
+	return res, nil
+}
+
 func CheckIfRSAValid(path string) error {
+	// remove any excess
+	path = strings.TrimSpace(path)
+
+	// handle linux paths
+	path, err := fixUserHomePath(path)
+
+	if err != nil {
+		return InvalidRSAKeyPath{
+			path:     path,
+			internal: err,
+		}
+	}
 
 	// check if there are invalid path elements
 	absPath, err := getAbsPath(path)
