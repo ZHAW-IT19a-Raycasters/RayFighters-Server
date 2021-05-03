@@ -17,7 +17,7 @@ func setupEnvironment(args []string, t *testing.T) {
 
 func setupParsers(t *testing.T) (*Setup, *argParser, *bytes.Buffer, *configParser, error) {
 	setup := NewSetup()
-	rawConf := newConfigurationLegal()
+	rawConf := newConfigurationLegal(t)
 	confData, err := marshalConfiguration(rawConf)
 
 	if err != nil {
@@ -112,7 +112,7 @@ func TestSetupConfFailed(t *testing.T) {
 	buffer.WriteByte(' ') // control
 
 	// override the reader to return garbage
-	rawConf := newConfigurationLegal()
+	rawConf := newConfigurationLegal(t)
 	rawConf.Web.Ip = "localho"
 	confData, err := marshalConfiguration(rawConf)
 

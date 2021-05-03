@@ -116,6 +116,5 @@ func TestJWTValid(t *testing.T) {
 	err = webconfig.CheckIfRSAValid(priKeyFile)
 	if err != nil {
 		t.Error("there should not be an error here")
-
 	}
 }
