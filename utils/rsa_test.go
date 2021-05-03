@@ -4,6 +4,8 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
+	"errors"
+	"strings"
 	"testing"
 
 	"github.zhaw.ch/raycasters/server/utils"
@@ -69,5 +71,46 @@ NeNcxDYgME1X7ruvj6BnjgMErInFIr6D5MCDe0vwCw==
 	if !pubKeyParsed.Equal(pubParsed) {
 		t.Error("keys should be equals")
 	}
+}
 
+func TestParseRSAInvalidPEM(t *testing.T) {
+	const text = `ǸO such text here.`
+
+	privKey, err := utils.ParseRSA([]byte(text))
+	if privKey != nil {
+		t.Error("there should not be a return after an error")
+	} else if err == nil {
+		t.Error("this is not valid PEM information")
+		return
+	} else if !errors.Is(err, utils.ErrInvalidRSAKey{}) {
+		t.Error("wrong error type returned")
+		return
+	} else if !errors.Is(errors.Unwrap(err), utils.ErrInvalidPEMData) {
+		t.Error("wrong internal error type returned")
+		return
+	} else if !strings.Contains(err.Error(), "not valid RSA") {
+		t.Error("incorrect error string used")
+	}
+}
+
+func TestParseRSAInvalidRSA(t *testing.T) {
+	const text = `ǸO such text here.`
+
+	parsed := pem.EncodeToMemory(&pem.Block{
+		Type:  "PUBLIC KEY",
+		Bytes: []byte(text),
+	})
+
+	privKey, err := utils.ParseRSA(parsed)
+	if privKey != nil {
+		t.Error("there should not be a return after an error")
+	} else if err == nil {
+		t.Error("this is not valid PEM information")
+		return
+	} else if !errors.Is(err, utils.ErrInvalidRSAKey{}) {
+		t.Error("wrong error type returned")
+		return
+	} else if !strings.Contains(err.Error(), "not valid RSA") {
+		t.Error("incorrect error string used")
+	}
 }

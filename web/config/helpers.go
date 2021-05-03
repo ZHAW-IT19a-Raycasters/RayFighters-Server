@@ -1,17 +1,25 @@
 package webconfig
 
 import (
+	"errors"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"os"
 	"path/filepath"
 	"strconv"
+
+	"github.zhaw.ch/raycasters/server/utils"
 )
 
 const (
 	// Is the 127.0.0.1 valid alternative
 	localhost string = "localhost"
 )
+
+// ErrISDirectory is the error called if the file is a
+// directory instead of a file.
+var ErrISDirectory = errors.New("file is a directory")
 
 // Represents an invalid port
 type InvalidPortError struct {
@@ -105,6 +113,8 @@ func CheckIfIpValid(addr string) error {
 }
 
 func CheckIfJWTValid(path string) error {
+
+	// check if there are invalid path elements
 	absPath, err := filepath.Abs(path)
 	if err != nil {
 		return InvalidRSAKeyPath{
@@ -113,12 +123,35 @@ func CheckIfJWTValid(path string) error {
 		}
 	}
 
-	_, err = os.Stat(absPath)
+	// check if the file exists
+	fileInfo, err := os.Stat(absPath)
 	if err != nil {
-		err = InvalidRSAKeyPath{
+		return InvalidRSAKeyPath{
 			path:     path,
 			internal: err,
 		}
 	}
-	return err
+
+	// check that it is a directory
+	if fileInfo.IsDir() {
+		return InvalidRSAKeyPath{
+			path:     path,
+			internal: ErrISDirectory,
+		}
+	}
+
+	// we do not have to check the error, as we
+	// previously checked if the file exists.
+	rsaData, _ := ioutil.ReadFile(absPath)
+	// check that is is a valid RSA file
+	_, err = utils.ParseRSA(rsaData)
+
+	if err != nil {
+		return InvalidRSAKeyPath{
+			path:     path,
+			internal: err,
+		}
+	}
+
+	return nil
 }
