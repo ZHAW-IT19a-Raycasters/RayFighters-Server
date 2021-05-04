@@ -264,7 +264,7 @@ func CheckIfRSAValid(path string) error {
 		}
 	}
 
-	// check that it is a directory
+	// check if the path is a directory
 	if fileInfo.IsDir() {
 		return InvalidRSAKeyPath{
 			path:     path,
@@ -275,6 +275,7 @@ func CheckIfRSAValid(path string) error {
 	// we do not have to check the error, as we
 	// previously checked if the file exists.
 	rsaData, _ := ioutil.ReadFile(absPath)
+
 	// check that is is a valid RSA file
 	_, err = utils.ParseRSA(rsaData)
 
