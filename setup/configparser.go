@@ -75,7 +75,7 @@ func (cp configParser) Parse() (*Configuration, error) {
 	}
 
 	// do a primary check if the configuration is legal.
-	err = checkIfConfigIsLegal(conf)
+	err = CheckIfConfigIsLegal(conf)
 
 	if err != nil {
 		return nil, err

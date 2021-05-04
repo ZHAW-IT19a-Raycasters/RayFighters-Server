@@ -1,3 +1,9 @@
 [Webconfig]
 ip = "127.0.0.1"
 port = 8080
+   
+    [Webconfig.JWTConfig]
+    RsaPrivateKey = "privKey.rsa"
+
+    [Webconfig.CORS]
+    Domains = ["http://127.0.0.1:8080", "http://localhost:8080", "http://127.0.0.1:9000", "http://localhost:9000"]
