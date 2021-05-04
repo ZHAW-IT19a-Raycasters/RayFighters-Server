@@ -47,7 +47,11 @@ func main() {
 		return
 	}
 
-	server := web.NewServer(&conf.Web)
+	server, err := web.NewServer(&conf.Web)
+	if err != nil {
+		logger.Errorf("unable to start the server due to [%s]", err.Error())
+		return
+	}
 
 	done := make(chan struct{})
 	ctx := context.Background()
