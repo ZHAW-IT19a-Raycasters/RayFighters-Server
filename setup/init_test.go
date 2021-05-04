@@ -140,11 +140,6 @@ func TestSetupConfFailed(t *testing.T) {
 		return
 	}
 
-	if !strings.Contains(res, "->") {
-		t.Error("error string has not been shown")
-		return
-	}
-
 	if !strings.Contains(res, "usage") {
 		t.Error("usage string has not been shown")
 		return
