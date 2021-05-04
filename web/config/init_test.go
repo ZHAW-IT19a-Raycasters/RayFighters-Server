@@ -1,9 +1,12 @@
 package webconfig
 
 import (
+	"errors"
+	"fmt"
 	"os"
 	"os/user"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -115,5 +118,56 @@ func TestFixLinuxPaths(t *testing.T) {
 	if err != nil {
 		t.Errorf("there should not be an error here, as the example is valid -> [%s]", err.Error())
 	}
+}
 
+func TestFixLinuxPathsInvalidPath(t *testing.T) {
+	// Attention this test is only for coverage purposes
+	const hiddenDirName = ".ssh"
+	const rawfileName = "id_rsa"
+	const file = "~/.ssh/id_rsa"
+
+	tmpDir := tmpDirSetup(t)
+	dirName := filepath.Join(tmpDir, hiddenDirName)
+	// create the sub dir
+	err := os.Mkdir(dirName, 0777)
+
+	if err != nil {
+		t.Errorf("error happend while creating the custom directory, [%s]", err.Error())
+		return
+	}
+
+	fileName := filepath.Join(dirName, rawfileName)
+	err = os.WriteFile(fileName, []byte(RsaPrivateKey), 0666)
+
+	if err != nil {
+		t.Errorf("error happend while writting to the rsa file [%s]", err.Error())
+		return
+	}
+
+	orgGetCurrUser := getCurrentUser
+
+	t.Cleanup(func() {
+		getCurrentUser = orgGetCurrUser
+	})
+
+	someAnnoyingError := fmt.Errorf("Some unbelivable error")
+
+	getCurrentUser = func() (*user.User, error) {
+		return nil, someAnnoyingError
+	}
+
+	conf := JwtConfig{
+		RsaPrivateKey: file,
+	}
+
+	err = conf.CheckConfiguration()
+	if err == nil {
+		t.Errorf("there should be an error here, as the example is invalid")
+	} else if !errors.Is(err, ErrUnableToParseUserHome{}) {
+		t.Error("incorrect error type used")
+	} else if !errors.Is(err, someAnnoyingError) {
+		t.Error("the internal error is different then it should be")
+	} else if !strings.Contains(err.Error(), "unable to parse") {
+		t.Error("wrong error string")
+	}
 }
