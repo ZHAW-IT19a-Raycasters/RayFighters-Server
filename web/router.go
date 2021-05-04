@@ -40,21 +40,6 @@ type Server struct {
 // ErrRoomIdUnavailable can be thrown when a room is requested that cannot currently be accessed.
 var ErrRoomIdUnavailable = errors.New("no Room available for the given ID")
 
-// TODO: Read this from the configuration
-// var jwtKey *rsa.PrivateKey = initKey()
-// var authMIddleware = authenticationManager{jwtKey}
-
-// func initKey() *rsa.PrivateKey {
-// 	// generate private key
-// 	privKey, err := rsa.GenerateKey(rand.Reader, 2048)
-// 	if err != nil {
-// 		logger.Warnf("failed to generate private key: %s", err)
-// 		str := fmt.Sprintf("Was not able to initialize the random key - [%s]", err.Error())
-// 		panic(str)
-// 	}
-// 	return privKey
-// }
-
 // NewServer registers routes for all exposed endpoints
 // and attaches the appropriate routehandler functions
 func NewServer(conf *webconfig.WebConfig) (*Server, error) {
