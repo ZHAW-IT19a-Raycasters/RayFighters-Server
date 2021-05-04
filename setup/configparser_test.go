@@ -87,6 +87,16 @@ func newConfigurationLegal(t *testing.T) Configuration {
 			JWTConfig: webconfig.JwtConfig{
 				RsaPrivateKey: rsaFile,
 			},
+			CORS: webconfig.CORSConfig{
+				Domains: []string{
+					// this system
+					"http://127.0.0.1:8080",
+					"http://localhost:8080",
+					// frontend
+					"http://127.0.0.1:9000",
+					"http://localhost:9000",
+				},
+			},
 		},
 	}
 }
