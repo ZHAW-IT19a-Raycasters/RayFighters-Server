@@ -46,6 +46,10 @@ func checkIfConfigRunCheck(toCheck CheckConfig, valRaw reflect.Value) error {
 
 // checkIfConfigCasePtr will check the correctness of a pointer type
 func checkIfConfigCasePtr(valRaw reflect.Value, val interface{}) error {
+	// pointer of an unwanted type
+	if valRaw.Elem().Kind() != reflect.Struct {
+		return nil
+	}
 	// check if the struct does implement
 	// the given check function
 	checkAble, ok := val.(CheckConfig)
@@ -94,6 +98,39 @@ func checkIfConfigCaseStruct(valRaw reflect.Value, valInt interface{}) error {
 	return checkIfConfigRunCheck(checkAble, valRaw)
 }
 
+// checkIfConfigHandleElement will handle the actuall reflected values
+// so that they can be processed as required.
+func checkIfConfigHandleElement(valRaw reflect.Value) error {
+
+	// check if exported else => move on
+	if !valRaw.CanInterface() {
+		return nil
+	}
+	// get raw interface to the value
+	valInt := valRaw.Interface()
+
+	// check if value is a struct or not
+	kind := valRaw.Kind()
+
+	var err error
+	switch kind {
+	case reflect.Struct:
+		err = checkIfConfigCaseStruct(valRaw, valInt)
+	case reflect.Ptr:
+		err = checkIfConfigCasePtr(valRaw, valInt)
+	default:
+		// the value is some other uninteresting type
+		return nil
+	}
+
+	if err != nil {
+		return err
+	}
+
+	// recurse over the checked value
+	return checkIfConfigRecurse(valInt)
+}
+
 // checkIfConfigRecurse will check if the valuies
 func checkIfConfigRecurse(val interface{}) error {
 
@@ -118,41 +155,11 @@ func checkIfConfigRecurse(val interface{}) error {
 		// try to understand the given value.
 		valRaw := raw.Field(i)
 
-		// check if exported else => move on
-		if !valRaw.CanInterface() {
-			continue
-		}
-
-		// get raw interface to the value
-		valInt := valRaw.Interface()
-
-		// check if value is a struct or not
-		kind := valRaw.Kind()
-
-		var err error
-		switch kind {
-		case reflect.Struct:
-			err = checkIfConfigCaseStruct(valRaw, valInt)
-		case reflect.Ptr:
-			// pointer of an unwanted type
-			if valRaw.Elem().Kind() != reflect.Struct {
-				continue
-			}
-			err = checkIfConfigCasePtr(valRaw, valInt)
-		default:
-			// the value is some other uninteresting type
-			continue
-		}
-
+		err := checkIfConfigHandleElement(valRaw)
 		if err != nil {
 			return err
 		}
 
-		// recurse over the checked value
-		err = checkIfConfigRecurse(valInt)
-		if err != nil {
-			return err
-		}
 	}
 	return nil
 }
