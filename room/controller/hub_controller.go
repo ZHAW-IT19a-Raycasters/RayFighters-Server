@@ -55,7 +55,6 @@ type HubController struct {
 }
 
 func getMap() string {
-
 	_, filename, _, _ := runtime.Caller(0)
 	p := filepath.Dir(filename)
 	p = filepath.Dir(p)
@@ -94,6 +93,7 @@ func NewHubController() *HubController {
 		// execution or not
 		_ = hc.RemoveClientIfTimeout(id)
 	}
+
 	hc.timeoutClientQueue = client.NewHubTimer(helpers.IdCountLimit, cTimerCallback)
 
 	return &hc
@@ -129,6 +129,7 @@ func (hc *HubController) RemoveClientIfTimeout(id uint8) error {
 	// removal during the moment since
 	// releasing the lock.
 	meta, ok := hc.clientManager.MapMeta(id)
+
 	if !ok {
 		return ErrClientDoesNotExist{
 			id: id,
@@ -216,7 +217,7 @@ func (hc *HubController) RegisterClient(meta client.ClientMeta) error {
 		hqueue.Enqueue(message.Bytes())
 	}
 
-	err = hc.mapController.AddClient(id)
+	coord, err := hc.mapController.AddClient(id)
 	if err != nil {
 		return err
 	}
@@ -246,10 +247,7 @@ func (hc *HubController) RegisterClient(meta client.ClientMeta) error {
 	except.Add(id)
 	hc.broadCast(playerJoined, except)
 
-	// TODO: once map is finished update spawn for fitting coordinates
-	// TODO: send last valid coordinates registered in case of
-	// reconnecting to the server
-	teleportPlayer := server.NewTeleportPlayer(id, 0, 0)
+	teleportPlayer := server.NewTeleportPlayer(id, coord.X(), coord.Y())
 	hc.broadCast(teleportPlayer, helpers.NewIdSet())
 
 	return nil

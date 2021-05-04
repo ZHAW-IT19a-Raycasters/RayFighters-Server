@@ -8,11 +8,11 @@ import (
 )
 
 type MapController struct {
-	clients map[uint8]gamemap.Coordinate
+	clients     map[uint8]gamemap.Coordinate
 	spawingarea []gamemap.Coordinate
-	map2d   gamemap.Map2d
-	getNextInt func(int) int
-	lock    *sync.RWMutex
+	map2d       gamemap.Map2d
+	getNextInt  func(int) int
+	lock        *sync.RWMutex
 }
 
 func NewMapController(filePath string) (MapController, error) {
@@ -23,14 +23,14 @@ func NewMapController(filePath string) (MapController, error) {
 	}
 	return MapController{
 		spawingarea: map2d.GetLegalSpawns(),
-		map2d:   map2d,
-		clients: make(map[uint8]gamemap.Coordinate),
-		getNextInt: rand.Intn,
-		lock:    &sync.RWMutex{},
+		map2d:       map2d,
+		clients:     make(map[uint8]gamemap.Coordinate),
+		getNextInt:  rand.Intn,
+		lock:        &sync.RWMutex{},
 	}, nil
 }
 
-func (mc *MapController) AddClient(id uint8) error {
+func (mc *MapController) AddClient(id uint8) (gamemap.Coordinate, error) {
 	// TODO: Clean up
 	mc.lock.Lock()
 	defer mc.lock.Unlock()
@@ -38,15 +38,16 @@ func (mc *MapController) AddClient(id uint8) error {
 	_, ok := mc.clients[id]
 
 	if ok {
-		return ErrClientExists{
+		return gamemap.Coordinate{}, ErrClientExists{
 			id: id,
 		}
 	}
 
 	nextRand := mc.getNextInt(len(mc.spawingarea))
 	spawn := mc.spawingarea[nextRand]
-	mc.clients[id] = gamemap.NewCoordinate(spawn.X(), spawn.Y(), 0)
-	return nil
+	coord := gamemap.NewCoordinate(spawn.X(), spawn.Y(), 0)
+	mc.clients[id] = coord
+	return coord, nil
 }
 
 // RemoveClient will remove a client if possible

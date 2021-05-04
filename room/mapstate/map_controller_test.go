@@ -95,14 +95,14 @@ func TestGameStateAddClientWithExistingID(t *testing.T) {
 		t.Error("NewMapController returned error in TestAddClient")
 		return
 	}
-	err = mapController.AddClient(1)
+	_, err = mapController.AddClient(1)
 
 	if err != nil {
 		t.Error("AddClient returned an error")
 		return
 	}
 
-	err = mapController.AddClient(1)
+	_, err = mapController.AddClient(1)
 
 	if err == nil {
 		t.Error("2 Clients with the same id were created")
@@ -154,7 +154,7 @@ func TestMapControllerRemoveClient(t *testing.T) {
 		return
 	}
 
-	err = mapController.AddClient(1)
+	_, err = mapController.AddClient(1)
 
 	if err != nil {
 		t.Error("AddClient returned an error")
@@ -196,7 +196,7 @@ func TestMoveClientTest(t *testing.T) {
 		return
 	}
 
-	err = mapController.AddClient(1)
+	_, err = mapController.AddClient(1)
 
 	if err != nil {
 		t.Error("AddClient returned an error")
@@ -255,7 +255,7 @@ func TestMoveClientFailTest(t *testing.T) {
 		return
 	}
 
-	err = mapController.AddClient(1)
+	_, err = mapController.AddClient(1)
 
 	if err != nil {
 		t.Error("AddClient returned an error")
@@ -318,9 +318,9 @@ func TestSpawningPointAddClient(t *testing.T) {
 		return
 	}
 
-	mapController.getNextInt = func(n int) int {return 4}
+	mapController.getNextInt = func(n int) int { return 4 }
 
-	err = mapController.AddClient(1)
+	_, err = mapController.AddClient(1)
 
 	if err != nil {
 		t.Error("AddClient returned an error")
