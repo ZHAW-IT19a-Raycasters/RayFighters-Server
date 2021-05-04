@@ -52,4 +52,3 @@ func (err ErrClientDoesNotExist) Is(target error) bool {
 	_, ok := target.(ErrClientDoesNotExist)
 	return ok
 }
-
