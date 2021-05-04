@@ -33,6 +33,7 @@ var logger = log.Log()
 // Server holds all endpoints for a server
 type Server struct {
 	endpoint *http.Server
+	conf     *webconfig.WebConfig
 }
 
 // ErrRoomIdUnavailable can be thrown when a room is requested that cannot currently be accessed.
@@ -94,14 +95,7 @@ func NewServer(conf *webconfig.WebConfig) *Server {
 	corsHandler := cors.New(
 		cors.Options{
 			// TODO: add allowed domains from config
-			AllowedOrigins: []string{
-				// this system
-				"http://127.0.0.1:8080",
-				"http://localhost:8080",
-				// frontend
-				"http://127.0.0.1:9000",
-				"http://localhost:9000",
-			},
+			AllowedOrigins:   conf.CORS.Domains,
 			AllowedMethods:   []string{http.MethodGet, http.MethodPost, http.MethodOptions},
 			AllowCredentials: true,
 		},
@@ -116,6 +110,7 @@ func NewServer(conf *webconfig.WebConfig) *Server {
 
 	return &Server{
 		endpoint: httpServer,
+		conf:     conf,
 	}
 }
 
