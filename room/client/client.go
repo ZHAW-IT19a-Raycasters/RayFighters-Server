@@ -17,9 +17,9 @@ import (
 const (
 	// MaxClientCommand is the prepared length of the opcode data slice
 	// Attention this value has to be changed once the protocol changes.
-	MaxClientCommand    = 17
-	defaultMessageType  = websocket.BinaryMessage
-	shutdownMessageType = websocket.CloseMessage
+	MaxClientCommand    int = 25
+	defaultMessageType  int = websocket.BinaryMessage
+	shutdownMessageType int = websocket.CloseMessage
 )
 
 // logger is responsible for logging to the system logger.
@@ -39,6 +39,23 @@ var (
 	// that the connections is closed by the client.
 	ErrClosedConnection = errors.New("the client closed the connection")
 )
+
+// ErrTooLongMessage is the error returned when the s
+type ErrTooLongMessage struct {
+	id   uint8
+	size int
+}
+
+// Error satisies the error interface
+func (err ErrTooLongMessage) Error() string {
+	return fmt.Sprintf("Non binary message type was received type : [%d]", err.id)
+}
+
+// Is satisfie the errors.Is definition
+func (err ErrTooLongMessage) Is(target error) bool {
+	_, ok := target.(ErrTooLongMessage)
+	return ok
+}
 
 // ErrNonBinaryMessage is the error returned when a non binary error happens
 type ErrNonBinaryMessage struct {
@@ -110,6 +127,7 @@ func (c *Client) registerConn(conn ClientMeta, queue ClientQueue) error {
 	// wait until there are no working connections
 	// in case that there already was a timeout
 	c.wg.Wait()
+	logger.Debugf("registering connecteion [%d]", c.meta.id)
 
 	c.lock.Lock()
 	defer c.lock.Unlock()
@@ -211,8 +229,6 @@ func (c *Client) checkOffline() bool {
 // condition this function will only ever be called a single time
 // per run.
 func (c *Client) sendData() {
-	defer c.shutdownHandler()
-
 	// No checks for activation are needed
 	// due to that this function will only
 	// be called from the run function
@@ -238,6 +254,8 @@ func (c *Client) sendData() {
 			return
 		}
 
+		logger.Debugf("Sending message [% X], to [%d]", message, c.meta.GetUUID())
+
 		if !c.sendDataHelper(message) {
 			return
 		}
@@ -260,6 +278,7 @@ func (c *Client) sendDataHelper(message []byte) bool {
 		}
 		return true
 	}
+
 	messageType := defaultMessageType
 	// if there is a disconnect here
 	if message[0] == server.DisconnectOpcode.Value() {
@@ -281,16 +300,16 @@ func (c *Client) sendDataHelper(message []byte) bool {
 	// flush the message to the network
 	err = cw.Close()
 
-	return !checkErr(err) && messageType == defaultMessageType
+	return checkErr(err) && messageType == defaultMessageType
 }
 
-// recvDataHandler will handle the received data pacakges
+// recvDataHandler will handle the received data packages
 func (c *Client) recvDataHandler(messageType int, message io.Reader) error {
 
-	logger.Debugf("Received message type [%d]", messageType)
+	logger.Debugf("Received websocket message type [%d] from [%d]", messageType, c.meta.id)
 
 	if messageType == websocket.CloseMessage {
-		logger.Infof("the client with the id [%d] closed the connection.", messageType)
+		logger.Infof("the client with the id [%d] closed the connection.", c.meta.id)
 		return ErrClosedConnection
 	} else if messageType != websocket.BinaryMessage {
 		err := ErrNonBinaryMessage{
@@ -311,11 +330,41 @@ func (c *Client) recvDataHandler(messageType int, message io.Reader) error {
 
 	if readBytes == 0 {
 		return ErrNoBytesRead
+	} else if readBytes > MaxClientCommand {
+		return ErrTooLongMessage{
+			id:   c.meta.GetId(),
+			size: readBytes,
+		}
 	}
 
 	// handle the gotten data on an other go thread
 	// as to not block the next readers
 	return c.queue.Enqueue(readData[:readBytes])
+}
+
+// recvConnectionErrHandler will handle the different error cases
+// possibly received by the server from the front end
+func (c *Client) recvConnectionErrHandler(err error) {
+	if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
+		// the case that either
+		// - the connection was correctly closed by the client side web socket
+		// - the connection was incorrectly closed by a closed browser instance
+		//   or the browser having navigated away from the page withe the connection.
+		logger.Infof("Connection to client [%d] was shutdown by client", c.meta.id)
+	} else if websocket.IsCloseError(err, websocket.CloseAbnormalClosure) {
+		// the case that there was an unexpected close event
+		// such as internet connection problems and similar.
+		// Given that case the client has to be set into its
+		// timeout state, so that it can be removed if no
+		// new connection can be established.
+		logger.Warnf("Client [%d] lost connection, setting to timeout", c.meta.id)
+		c.registerTimeout()
+	} else {
+		// every other unexpected case
+		logger.Warnf("unexpected web socket closure error received for client [%d] "+
+			"- see https://rfc-editor.org/rfc/rfc6455.html#section-11.7 for more "+
+			"information\n[%s]", c.meta.id, err.Error())
+	}
 }
 
 // recvData is the actual function used to run the client read loop
@@ -331,28 +380,26 @@ func (c *Client) recvData() {
 		// as in case of an error the messageType and
 		// message will be their nulled values.
 
+		// first check if client is still active, as there is the case where
+		// the sender will shutdown after getting a disconnect opcode
+		if !c.isActive.Get() {
+			// simply shutdown
+			logger.Debugf("shutting down the receiver of the client [%d]", c.meta.GetId())
+			return
+		}
+
 		// as per definition
 		// Applications must break out of the application's read loop when this method returns
 		// a non-nil error value. Errors returned from this method are permanent. Once this
 		// method returns a non-nil error, all subsequent calls to this method return the same
 		// error
 		if err != nil {
-			if websocket.IsCloseError(err, websocket.CloseNormalClosure) {
-				logger.Infof("Connection to client [%d] was shutdown by client", c.meta.id)
-			} else if websocket.IsCloseError(err, websocket.CloseAbnormalClosure) {
-				logger.Warnf("Client [%d] lost connection, setting to timeout", c.meta.id)
-				// if there was an unexpected close error
-				// then the client has to be set to timeout
-				c.registerTimeout()
-			} else {
-				logger.Warnf("unexpected web socket closure error received for client [%d] "+
-					"- see https://rfc-editor.org/rfc/rfc6455.html#section-11.7 for more information\n[%s]", c.meta.id, err.Error())
-			}
-			// break out of the endless loop directly to a shutdown
+			c.recvConnectionErrHandler(err)
 			return
 		}
 
 		err = c.recvDataHandler(messageType, message)
+
 		if err != nil {
 			return
 		}

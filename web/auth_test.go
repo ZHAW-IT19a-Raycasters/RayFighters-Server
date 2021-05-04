@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -16,7 +15,6 @@ import (
 	"github.com/lestrrat-go/jwx/jwt"
 )
 
-
 func TestAuthTokenIssueing(t *testing.T) {
 
 	// generate key
@@ -25,7 +23,7 @@ func TestAuthTokenIssueing(t *testing.T) {
 		t.Errorf("failed to generate private key: %s\n", err)
 		return
 	}
-	
+
 	var payload []byte
 	// Create signed payload
 	token := jwt.New()
@@ -35,7 +33,6 @@ func TestAuthTokenIssueing(t *testing.T) {
 		t.Errorf("failed to generate signed payload: %s\n", err)
 		return
 	}
-
 
 	{ // Parse signed payload, and perform (1) verification of the signature
 		// and (2) validation of the JWT token
@@ -54,57 +51,52 @@ func TestAuthTokenIssueing(t *testing.T) {
 			t.Errorf("failed to generate JSON: %s\n", err)
 			return
 		}
-		fmt.Printf("%s\n", buf)
+		t.Logf("%s", buf)
 	}
-
-	// 
 }
 
 func TestAuthRequestWithValidJson(t *testing.T) {
 	postBody, _ := json.Marshal(map[string]string{
-		"username":  "Phil",
+		"username": "Phil",
 	})
 	req := httptest.NewRequest("POST", "/auth", bytes.NewBuffer(postBody))
 	rr := httptest.NewRecorder()
 
 	router := mux.NewRouter()
-	// generate private key
-	privKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	auth, err := newAuthMiddleware()
 	if err != nil {
-		fmt.Printf("failed to generate private key: %s\n", err)
+		t.Errorf("Could not create the auth middleware [%s]", err.Error())
+		return
 	}
-    router.HandleFunc("/auth", ServeAuthWithKey(privKey))
+	router.HandleFunc("/auth", auth.ServeAuthWithKey())
 	router.ServeHTTP(rr, req)
 	res := rr.Result()
 	if res.StatusCode != http.StatusOK {
 		t.Errorf("handler returned wrong status code: got %v want %v",
-		res.StatusCode, http.StatusOK)
+			res.StatusCode, http.StatusOK)
 	}
-
 }
-
 
 func TestAuthTokenResponseVaild(t *testing.T) {
 	postBody, _ := json.Marshal(map[string]string{
-		"username":  "Phil",
+		"username": "Phil",
 	})
 	req := httptest.NewRequest("POST", "/auth", bytes.NewBuffer(postBody))
 	rr := httptest.NewRecorder()
 
-	// generate private key
-	privKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		fmt.Printf("failed to generate private key: %s\n", err)
-	}
-
 	router := mux.NewRouter()
+	auth, err := newAuthMiddleware()
+	if err != nil {
+		t.Errorf("Could not create the auth middleware [%s]", err.Error())
+		return
+	}
 	// #TODO: generate key
-    router.HandleFunc("/auth", ServeAuthWithKey(privKey))
+	router.HandleFunc("/auth", auth.ServeAuthWithKey())
 	router.ServeHTTP(rr, req)
 	res := rr.Result()
 	if res.StatusCode != http.StatusOK {
 		t.Errorf("handler returned wrong status code: got %v want %v",
-		res.StatusCode, http.StatusOK)
+			res.StatusCode, http.StatusOK)
 	}
 
 	if res.Header.Get("Set-Cookie") == "" {
@@ -112,11 +104,11 @@ func TestAuthTokenResponseVaild(t *testing.T) {
 	}
 }
 
-func TestValidUsernameHtmlEscape(t* testing.T){
+func TestValidUsernameHtmlEscape(t *testing.T) {
 	username := "<SCRIPT SRC=http://xss.rocks/xss.js></SCRIPT>"
 	escaped, _ := validUsername(username)
 	expected := "&lt;SCRIPT SRC=http://xss.rocks/xss.js&gt;&lt;/SCRIPT&gt;"
-	if strings.Compare(escaped,expected)!=0 {
-		t.Errorf("expected %s, got %s",expected,escaped)
+	if strings.Compare(escaped, expected) != 0 {
+		t.Errorf("expected %s, got %s", expected, escaped)
 	}
 }

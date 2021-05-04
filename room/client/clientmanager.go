@@ -324,6 +324,7 @@ func (manager *ClientManager) Shutdown(cxt context.Context) {
 	}
 
 	// run shutdown on all clients
+	manager.lock.RLock()
 	for _, value := range manager.clients {
 		// run shutdown in it's own threads
 		// do not remove all the clients
@@ -331,6 +332,7 @@ func (manager *ClientManager) Shutdown(cxt context.Context) {
 		// for not used data.
 		go closeClient(value)
 	}
+	manager.lock.RUnlock()
 
 	select {
 	case <-waiter:

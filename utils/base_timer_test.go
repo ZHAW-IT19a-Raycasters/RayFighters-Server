@@ -47,9 +47,10 @@ func TestBaseTimerRun(t *testing.T) {
 	bt.Enqueue(&elem)
 
 	<-waiter
+	since := time.Since(elem.time)
 
-	if time.Since(elem.time) < timeOutTime {
-		t.Error("the timer should be waiting at least the timeout time")
+	if since <= timeOutTime {
+		t.Errorf("the timer should be waiting at least the timeout time exp: [%d] got [%d]", timeOutTime, since)
 	}
 }
 

@@ -61,7 +61,7 @@ func getMap() string {
 	p = filepath.Dir(p)
 	p = filepath.Dir(p)
 
-	return filepath.Join(p, "maps", "sundown_resort.txt")
+	return filepath.Join(p, "maps", "desert.txt")
 }
 
 // NewHubController will create a new controller
@@ -80,6 +80,7 @@ func NewHubController() *HubController {
 		connections:   make(map[uint8]client.HubQueue),
 		gameState:     NewGameState(),
 		mapController: mapController,
+		semaphore:     utils.NewCountingSemaphore(uint32(helpers.IdCountLimit)),
 		wg:            sync.WaitGroup{},
 		lock:          sync.RWMutex{},
 	}
@@ -171,6 +172,7 @@ func (hc *HubController) ClientExists(meta client.ClientMeta) bool {
 // RegisterClient will add the client to the controller
 func (hc *HubController) RegisterClient(meta client.ClientMeta) error {
 	// TODO: register in the game state (if it is a new connection)
+	logger.Debugf("registering client in hub [%s]", meta.GetId().String())
 
 	// prepare the queues
 	cqueue, hqueue := client.NewWorkQueue()
@@ -277,13 +279,14 @@ func (hc *HubController) runClientConnection(hqueue client.HubQueue, id uint8) {
 			defer wg.Done()
 
 			gotten := hc.handleRead(data, id)
-			toSend := gotten.Bytes()
 			// this means that the given opcode will not actually
 			// result in a direct return message, this happens
 			// with broadcast commands.
 			if gotten == nil {
 				return
 			}
+
+			toSend := gotten.Bytes()
 			hqueue.Enqueue(toSend)
 
 			if toSend[0] == server.UnknownOpcode.Value() {
@@ -470,10 +473,10 @@ func (hc *HubController) handleWhoAmI(t []byte, id uint8) protocol.Bytefy {
 	return newYouAreCalled
 }
 
-func (hc *HubController) handleMovement(t []byte, id uint8) protocol.Bytefy {
-	movement, err := pclient.NewMovementByte(t)
+func (hc *HubController) handleMovement(message []byte, id uint8) protocol.Bytefy {
+	movement, err := pclient.NewMovementByte(message)
 	if err != nil {
-		logger.Info(err)
+		logger.Infof("[%s] - message [% X]", err.Error(), message)
 		newUnknown := server.NewUnknown()
 		return newUnknown
 	}
