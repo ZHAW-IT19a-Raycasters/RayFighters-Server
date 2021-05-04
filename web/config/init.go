@@ -1,6 +1,8 @@
 package webconfig
 
-import "fmt"
+import (
+	"fmt"
+)
 
 // The configuration for the webserver
 type WebConfig struct {
@@ -10,6 +12,8 @@ type WebConfig struct {
 	Port int
 	// the keys
 	JWTConfig JwtConfig
+	// the cors configuration
+	CORS CORSConfig
 }
 
 // The stringify interface
@@ -46,4 +50,24 @@ type JwtConfig struct {
 // valid.
 func (j *JwtConfig) CheckConfiguration() error {
 	return CheckIfRSAValid(j.RsaPrivateKey)
+}
+
+type CORSConfig struct {
+	Domains []string
+}
+
+func (c *CORSConfig) CheckConfiguration() error {
+	if len(c.Domains) == 0 {
+		return ErrEmptyCORSDomain
+	}
+
+	for _, domain := range c.Domains {
+		err := CheckIfCORSDomainValid(domain)
+
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

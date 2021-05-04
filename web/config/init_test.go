@@ -171,3 +171,51 @@ func TestFixLinuxPathsInvalidPath(t *testing.T) {
 		t.Error("wrong error string")
 	}
 }
+
+func TestCORSConfigValid(t *testing.T) {
+	cors := []string{
+		// this system
+		"http://127.0.0.1:8080",
+		"http://localhost:8080",
+		// frontend
+		"http://127.0.0.1:9000",
+		"http://localhost:9000",
+	}
+
+	conf := CORSConfig{
+		Domains: cors,
+	}
+
+	err := conf.CheckConfiguration()
+	if err != nil {
+		t.Error("there should not be an error on these valid domains")
+	}
+}
+
+func TestCORSConfigEmptry(t *testing.T) {
+	cors := []string{}
+
+	conf := CORSConfig{
+		Domains: cors,
+	}
+
+	err := conf.CheckConfiguration()
+	if err == nil {
+		t.Error("there should be an error on these invalid domains")
+	}
+}
+func TestCORSConfigInvalid(t *testing.T) {
+	cors := []string{
+		"ftp://127.0.0.1:8080",
+		"http://localhost:8080/Path",
+	}
+
+	conf := CORSConfig{
+		Domains: cors,
+	}
+
+	err := conf.CheckConfiguration()
+	if err == nil {
+		t.Error("there should be an error on these invalid domains")
+	}
+}

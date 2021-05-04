@@ -6,38 +6,80 @@ import (
 	"io/ioutil"
 	"math"
 	"net"
+	"net/url"
 	"os"
 	"os/user"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 
 	"github.zhaw.ch/raycasters/server/utils"
 )
 
-const (
-	// Is the 127.0.0.1 valid alternative
-	localhost string = "localhost"
+// Is the 127.0.0.1 valid alternative
+const localhost string = "localhost"
+
+var (
+	// getCurrentUser is extracted so that
+	// it can get mocked in tests to achive
+	// always the same result.
+	getCurrentUser = user.Current
+
+	// getAbsPath is the function to get the
+	// absolute file path from an initial string.
+	// Attention this is for mocking only so as
+	// for force an error here.
+	getAbsPath = filepath.Abs
+
+	// uriMatcher will match against the allowed
+	// uri schemes used for cors
+	uriMatcher = regexp.MustCompile("^https?$")
 )
 
-// getCurrentUser is extracted so that
-// it can get mocked in tests to achive
-// always the same result.
-var getCurrentUser = user.Current
+var (
+	// ErrIsDirectory is the error called if the file is a
+	// directory instead of a file.
+	ErrIsDirectory = errors.New("file is a directory")
 
-// getAbsPath is the function to get the
-// absolute file path from an initial string.
-// Attention this is for mocking only so as
-// for force an error here.
-var getAbsPath = filepath.Abs
+	// ErrLocalhostNotValidIp is the exception to the rule
+	// of valid ip addresses for golang.
+	ErrLocalhostNotValidIp = errors.New("localhost is not an allowed ip, please use 127.0.0.1 instead")
 
-// ErrIsDirectory is the error called if the file is a
-// directory instead of a file.
-var ErrIsDirectory = errors.New("file is a directory")
+	// ErrEmptyCORSDomain is the error returned, when there where no
+	// domains added to the CORS configuration.
+	ErrEmptyCORSDomain = errors.New("at least one CORS domain has to be set")
 
-// ErrLocalhostNotValidIp is the exception to the rule
-// of valid ip addresses for golang.
-var ErrLocalhostNotValidIp = errors.New("localhost is not an allowed ip, please use 127.0.0.1 instead")
+	// ErrIncorrectCORSDomainScheme is the error returned once
+	// the uri scheme is incorrect.
+	ErrIncorrectCORSDomainScheme = errors.New("incorrect uri scheme used, we only support http or https")
+
+	// ErrIncorrectCORSDomainScheme is the error returned once
+	// the uri scheme is incorrect.
+	ErrIncorrectCORSDomainPath = errors.New("incorrect uri path used, as per the CORS domain definition no paths are allowed")
+)
+
+// ErrInvalidCORSConfiguration is the wrapper error that
+// handles all the CORS errors.
+type ErrInvalidCORSConfiguration struct {
+	internal error
+}
+
+// Error satisfies the errorri equirements.
+func (err ErrInvalidCORSConfiguration) Error() string {
+	return fmt.Sprintf("unable to use the CORS domains because of [%s]", err.Unwrap())
+}
+
+// Is satisfies the errors.Is requirements.
+func (err ErrInvalidCORSConfiguration) Is(target error) bool {
+	_, ok := target.(ErrInvalidCORSConfiguration)
+	return ok
+}
+
+// Unwrap satisfies the errors.Unrap requirements.
+func (err ErrInvalidCORSConfiguration) Unwrap() error {
+	return err.internal
+}
 
 // ErrUnableToParseUserHome is the error that
 // is returned in the case that something went
@@ -59,7 +101,7 @@ func (err ErrUnableToParseUserHome) Is(target error) bool {
 	return ok
 }
 
-// Unwrap satisfies the errors.Unrap requirements.
+// Unwrap satisfies the errors.Unwrap requirements.
 func (err ErrUnableToParseUserHome) Unwrap() error {
 	return err.internal
 }
@@ -83,6 +125,7 @@ type InvalidIpError struct {
 	falseIp string
 }
 
+// The error interface
 func (err InvalidIpError) Error() string {
 	return fmt.Sprintf("is not a valid IP [%s]", err.falseIp)
 }
@@ -94,15 +137,18 @@ type InvalidRSAKeyPath struct {
 	internal error
 }
 
+// The error interface
 func (err InvalidRSAKeyPath) Error() string {
 	return fmt.Sprintf("file [%s] is not a valid RSA private key -> [%s]", err.path, err.internal.Error())
 }
 
+// Is satisfies the errors.Is requirements.
 func (err InvalidRSAKeyPath) Is(target error) bool {
 	_, ok := target.(InvalidRSAKeyPath)
 	return ok
 }
 
+// Unwrap satisfies the errors.Unwrap requirements.
 func (err InvalidRSAKeyPath) Unwrap() error {
 	return err.internal
 }
@@ -237,6 +283,32 @@ func CheckIfRSAValid(path string) error {
 			path:     path,
 			internal: err,
 		}
+	}
+
+	return nil
+}
+
+// CheckIfCORSDomainValid check if the given
+// domain is valid or not.
+func CheckIfCORSDomainValid(domain string) error {
+
+	// using the parse url request to check
+	// if the given domain is valid or not
+	uri, err := url.ParseRequestURI(domain)
+	if err != nil {
+		return ErrInvalidCORSConfiguration{
+			internal: err,
+		}
+	}
+
+	// check scheme
+	if !uriMatcher.Match([]byte(uri.Scheme)) {
+		return ErrIncorrectCORSDomainScheme
+	}
+
+	// check that there is no path used
+	if strings.TrimSpace(uri.Path) != "" {
+		return ErrIncorrectCORSDomainPath
 	}
 
 	return nil

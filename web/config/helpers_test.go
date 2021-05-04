@@ -239,3 +239,46 @@ func TestRSAValidatorIsDirectory(t *testing.T) {
 		t.Error("it is a folder and the error should say that")
 	}
 }
+
+func TestCORSDomainValid(t *testing.T) {
+	domains := []string{
+		"http://localhost",
+		"https://localhost:8080",
+		"http://127.0.0.1:666",
+		"https://www.google.ch:4242",
+	}
+
+	for _, domain := range domains {
+		err := CheckIfCORSDomainValid(domain)
+		if err != nil {
+			t.Errorf("correct domain [%s] was checked as incorrect", domain)
+			return
+		}
+	}
+}
+
+func TestCORSDomainvalid(t *testing.T) {
+	check := func(domain string, expErr error) error {
+		gotErr := CheckIfCORSDomainValid(domain)
+
+		if gotErr == nil {
+			t.Errorf("there should have been an error on input [%s]", domain)
+			t.SkipNow()
+		} else if !errors.Is(gotErr, expErr) {
+			t.Errorf("incorrect error type returned on input [%s]", domain)
+			t.SkipNow()
+		}
+		return gotErr
+	}
+
+	// not a valid scheme
+	check("fpt://something.ch", ErrIncorrectCORSDomainScheme)
+	// no path allowed
+	check("http://something.ch/aParameter", ErrIncorrectCORSDomainPath)
+
+	// not a valid URL
+	err := check("something.ch", ErrInvalidCORSConfiguration{})
+	if !strings.Contains(err.Error(), "unable to use the CORS domain") {
+		t.Error("incorrect string used")
+	}
+}
