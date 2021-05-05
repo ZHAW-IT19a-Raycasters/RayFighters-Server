@@ -6,7 +6,7 @@ import (
 
 // Error codes returned by failures in gamemap.
 var (
-	ErrMapElmtWrgSym = errors.New("mapelement: unsupported symbol")
+	ErrUnknownMapSymbol = errors.New("mapelement: unsupported symbol")
 )
 
 // MapElement is enum representation of elements of game map.
@@ -33,12 +33,14 @@ func convert(r rune) (MapElement, error) {
 	case r >= rune('!') && r <= rune('~'):
 		return Floor, nil
 	default:
-		return 0, ErrMapElmtWrgSym
+		return 0, ErrUnknownMapSymbol
 	}
 }
 
 // equals1d compares two 1d slices of MapElements.
-// Returns true if either A: (both are nil) or B: (both have same length and same elements for each position).
+// Returns true if either A: (both are nil) or B:
+// (both have same length and same elements for each
+// position).
 func equals1d(sliceOne, sliceTwo []MapElement) bool {
 	// If one is nil, the other must also be nil.
 	if (sliceOne == nil) != (sliceTwo == nil) {
@@ -59,7 +61,9 @@ func equals1d(sliceOne, sliceTwo []MapElement) bool {
 }
 
 // equals2d compares two 2d slices of MapElements.
-// Returns true if either A: (both are nil) or B: (both have same dimensions and same elements for each position).
+// Returns true if either A: (both are nil) or B:
+// (both have same dimensions and same elements
+// for each position).
 func equals2d(sliceOne, sliceTwo [][]MapElement) bool {
 	// If one is nil, the other must also be nil.
 	if (sliceOne == nil) != (sliceTwo == nil) {
