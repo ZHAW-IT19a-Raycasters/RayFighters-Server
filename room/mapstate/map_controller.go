@@ -127,11 +127,12 @@ func (mc *MapController) IsPenetrable(x int, y int) bool {
 }
 
 // returns uid of the client which will be hit by the ray
-func (mc *MapController) GetHit(angle, rayStartX, rayStartY float64) (bool, uint8, float64, float64) {
+func (mc *MapController) GetHit(shooterID uint8, angle, rayStartX, rayStartY float64) (bool, uint8, float64, float64) {
 	a := -math.Tan(angle)
 	b := 1.0
 	c := math.Tan(angle)*rayStartX - rayStartY
-	margin := 0.00001
+	// defines the size of target
+	margin := 0.5
 	hit := false
 	victimId := uint8(0)
 	distance := 0.0
@@ -143,6 +144,10 @@ func (mc *MapController) GetHit(angle, rayStartX, rayStartY float64) (bool, uint
 	// iteration value will not be produced.
 	// CHECK: https://golang.org/ref/spec#For_statements
 	for id, coord := range mc.clients {
+		if id == shooterID {
+			// shooter itself will be skipped
+			continue
+		}
 		userX = coord.X()
 		userY = coord.Y()
 		// TODO: Check if victim is behind shooter
@@ -185,7 +190,7 @@ func (mc *MapController) CheckShooting(shooterId uint8, shotAngle float64) (bool
 
 	// ray origin coordinates
 	rayStartX, rayStartY, _ := mc.GetPosition(shooterId)
-	hit, candidateId, candX, candY := mc.GetHit(shotAngle, rayStartX, rayStartX)
+	hit, targetID, targetX, targetY := mc.GetHit(shooterId, shotAngle, rayStartX, rayStartX)
 	if !hit {
 		return false, 0
 	}
@@ -257,7 +262,7 @@ func (mc *MapController) CheckShooting(shooterId uint8, shotAngle float64) (bool
 			// we reached the map bound
 			// found no obstacle was on the way to candidate, therefore
 			// the candidate is dead
-			return true, candidateId
+			return true, targetID
 		}
 
 		// After each iteration check if any obstacle is on the way
@@ -269,10 +274,10 @@ func (mc *MapController) CheckShooting(shooterId uint8, shotAngle float64) (bool
 		}
 	}
 	// Check if obstacle between candidate and shooter
-	if inOrder(rayStartX, float64(mapX), candX) && inOrder(rayStartY, float64(mapY), candY) {
+	if inOrder(rayStartX, float64(mapX), targetX) && inOrder(rayStartY, float64(mapY), targetY) {
 		return false, 0
 	}
-	return true, candidateId
+	return true, targetID
 }
 
 // true if values are ordered as given
