@@ -10,63 +10,30 @@ import (
 //	- coordinates (x horizontally to the right, y vertically down);
 //	- angle (with respect to x, clockwise)
 
-// If shooter and target are having same coordinates, false is expected
-func Test_isShotInDirectionOfTargetSameCoords(t *testing.T) {
-	xTarget := 0.0
-	yTarget := xTarget
-	xShooter := 0.0
-	yShooter := xShooter
-	shotAngle := 0.2
-
-	expected := false
-	actual := isShotInDirectionOfTarget(xTarget, yTarget, xShooter, yShooter, shotAngle)
-	if actual != expected {
-		t.Errorf("Expected: %v Actual: %v ", expected, actual)
+func Test_isShotInDirectionOfTarget(t *testing.T) {
+	type args struct {
+		xTarget   float64
+		yTarget   float64
+		xShooter  float64
+		yShooter  float64
+		shotAngle float64
 	}
-}
-
-// If the shot direction may possibly hit target, true is expected.
-func Test_isShotInDirectionOfTargetHitDiagonal(t *testing.T) {
-	xShooter := 0.0
-	yShooter := 0.0
-	xTarget := 1.0
-	yTarget := 1.0
-	shotAngle := math.Pi / 4
-
-	expected := true
-	actual := isShotInDirectionOfTarget(xTarget, yTarget, xShooter, yShooter, shotAngle)
-	if actual != expected {
-		t.Errorf("Expected: %v Actual: %v ", expected, actual)
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		{name: "Hor. shot which hits", args: args{1.0, 0.0, 0.0, 0.0, 0.0}, want: true},
+		{name: "Vert. shot which hits", args: args{1.0, 1.0, 0.0, 0.0, math.Pi / 2}, want: true},
+		{name: "Diag. shot which hits", args: args{1.0, 1.0, 0.0, 0.0, math.Pi / 4}, want: true},
+		{name: "Shooter and Target coords are equal", args: args{0.0, 0.0, 0.0, 0.0, math.Pi / 4}, want: false},
 	}
-}
-
-// If the shot direction may possibly hit target, true is expected.
-func Test_isShotInDirectionOfTargetHitVertical(t *testing.T) {
-	xShooter := 0.0
-	yShooter := 0.0
-	xTarget := 0.0
-	yTarget := 1.0
-	shotAngle := math.Pi / 2
-
-	expected := true
-	actual := isShotInDirectionOfTarget(xTarget, yTarget, xShooter, yShooter, shotAngle)
-	if actual != expected {
-		t.Errorf("Expected: %v Actual: %v ", expected, actual)
-	}
-}
-
-// If the shot direction may possibly hit target, true is expected.
-func Test_isShotInDirectionOfTargetHitHorizontal(t *testing.T) {
-	xShooter := 0.0
-	yShooter := 0.0
-	xTarget := 1.0
-	yTarget := 0.0
-	shotAngle := 0.0
-
-	expected := true
-	actual := isShotInDirectionOfTarget(xTarget, yTarget, xShooter, yShooter, shotAngle)
-	if actual != expected {
-		t.Errorf("Expected: %v Actual: %v ", expected, actual)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isShotInDirectionOfTarget(tt.args.xTarget, tt.args.yTarget, tt.args.xShooter, tt.args.yShooter, tt.args.shotAngle); got != tt.want {
+				t.Errorf("isShotInDirectionOfTarget() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
 
