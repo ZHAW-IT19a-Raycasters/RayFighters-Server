@@ -131,8 +131,8 @@ func (mc *MapController) IsPenetrable(x int, y int) bool {
 func (mc *MapController) IsHit(shooterID uint8, shotAngle, xShooter, yShooter float64) (bool, uint8, float64, float64) {
 	// calculate ray constants
 	slope := math.Tan(shotAngle)
-	a := 1.0
-	b := -slope
+	a := -slope
+	b := 1.0
 	c := slope*xShooter - yShooter
 	// defines target size
 	margin := 0.5
