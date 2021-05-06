@@ -1,6 +1,7 @@
 package mapstate
 
 import (
+	"fmt"
 	"math"
 	"math/rand"
 	"sync"
@@ -130,8 +131,8 @@ func (mc *MapController) IsPenetrable(x int, y int) bool {
 func (mc *MapController) IsHit(shooterID uint8, shotAngle, xShooter, yShooter float64) (bool, uint8, float64, float64) {
 	// calculate ray constants
 	slope := math.Tan(shotAngle)
-	a := -slope
-	b := 1.0
+	a := 1.0
+	b := -slope
 	c := slope*xShooter - yShooter
 	// defines target size
 	margin := 0.5
@@ -154,10 +155,15 @@ func (mc *MapController) IsHit(shooterID uint8, shotAngle, xShooter, yShooter fl
 		xTarget = coord.X()
 		yTarget = coord.Y()
 		// if area around target intersects the ray -> hit
-		distToRay = math.Abs(calculateDistance(a, b, c, xTarget, yTarget))
+		distToRay = calcDistToShotTrajectory(a, b, c, xTarget, yTarget)
+		fmt.Println("Distance ", distToRay)
 		if distToRay <= margin {
 			// Invariant: target intersects the trajectory of shot
 			hit = isShotInDirectionOfTarget(xTarget, yTarget, xShooter, yShooter, shotAngle)
+			if hit {
+				return hit, targetID, xTarget, yTarget
+			}
+			// TODO get the nearest target
 		}
 	}
 	return hit, targetID, xTarget, yTarget
@@ -182,13 +188,14 @@ func isShotInDirectionOfTarget(xTarget, yTarget, xShooter, yShooter, shotAngle f
 }
 
 // https://en.wikipedia.org/wiki/Distance_from_a_point_to_a_line
-func calculateDistance(a float64, b float64, c float64, xTarget float64, yTarget float64) float64 {
+func calcDistToShotTrajectory(a, b, c, xTarget, yTarget float64) float64 {
 	return math.Abs(a*xTarget+b*yTarget+c) / math.Sqrt(a*a+b*b)
 }
 
 // raycasting return true if some player was hit and uid of victim, else (false, 0) is returned
 // shotAngle is in radians
 func (mc *MapController) CheckShooting(shooterId uint8, shotAngle float64) (bool, uint8) {
+	fmt.Println(180 / math.Pi * shotAngle)
 	// y axes directed vertically downwards
 	// x axes directed horizontally to the right
 	// STEP 1: Get candidate
