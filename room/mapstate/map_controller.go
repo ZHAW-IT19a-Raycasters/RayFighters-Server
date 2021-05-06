@@ -148,37 +148,38 @@ func (mc *MapController) GetHit(shooterID uint8, angle, rayStartX, rayStartY flo
 			// shooter itself will be skipped
 			continue
 		}
-		userX = coord.X()
-		userY = coord.Y()
-		// TODO: Check if victim is behind shooter
-		if (rayStartX-userX)*math.Cos(angle) > 0 && (rayStartY-userY)*rayStartY*math.Sin(angle) > 0 {
-			//is behind
-			// skip this one
-			continue
-		}
-		if math.Abs(calculateDistance(a, b, c, userX, userY)) < margin {
-			// TODO: I DON'T LIKE THIS FIND BETTER SOLUTION!!!!!
-			if !hit {
-				hit = true
-				victimId = id
-				distance = math.Sqrt(math.Abs(rayStartX-userX)*math.Abs(rayStartX-userX) +
-					math.Abs(rayStartY-userY)*math.Abs(rayStartY-userY))
-				continue
-			}
-
-			if distance > math.Sqrt(math.Abs(rayStartX-userX)*math.Abs(rayStartX-userX)+
-				math.Abs(rayStartY-userY)*math.Abs(rayStartY-userY)) {
-				victimId = id
-				distance = math.Sqrt(math.Abs(rayStartX-userX)*math.Abs(rayStartX-userX) +
-					math.Abs(rayStartY-userY)*math.Abs(rayStartY-userY))
-			}
+		xTarget = coord.X()
+		yTarget = coord.Y()
+		// if area around target intersects the ray -> hit
+		distToRay = math.Abs(calculateDistance(a, b, c, xTarget, yTarget))
+		if distToRay <= margin {
+			// Invariant: target intersects the trajectory of shot
+			hit = isShotInDirectionOfTarget(xTarget, yTarget, xShooter, yShooter, shotAngle)
 		}
 	}
-	return hit, victimId, userX, userY
+	return hit, targetID, xTarget, yTarget
 }
 
-func calculateDistance(a float64, b float64, c float64, x float64, y float64) float64 {
-	return math.Abs(a*x+b*y+c) / math.Sqrt(a*a+b*b)
+// isShotInDirectionOfTarget checks if shot was in the direction of target
+// Note: doesn't check if ray effectively hits the target
+// Note: if (xS,yS) equal to (xTarget, yTarget) false is returned
+func isShotInDirectionOfTarget(xTarget, yTarget, xShooter, yShooter, shotAngle float64) bool {
+	margin := 0.0000000000000001
+	shotDirX := 1.0 * math.Cos(shotAngle)
+	shotDirY := 1.0 * math.Sin(shotAngle)
+	distX := xShooter - xTarget
+	distY := yShooter - yTarget
+	// shotDirX(Y) and distX(Y) have to point in diff. directions
+	// check cases: diag. shot, horizontal shot, vertical shot
+	if (shotDirX*distX < 0 && shotDirY*distY < 0) || (shotDirX-distX < margin && shotDirY*distY < 0) || (shotDirY-distY < margin && shotDirX*distX < 0) {
+		return true
+	}
+	return false
+}
+
+// https://en.wikipedia.org/wiki/Distance_from_a_point_to_a_line
+func calculateDistance(a float64, b float64, c float64, xTarget float64, yTarget float64) float64 {
+	return math.Abs(a*xTarget+b*yTarget+c) / math.Sqrt(a*a+b*b)
 }
 
 // raycasting return true if some player was hit and uid of victim, else (false, 0) is returned
@@ -189,94 +190,97 @@ func (mc *MapController) CheckShooting(shooterId uint8, shotAngle float64) (bool
 	// STEP 1: Get candidate
 
 	// ray origin coordinates
+	//rayStartX, rayStartY, _ := mc.GetPosition(shooterId)
+	//hit, targetID, targetX, targetY := mc.IsHit(shooterId, shotAngle, rayStartX, rayStartY)
 	rayStartX, rayStartY, _ := mc.GetPosition(shooterId)
-	hit, targetID, targetX, targetY := mc.GetHit(shooterId, shotAngle, rayStartX, rayStartX)
+	hit, targetID, _, _ := mc.IsHit(shooterId, shotAngle, rayStartX, rayStartY)
 	if !hit {
 		return false, 0
 	}
+	/*
+		// STEP2: CHECK if there is any obstacle in between
+		// STEP2.1.1: Init step
+		// current position on map
+		mapX, mapY, _ := mc.GetMapCoordinates(shooterId)
+		// projections of direction ray vector on x(or y) axes
+		rayDirX := math.Cos(shotAngle)
+		rayDirY := math.Sin(shotAngle)
 
-	// STEP2: CHECK if there is any obstacle in between
-	// STEP2.1.1: Init step
-	// current position on map
-	mapX, mapY, _ := mc.GetMapCoordinates(shooterId)
-	// projections of direction ray vector on x(or y) axes
-	rayDirX := math.Cos(shotAngle)
-	rayDirY := math.Sin(shotAngle)
+		// calculate ray length scaling factor when taking step in x(or y) direction
+		//rayLengthScaleFactorStepInX := math.Sqrt(1  + (rayDirY/rayDirX) *(rayDirY/rayDirX))
+		rayLengthScaleFactorStepInX := 1 / math.Abs(math.Cos(shotAngle))
+		//rayLengthScaleFactorStepInY :=  math.Sqrt(1  + (rayDirX/rayDirY) *(rayDirX/rayDirY))
+		rayLengthScaleFactorStepInY := 1 / math.Abs(math.Sin(shotAngle))
+		// ray length in in x(or y) direction
+		rayLengthX := 0.0 // if we make step in x direction
+		rayLengthY := 0.0 // if we make step in y direction
 
-	// calculate ray length scaling factor when taking step in x(or y) direction
-	//rayLengthScaleFactorStepInX := math.Sqrt(1  + (rayDirY/rayDirX) *(rayDirY/rayDirX))
-	rayLengthScaleFactorStepInX := 1 / math.Abs(math.Cos(shotAngle))
-	//rayLengthScaleFactorStepInY :=  math.Sqrt(1  + (rayDirX/rayDirY) *(rayDirX/rayDirY))
-	rayLengthScaleFactorStepInY := 1 / math.Abs(math.Sin(shotAngle))
-	// ray length in in x(or y) direction
-	rayLengthX := 0.0 // if we make step in x direction
-	rayLengthY := 0.0 // if we make step in y direction
-
-	// we always walk 1 unit in the same x(und y) direction
-	var stepX int
-	var stepY int
-	//  STEP2.1.2: Init step: calculate steps and the ray length
-	// until the first intersection with x-(or y-)grid line
-	if rayDirX < 0 {
-		// ray directed reversed to y-direction
-		stepX = -1 // we go in negative x direction
-		// (player posit. - curr cell coord ) x scaleFactor
-		rayLengthX = (rayStartX - float64(mapX)) * rayLengthScaleFactorStepInX
-	} else {
-		// ray co-directed with y-direction
-		stepX = 1 // we go in positive x direction
-		// (coord of next cell - player posit.) x step
-		rayLengthX = (float64(mapX+1.0) - rayStartX) * rayLengthScaleFactorStepInX
-	}
-	if rayDirY < 0 {
-		// ray directed reversed to y-direction
-		stepY = -1
-		rayLengthY = (rayStartY - float64(mapY)) * rayLengthScaleFactorStepInY
-	} else {
-		// ray co-directed with y-direction
-		stepY = 1
-		rayLengthY = (float64(mapY+1.0) - rayStartY) * rayLengthScaleFactorStepInY
-	}
-	// STEP2.2: loop through cells
-	// get coordinates of obstacle
-	// check if some is hit
-	// compare coords of abstraction an player
-	for {
-		// end condition is given by isMapBound()
-		if rayLengthX < rayLengthY {
-			// walk along x axis
-			mapX += stepX
-			// we move 1 unit
-			// add to length 1 x scalingFactor
-			rayLengthX += rayLengthScaleFactorStepInX
+		// we always walk 1 unit in the same x(und y) direction
+		var stepX int
+		var stepY int
+		//  STEP2.1.2: Init step: calculate steps and the ray length
+		// until the first intersection with x-(or y-)grid line
+		if rayDirX < 0 {
+			// ray directed reversed to y-direction
+			stepX = -1 // we go in negative x direction
+			// (player posit. - curr cell coord ) x scaleFactor
+			rayLengthX = (rayStartX - float64(mapX)) * rayLengthScaleFactorStepInX
 		} else {
-			// walk along y axis
-			mapY += stepY
-			// we move 1 unit
-			// add to length 1 x scalingFactor
-			rayLengthY += rayLengthScaleFactorStepInY
+			// ray co-directed with y-direction
+			stepX = 1 // we go in positive x direction
+			// (coord of next cell - player posit.) x step
+			rayLengthX = (float64(mapX+1.0) - rayStartX) * rayLengthScaleFactorStepInX
 		}
+		if rayDirY < 0 {
+			// ray directed reversed to y-direction
+			stepY = -1
+			rayLengthY = (rayStartY - float64(mapY)) * rayLengthScaleFactorStepInY
+		} else {
+			// ray co-directed with y-direction
+			stepY = 1
+			rayLengthY = (float64(mapY+1.0) - rayStartY) * rayLengthScaleFactorStepInY
+		}
+		// STEP2.2: loop through cells
+		// get coordinates of obstacle
+		// check if some is hit
+		// compare coords of abstraction an player
+		for {
+			// end condition is given by isMapBound()
+			if rayLengthX < rayLengthY {
+				// walk along x axis
+				mapX += stepX
+				// we move 1 unit
+				// add to length 1 x scalingFactor
+				rayLengthX += rayLengthScaleFactorStepInX
+			} else {
+				// walk along y axis
+				mapY += stepY
+				// we move 1 unit
+				// add to length 1 x scalingFactor
+				rayLengthY += rayLengthScaleFactorStepInY
+			}
 
-		// After each iteration check map bound was reached
-		if mc.IsMapBound(mapX, mapY) {
-			// we reached the map bound
-			// found no obstacle was on the way to candidate, therefore
-			// the candidate is dead
-			return true, targetID
-		}
+			// After each iteration check map bound was reached
+			if mc.IsMapBound(mapX, mapY) {
+				// we reached the map bound
+				// found no obstacle was on the way to candidate, therefore
+				// the candidate is dead
+				return true, targetID
+			}
 
-		// After each iteration check if any obstacle is on the way
-		if !mc.IsPenetrable(mapX, mapY) {
-			// found some obstacle
-			// the victim is safe
-			// for now
-			break
+			// After each iteration check if any obstacle is on the way
+			if !mc.IsPenetrable(mapX, mapY) {
+				// found some obstacle
+				// the victim is safe
+				// for now
+				break
+			}
 		}
-	}
-	// Check if obstacle between candidate and shooter
-	if inOrder(rayStartX, float64(mapX), targetX) && inOrder(rayStartY, float64(mapY), targetY) {
-		return false, 0
-	}
+		// Check if obstacle between candidate and shooter
+		if inOrder(rayStartX, float64(mapX), targetX) && inOrder(rayStartY, float64(mapY), targetY) {
+			return false, 0
+		}
+	*/
 	return true, targetID
 }
 

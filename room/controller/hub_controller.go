@@ -525,7 +525,6 @@ func (hc *HubController) handleShooting(t []byte, shooterId uint8) protocol.Byte
 	return nil
 }
 
-
 func (hc *HubController) handleRequestOtherPlayer(t []byte) protocol.Bytefy {
 	_, err := pclient.NewRequestOtherPlayersBytes(t)
 	if err != nil {
