@@ -40,7 +40,9 @@ func (map2d *Map2d) MapElementAt(x int, y int) MapElement {
 	if x >= d || y >= d || x < 0 || y < 0 {
 		return Floor
 	}
-	return map2d.map2d[x][y]
+	// as per definition seen in
+	// https://github.zhaw.ch/raycasters/docs/wiki/Map
+	return map2d.map2d[y][x]
 }
 
 // GetMapDimension returns map dimension
@@ -59,16 +61,16 @@ func (map2d *Map2d) Compare(other *Map2d) bool {
 
 func (map2d *Map2d) GetLegalSpawns() []Coordinate {
 	counter := 0
-	for _, x := range map2d.map2d  {
+	for _, x := range map2d.map2d {
 		for _, y := range x {
 			if y != Wall {
-				counter+=1
+				counter += 1
 			}
 		}
 	}
 
 	res := make([]Coordinate, 0, counter)
-	for i, x := range map2d.map2d  {
+	for i, x := range map2d.map2d {
 		for j, y := range x {
 			if y != Wall {
 				res = append(res, NewCoordinate(float64(i), float64(j), 0))
