@@ -27,6 +27,8 @@ func Test_isShotInDirectionOfTarget(t *testing.T) {
 		{name: "Vert. shot which hits", args: args{1.0, 1.0, 0.0, 0.0, math.Pi / 2}, want: true},
 		{name: "Diag. shot which hits", args: args{1.0, 1.0, 0.0, 0.0, math.Pi / 4}, want: true},
 		{name: "Shooter and Target coords are equal", args: args{0.0, 0.0, 0.0, 0.0, math.Pi / 4}, want: false},
+		{name: "Target is behind of shooter", args: args{0.0, 0.0, 1.0, 1.0, math.Pi / 4}, want: false},
+		{name: "Target is in front of shooter", args: args{0.0, 0.0, 1.0, 1.0, math.Pi - math.Pi/4}, want: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
