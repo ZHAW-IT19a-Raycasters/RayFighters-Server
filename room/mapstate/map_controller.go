@@ -126,7 +126,7 @@ func (mc *MapController) IsPenetrable(x int, y int) bool {
 	return mc.map2d.IsPenetrable(x, y)
 }
 
-// returns uid of the client which will be hit by the ray
+// IsHit returns uid of the client, which may be hit by the shot, given there are no impenetrable obstacles on the way.
 func (mc *MapController) IsHit(shooterID uint8, shotAngle, xShooter, yShooter float64) (bool, uint8, float64, float64) {
 	// calculate ray constants
 	slope := math.Tan(shotAngle)
@@ -167,6 +167,7 @@ func (mc *MapController) IsHit(shooterID uint8, shotAngle, xShooter, yShooter fl
 // Note: doesn't check if ray effectively hits the target
 // Note: if (xS,yS) equal to (xTarget, yTarget) false is returned
 func isShotInDirectionOfTarget(xTarget, yTarget, xShooter, yShooter, shotAngle float64) bool {
+	// margin defines, when a-b is considered to be zero
 	margin := 0.0000000000000001
 	shotDirX := 1.0 * math.Cos(shotAngle)
 	shotDirY := 1.0 * math.Sin(shotAngle)
