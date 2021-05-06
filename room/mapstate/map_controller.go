@@ -127,8 +127,8 @@ func (mc *MapController) IsPenetrable(x int, y int) bool {
 	return mc.map2d.IsPenetrable(x, y)
 }
 
-// IsHit returns uid of the client, which may be hit by the shot, given there are no impenetrable obstacles on the way.
-func (mc *MapController) IsHit(shooterID uint8, shotAngle, xShooter, yShooter float64) (bool, uint8, float64, float64) {
+// GetHit returns uid of the client, which may be hit by the shot, given there are no impenetrable obstacles on the way.
+func (mc *MapController) GetHit(shooterID uint8, shotAngle, xShooter, yShooter float64) (bool, uint8, float64, float64) {
 	// calculate ray constants
 	slope := math.Tan(shotAngle)
 	a := -slope
@@ -141,15 +141,16 @@ func (mc *MapController) IsHit(shooterID uint8, shotAngle, xShooter, yShooter fl
 	distToRay := 0.0
 	xTarget := 0.0
 	yTarget := 0.0
+	distToShooter := math.MaxFloat64
 	// We don't need lock because,
 	// The iteration order over maps is not specified and is not guaranteed to be the same from one iteration
 	// to the next. If a map entry that has not yet been reached is removed during iteration, the corresponding
 	// iteration value will not be produced.
 	// CHECK: https://golang.org/ref/spec#For_statements
-	// Check if any target intersects the ray
+	// Get the nearest target which intersects the shooting trajectory
 	for id, coord := range mc.clients {
 		if id == shooterID {
-			// shooter itself will be skipped
+			// shooter itself should be skipped
 			continue
 		}
 		xTarget = coord.X()
@@ -159,14 +160,26 @@ func (mc *MapController) IsHit(shooterID uint8, shotAngle, xShooter, yShooter fl
 		fmt.Println("Distance ", distToRay)
 		if distToRay <= margin {
 			// Invariant: target intersects the trajectory of shot
-			hit = isShotInDirectionOfTarget(xTarget, yTarget, xShooter, yShooter, shotAngle)
-			if hit {
-				return hit, targetID, xTarget, yTarget
+			if isShotInDirectionOfTarget(xTarget, yTarget, xShooter, yShooter, shotAngle) {
+				// pick the nearest target
+				d := getDistance(xShooter, yShooter, xTarget, yTarget)
+				if distToShooter > d {
+					hit = true
+					// save the best result
+					targetID = id
+					distToShooter = d
+				}
 			}
-			// TODO get the nearest target
 		}
 	}
 	return hit, targetID, xTarget, yTarget
+}
+
+// getDistance returns euclidean distance between two points on the map
+func getDistance(x1, y1, x2, y2 float64) float64 {
+	dx := x2 - x1
+	dy := y2 - y1
+	return math.Sqrt(dx*dx + dy*dy)
 }
 
 // isShotInDirectionOfTarget checks if shot was in the direction of target
@@ -187,12 +200,13 @@ func isShotInDirectionOfTarget(xTarget, yTarget, xShooter, yShooter, shotAngle f
 	return false
 }
 
+// calcDistToShotTrajectory returns distance between target and an shooting trajectory defined by given parameters
 // https://en.wikipedia.org/wiki/Distance_from_a_point_to_a_line
 func calcDistToShotTrajectory(a, b, c, xTarget, yTarget float64) float64 {
 	return math.Abs(a*xTarget+b*yTarget+c) / math.Sqrt(a*a+b*b)
 }
 
-// raycasting return true if some player was hit and uid of victim, else (false, 0) is returned
+// raycasting return true if some player was hit and uid of victim, else (false, 0) is returnedx
 // shotAngle is in radians
 func (mc *MapController) CheckShooting(shooterId uint8, shotAngle float64) (bool, uint8) {
 	fmt.Println(180 / math.Pi * shotAngle)
@@ -202,9 +216,9 @@ func (mc *MapController) CheckShooting(shooterId uint8, shotAngle float64) (bool
 
 	// ray origin coordinates
 	//rayStartX, rayStartY, _ := mc.GetPosition(shooterId)
-	//hit, targetID, targetX, targetY := mc.IsHit(shooterId, shotAngle, rayStartX, rayStartY)
+	//hit, targetID, targetX, targetY := mc.GetHit(shooterId, shotAngle, rayStartX, rayStartY)
 	rayStartX, rayStartY, _ := mc.GetPosition(shooterId)
-	hit, targetID, _, _ := mc.IsHit(shooterId, shotAngle, rayStartX, rayStartY)
+	hit, targetID, _, _ := mc.GetHit(shooterId, shotAngle, rayStartX, rayStartY)
 	if !hit {
 		return false, 0
 	}
