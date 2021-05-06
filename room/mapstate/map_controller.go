@@ -127,22 +127,25 @@ func (mc *MapController) IsPenetrable(x int, y int) bool {
 }
 
 // returns uid of the client which will be hit by the ray
-func (mc *MapController) GetHit(shooterID uint8, angle, rayStartX, rayStartY float64) (bool, uint8, float64, float64) {
-	a := -math.Tan(angle)
+func (mc *MapController) IsHit(shooterID uint8, shotAngle, xShooter, yShooter float64) (bool, uint8, float64, float64) {
+	// calculate ray constants
+	slope := math.Tan(shotAngle)
+	a := -slope
 	b := 1.0
-	c := math.Tan(angle)*rayStartX - rayStartY
-	// defines the size of target
+	c := slope*xShooter - yShooter
+	// defines target size
 	margin := 0.5
 	hit := false
-	victimId := uint8(0)
-	distance := 0.0
-	userX := 0.0
-	userY := 0.0
+	targetID := uint8(0)
+	distToRay := 0.0
+	xTarget := 0.0
+	yTarget := 0.0
 	// We don't need lock because,
 	// The iteration order over maps is not specified and is not guaranteed to be the same from one iteration
 	// to the next. If a map entry that has not yet been reached is removed during iteration, the corresponding
 	// iteration value will not be produced.
 	// CHECK: https://golang.org/ref/spec#For_statements
+	// Check if any target intersects the ray
 	for id, coord := range mc.clients {
 		if id == shooterID {
 			// shooter itself will be skipped
@@ -284,7 +287,7 @@ func (mc *MapController) CheckShooting(shooterId uint8, shotAngle float64) (bool
 	return true, targetID
 }
 
-// true if values are ordered as given
+// true if values are in the give order
 func inOrder(var1, var2, var3 float64) bool {
 	return var1 < var2 && var2 < var3
 }
