@@ -318,7 +318,7 @@ func TestSpawningPointAddClient(t *testing.T) {
 		return
 	}
 
-	mapController.getNextInt = func(n int) int {return 4}
+	mapController.getNextInt = func(n int) int { return 4 }
 
 	err = mapController.AddClient(1)
 
