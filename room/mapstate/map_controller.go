@@ -48,6 +48,26 @@ func (mc *MapController) AddClient(id uint8) (gamemap.Coordinate, error) {
 		}
 	}
 
+	coord, err := mc.RandomSpawn(id)
+
+	if err != nil {
+		return gamemap.Coordinate{}, nil
+	}
+
+	return coord, nil
+}
+
+func (mc *MapController) RandomSpawn(id uint8) (gamemap.Coordinate, error) {
+	// no lock is needed here as
+	// there the coordinate has
+	// its own.
+	_, ok := mc.clients[id]
+	if !ok {
+		return gamemap.Coordinate{}, ErrClientDoesNotExist{
+			id: id,
+		}
+	}
+
 	nextRand := mc.getNextInt(len(mc.spawingarea))
 	spawn := mc.spawingarea[nextRand]
 	coord := gamemap.NewCoordinate(spawn.X(), spawn.Y(), 0)
@@ -57,6 +77,7 @@ func (mc *MapController) AddClient(id uint8) (gamemap.Coordinate, error) {
 	defer mc.lock.Unlock()
 
 	mc.clients[id] = pCoord
+
 	return coord, nil
 }
 
@@ -85,7 +106,7 @@ func (mc *MapController) MoveClient(id uint8, x, y, angle float64) (gamemap.Coor
 	// its own.
 	client, ok := mc.clients[id]
 	if !ok {
-		return gamemap.Coordinate{}, ErrClientExists{
+		return gamemap.Coordinate{}, ErrClientDoesNotExist{
 			id: id,
 		}
 	}

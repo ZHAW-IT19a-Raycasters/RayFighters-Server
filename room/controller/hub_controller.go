@@ -89,7 +89,8 @@ func NewHubController() *HubController {
 	}
 
 	// implement item timer callbacks (blocked by missing map implementation)
-	// Attention this is not done anymore
+	// Attention this is not done anymore, but the comment is kept here as
+	// a reminder for possible continued developement.
 
 	// client timer callbacks
 	cTimeoutCallback := func(id uint8) {
@@ -124,7 +125,13 @@ func (hc *HubController) respawnPlayer(id uint8) error {
 		return err
 	}
 
-	// TODO: get the new spawn point of the player
+	// error not needed here as we previously already
+	// checked if the player exists or not.
+	coord, _ := hc.mapController.RandomSpawn(id)
+
+	// teleport the player back into the game
+	tp := server.NewTeleportPlayer(id, coord.X(), coord.Y())
+	hc.broadCast(tp, helpers.NewIdSet())
 
 	return nil
 }
