@@ -35,7 +35,11 @@ type HubController struct {
 	mapController mapstate.MapController
 	// timeoutClientQueue stores the currently timedout clients
 	// so that they can be removed once the timeout runs out.
-	timeoutClientQueue client.HubTimer
+	timeoutClientQueue client.HubTimeoutHandler
+	// respawnHandler stores and later on handles
+	// the currently killed players so that they
+	// can be reborn once the timeout runs out.
+	respawnHandler client.HubRespawnHandler
 	// timeoutItemQueue stores the currently timedout map elements
 	// so that they can be respawned once the timeout runs out.
 	timeoutItemQueue items.ItemTimer
@@ -84,41 +88,70 @@ func NewHubController() *HubController {
 		lock:          sync.RWMutex{},
 	}
 
-	// TODO: implement item timer callbacks (blocked by missing map implementation)
+	// implement item timer callbacks (blocked by missing map implementation)
+	// Attention this is not done anymore
 
 	// client timer callbacks
-	cTimerCallback := func(id uint8) {
+	cTimeoutCallback := func(id uint8) {
 		// error is not important for execution
 		// as it only says if there was an
 		// execution or not
-		_ = hc.RemoveClientIfTimeout(id)
+		_ = hc.removeClientIfTimeout(id)
 	}
 
-	hc.timeoutClientQueue = client.NewHubTimer(helpers.IdCountLimit, cTimerCallback)
+	hc.timeoutClientQueue = client.NewHubTimer(helpers.IdCountLimit, cTimeoutCallback)
+
+	// client respawn callbacks
+	cRespawnCallback := func(id uint8) {
+		// error is not important for execution
+		// as it only says if there was an
+		// execution or not
+		_ = hc.respawnPlayer(id)
+	}
+
+	hc.respawnHandler = client.NewHubRespawnHandler(helpers.IdCountLimit, cRespawnCallback)
 
 	return &hc
 }
 
-// RemoveClientIfTimeout will remove a client only
-// if the client is timedout
-func (hc *HubController) RemoveClientIfTimeout(id uint8) error {
-	checkState := func() error {
-		hc.lock.RLock()
-		defer hc.lock.RUnlock()
-		status, ok := hc.clientManager.GetClientStatus(id)
-		if !ok {
-			return ErrClientDoesNotExist{
-				id: id,
-			}
-		} else if status != client.Timeout {
-			return ErrClientNotTimedOut{
-				id: id,
-			}
-		}
-		return nil
+func (hc *HubController) respawnPlayer(id uint8) error {
+	// check if the player is stil active
+	// only respawn if the client is still
+	// active.
+	err := hc.checkClientState(id, client.Active)
+
+	if err != nil {
+		return err
 	}
 
-	err := checkState()
+	// TODO: get the new spawn point of the player
+
+	return nil
+}
+
+func (hc *HubController) checkClientState(id uint8, expectedState client.ConnectionStatus) error {
+	hc.lock.RLock()
+	defer hc.lock.RUnlock()
+	status, ok := hc.clientManager.GetClientStatus(id)
+	if !ok {
+		return ErrClientDoesNotExist{
+			id: id,
+		}
+	} else if status != expectedState {
+		return ErrClientUnexpectedState{
+			state: expectedState,
+			id:    id,
+		}
+	}
+	return nil
+}
+
+// removeClientIfTimeout will remove a client only
+// if the client is timedout
+func (hc *HubController) removeClientIfTimeout(id uint8) error {
+
+	err := hc.checkClientState(id, client.Timeout)
+
 	if err != nil {
 		return err
 	}
