@@ -107,6 +107,8 @@ func NewHubController() *HubController {
 		// error is not important for execution
 		// as it only says if there was an
 		// execution or not
+		logger.Debugf("spawning player [%d] back into the map", id)
+
 		_ = hc.respawnPlayer(id)
 	}
 
@@ -261,6 +263,8 @@ func (hc *HubController) RegisterClient(meta client.ClientMeta) error {
 	if err != nil {
 		return err
 	}
+
+	logger.Debugf("Spawning player [%d] at x : [%f] y : [%f]", id, coord.X(), coord.Y())
 
 	// add the queue to the controller
 	hc.lock.Lock()

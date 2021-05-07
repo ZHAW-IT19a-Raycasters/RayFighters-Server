@@ -70,6 +70,7 @@ func NewHubRespawnHandler(bufferSize int, callback func(id uint8)) HubRespawnHan
 // RegisterRespawn will respawn the user called by the parameter id
 // once its respawn time has run out.
 func (rh *HubRespawnHandler) RegisterRespawn(id uint8) {
+	logger.Debugf("registered respawn for player [%d]", id)
 	data := newRespawnData(id)
 	rh.baseTimer.Enqueue(data)
 }

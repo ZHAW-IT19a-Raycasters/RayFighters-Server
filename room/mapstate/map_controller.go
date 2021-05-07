@@ -48,15 +48,30 @@ func (mc *MapController) AddClient(id uint8) (gamemap.Coordinate, error) {
 		}
 	}
 
-	coord, err := mc.RandomSpawn(id)
-
-	if err != nil {
-		return gamemap.Coordinate{}, nil
-	}
+	coord := mc.unsafeRandomSpawn(id)
 
 	return coord, nil
 }
 
+// unsafeRandomSpawn is the inner logic of the random spawn
+// functionality, this function does not assume anything
+// about the players existance or else, so be carefull
+// when using it.
+func (mc *MapController) unsafeRandomSpawn(id uint8) gamemap.Coordinate {
+	nextRand := mc.getNextInt(len(mc.spawingarea))
+	spawn := mc.spawingarea[nextRand]
+	coord := gamemap.NewCoordinate(spawn.X(), spawn.Y(), 0)
+	pCoord := &coord
+
+	mc.lock.Lock()
+	defer mc.lock.Unlock()
+
+	mc.clients[id] = pCoord
+
+	return coord
+}
+
+// RandomSpawn will move a players location as to respawn it into the game.
 func (mc *MapController) RandomSpawn(id uint8) (gamemap.Coordinate, error) {
 	// no lock is needed here as
 	// there the coordinate has
@@ -68,15 +83,7 @@ func (mc *MapController) RandomSpawn(id uint8) (gamemap.Coordinate, error) {
 		}
 	}
 
-	nextRand := mc.getNextInt(len(mc.spawingarea))
-	spawn := mc.spawingarea[nextRand]
-	coord := gamemap.NewCoordinate(spawn.X(), spawn.Y(), 0)
-	pCoord := &coord
-
-	mc.lock.Lock()
-	defer mc.lock.Unlock()
-
-	mc.clients[id] = pCoord
+	coord := mc.unsafeRandomSpawn(id)
 
 	return coord, nil
 }
