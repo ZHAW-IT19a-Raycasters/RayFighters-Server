@@ -89,7 +89,7 @@ func setupTestServer(t *testing.T) ([]*room.Hub, *httptest.Server, error) {
 	// Need to create a router that we can pass the request through so that the vars will be added to the context
 	router := mux.NewRouter()
 
-	auth := newAuthManager()
+	auth, _ := newAuthManager("")
 
 	router.HandleFunc("/auth", auth.ServeAuthWithKey())
 	router.HandleFunc("/ws/{roomID:[0-9]+}", func(rw http.ResponseWriter, r *http.Request) {

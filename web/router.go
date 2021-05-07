@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"time"
 
@@ -16,7 +15,6 @@ import (
 	"github.zhaw.ch/raycasters/server/log"
 	"github.zhaw.ch/raycasters/server/room"
 	"github.zhaw.ch/raycasters/server/room/client"
-	"github.zhaw.ch/raycasters/server/utils"
 	"github.zhaw.ch/raycasters/server/web/helpers"
 
 	webconfig "github.zhaw.ch/raycasters/server/web/config"
@@ -24,8 +22,8 @@ import (
 
 const (
 	hubsCount           int           = 3
-	serverTimeout       time.Duration = 15 * time.Second
 	websocketBufferSize int           = 1024
+	serverTimeout       time.Duration = 15 * time.Second
 )
 
 var logger = log.Log()
@@ -51,20 +49,10 @@ func NewServer(conf *webconfig.WebConfig) (*Server, error) {
 		go hubs[i].Run()
 	}
 
-	data, err := ioutil.ReadFile(conf.JWTConfig.RsaPrivateKey)
+	auth, err := newAuthManager(conf.JWTConfig.RsaPrivateKey)
 
 	if err != nil {
 		return nil, err
-	}
-
-	rsaKEy, err := utils.ParseRSA(data)
-
-	if err != nil {
-		return nil, err
-	}
-
-	auth := authenticationManager{
-		privateKey: rsaKEy,
 	}
 
 	// init global jwt decoding
