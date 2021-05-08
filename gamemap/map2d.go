@@ -79,3 +79,12 @@ func (map2d *Map2d) GetLegalSpawns() []Coordinate {
 	}
 	return res
 }
+
+func (map2d *Map2d) IsMapBoundary(x int, y int) bool {
+	return x == (map2d.dim-1) || y == (map2d.dim-1)
+}
+
+// IsPenetrable true if a bullet can pass through it
+func (map2d *Map2d) IsPenetrable(x int, y int) bool {
+	return map2d.MapElementAt(x, y) != Wall
+}
