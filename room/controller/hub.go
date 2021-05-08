@@ -45,7 +45,7 @@ var (
 // different modules like the map or the client manager.
 type Hub struct {
 	// id is the designated hub identifier
-	id int
+	id uint8
 	// controller is the struct responsible for running all the client opcodes
 	// and handling all the io.
 	controller *HubController
@@ -66,7 +66,7 @@ type Hub struct {
 // NewHub will initiate a new hub struct.
 // The hubId needs to be unique over all
 // the data structures.
-func NewHub(hubId int) *Hub {
+func NewHub(hubId uint8) *Hub {
 	h := &Hub{
 		input:      make(chan client.ClientMeta),
 		controller: NewHubController(),
