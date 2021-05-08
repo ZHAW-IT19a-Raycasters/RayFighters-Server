@@ -174,12 +174,11 @@ func (mc *MapController) GetHit(shooterID uint8, shotAngle, xShooter, yShooter f
 		}
 		xTarget = coord.X()
 		yTarget = coord.Y()
-		logger.Debugf("Target position: x-%f, y-%f", xTarget, yTarget)
 		// if area around target intersects the ray -> hit
 		distToRay = calcDistToShotTrajectory(a, b, c, xTarget, yTarget)
-		logger.Debugf("ID-%d distance from shot: %f", targetID, distToRay)
 		if distToRay <= margin {
 			// Invariant: target intersects the trajectory of shot
+
 			if isShotInDirectionOfTarget(xTarget, yTarget, xShooter, yShooter, shotAngle) {
 				// pick the nearest target
 				d := getDistance(xShooter, yShooter, xTarget, yTarget)
@@ -191,6 +190,7 @@ func (mc *MapController) GetHit(shooterID uint8, shotAngle, xShooter, yShooter f
 				}
 			}
 		}
+		logger.Debugf("Shot from (%f,%f) @ Target (%f,%f). Hit? %v. Delta trajectory: %f", xShooter, yShooter, xTarget, yTarget, hit, distToRay)
 	}
 	return hit, targetID, xTarget, yTarget
 }
