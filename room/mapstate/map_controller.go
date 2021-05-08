@@ -146,8 +146,8 @@ func (mc *MapController) IsPenetrable(x int, y int) bool {
 	return mc.map2d.IsPenetrable(x, y)
 }
 
-// GetHit returns uid of the client, which may be hit by the shot, given there are no impenetrable obstacles on the way.
-func (mc *MapController) GetHit(shooterID uint8, shotAngle, xShooter, yShooter float64) (bool, uint8, float64, float64) {
+// GetNearestHit returns uid of the nearest client, which may be hit by the shot, given there are no impenetrable obstacles on the way.
+func (mc *MapController) GetNearestHit(shooterID uint8, shotAngle, xShooter, yShooter float64) (bool, uint8, float64, float64) {
 	// calculate ray constants
 	slope := math.Tan(shotAngle)
 	a := -slope
@@ -236,10 +236,10 @@ func (mc *MapController) CheckShooting(shooterId uint8, shotAngle float64) (bool
 
 	// ray origin coordinates
 	//rayStartX, rayStartY, _ := mc.GetPosition(shooterId)
-	//hit, targetID, targetX, targetY := mc.GetHit(shooterId, shotAngle, rayStartX, rayStartY)
+	//hit, targetID, targetX, targetY := mc.GetNearestHit(shooterId, shotAngle, rayStartX, rayStartY)
 	rayStartX, rayStartY, _ := mc.GetPosition(shooterId)
 	logger.Debugf("Ray origin: x-%f, y-%f", rayStartX, rayStartY)
-	hit, targetID, _, _ := mc.GetHit(shooterId, shotAngle, rayStartX, rayStartY)
+	hit, targetID, _, _ := mc.GetNearestHit(shooterId, shotAngle, rayStartX, rayStartY)
 	logger.Debugf("Shooter: %d Hit: %v", shooterId, hit)
 	if !hit {
 		return false, 0
