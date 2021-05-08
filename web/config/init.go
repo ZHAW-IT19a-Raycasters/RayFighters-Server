@@ -49,6 +49,11 @@ type JwtConfig struct {
 // CheckConfiguration checks if the Jwt configuration is
 // valid.
 func (j *JwtConfig) CheckConfiguration() error {
+	// special case where a new RSA key is
+	// generated for the system.
+	if j.RsaPrivateKey == "" {
+		return nil
+	}
 	return CheckIfRSAValid(j.RsaPrivateKey)
 }
 

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"html"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"time"
 	"unicode/utf8"
@@ -13,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/lestrrat-go/jwx/jwa"
 	"github.com/lestrrat-go/jwx/jwt"
+	"github.zhaw.ch/raycasters/server/utils"
 )
 
 const (
@@ -21,6 +23,34 @@ const (
 	JwtUUID       string = "uuid"
 )
 
+// errParseCookie is the error that happens on a parse error
+type errParseCookie struct {
+	logMsg, httpMsg string
+	status          int
+}
+
+// ErrAuthManagerFailour is the error that is returned once
+// there is an authentication error of any kind.
+type ErrAuthManagerFailure struct {
+	internal error
+}
+
+// Error satisfies the error interface
+func (err ErrAuthManagerFailure) Error() string {
+	return fmt.Sprintf("an error happend while creating the auth manager [%s]", err.Unwrap().Error())
+}
+
+// Is satisfies the errors.Is interface
+func (err ErrAuthManagerFailure) Is(target error) bool {
+	_, ok := target.(ErrAuthManagerFailure)
+	return ok
+}
+
+// Unwrap satisfies the errors.Unwrap functionality.
+func (err ErrAuthManagerFailure) Unwrap() error {
+	return err.internal
+}
+
 // Create a struct to read the username and password from the request body
 type Credentials struct {
 	Username string `json:"username"`
@@ -28,7 +58,51 @@ type Credentials struct {
 
 // holds information needed for validating provided authentication
 type authenticationManager struct {
-	privateKey *rsa.PrivateKey
+	privateKeyPath string
+	privateKey     *rsa.PrivateKey
+}
+
+// newAuthManager will create a new auth manager
+// using either the given path or creating a new
+// internally used RSA private key.
+func newAuthManager(privateKeyPath string) (authenticationManager, error) {
+	// special case where a new rsa key has to be generated
+	if privateKeyPath == "" {
+		logger.Debug("Generating a temporary RSA PRIVATE KEY")
+		key, err := utils.GenerateRSA()
+		if err != nil {
+			return authenticationManager{},
+				ErrAuthManagerFailure{
+					internal: err,
+				}
+		}
+		return authenticationManager{
+			privateKeyPath: privateKeyPath,
+			privateKey:     key,
+		}, nil
+	}
+
+	logger.Debug("reading the RSA PRIVATE KEY")
+
+	data, err := ioutil.ReadFile(privateKeyPath)
+
+	if err != nil {
+		return authenticationManager{}, ErrAuthManagerFailure{
+			internal: err,
+		}
+	}
+	key, err := utils.ParseRSA(data)
+
+	if err != nil {
+		return authenticationManager{}, ErrAuthManagerFailure{
+			internal: err,
+		}
+	}
+
+	return authenticationManager{
+		privateKeyPath: privateKeyPath,
+		privateKey:     key,
+	}, nil
 }
 
 // ServeAuthWithKey creates a closure with the given key and
@@ -37,6 +111,7 @@ type authenticationManager struct {
 // and adds it to the Response Header via Set-Cookie
 func (auth *authenticationManager) ServeAuthWithKey() (HandleFunc func(w http.ResponseWriter, r *http.Request)) {
 	return func(w http.ResponseWriter, r *http.Request) {
+		// check if there already is a valid JWT token
 
 		var creds Credentials
 		err := parseToCredentialsFromJSON(&creds, r.Body)
@@ -87,24 +162,42 @@ func (auth *authenticationManager) createCookie(creds *Credentials) (*http.Cooki
 	}, nil
 }
 
+// parseCookie will parse the cookie if possible to
+// check for its validity.
+func (amw *authenticationManager) parseCookie(r *http.Request) (jwt.Token, *errParseCookie) {
+	logger.Debug(r.Cookies())
+	// get cookie from request
+	jwtCookie, err := r.Cookie(JwtCookieName)
+	if err != nil {
+		return nil, &errParseCookie{
+			logMsg:  fmt.Sprintf("no JWT found in request Cookies %s", err.Error()),
+			httpMsg: "no JWT found in Cookies",
+			status:  http.StatusUnauthorized,
+		}
+	}
+
+	logger.Debug(*jwtCookie)
+
+	token, err := jwt.ParseString(jwtCookie.Value, jwt.WithVerify(jwa.RS512, amw.privateKey.PublicKey))
+
+	if err != nil {
+		return nil, &errParseCookie{
+			logMsg:  fmt.Sprintf("unauthenticated request %s", err.Error()),
+			httpMsg: "unauthenticated request",
+			status:  http.StatusUnauthorized,
+		}
+	}
+	return token, nil
+}
+
 // Middleware checks if user is authenticated via valid token
 func (amw *authenticationManager) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		logger.Debug(r.Cookies())
-		// get cookie from request
-		jwtCookie, err := r.Cookie(JwtCookieName)
-		if err != nil {
-			logger.Warnf("no JWT found in request Cookies %s", err)
-			http.Error(w, "no JWT found in Cookies", http.StatusUnauthorized)
-			return
-		}
-		logger.Debug(*jwtCookie)
+		token, errHandler := amw.parseCookie(r)
 
-		token, err := jwt.ParseString(jwtCookie.Value, jwt.WithVerify(jwa.RS512, amw.privateKey.PublicKey))
-
-		if err != nil {
-			logger.Warnf("unauthenticated request %s", err)
-			http.Error(w, err.Error(), http.StatusUnauthorized)
+		if errHandler != nil {
+			logger.Info(errHandler.httpMsg)
+			http.Error(w, errHandler.httpMsg, errHandler.status)
 			return
 		}
 
