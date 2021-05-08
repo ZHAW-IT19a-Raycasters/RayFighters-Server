@@ -14,12 +14,14 @@ import (
 func helper(t *testing.T, err error) {
 	if err != nil {
 		t.Errorf("Arguments are supposed to be valid\n%w", err)
+		t.SkipNow()
 	}
 }
 
 func helperNil(t *testing.T, err error, msg string) {
 	if err == nil {
 		t.Errorf("Arguments are supposed to be invalid\n%s", msg)
+		t.SkipNow()
 	}
 }
 
@@ -37,7 +39,7 @@ func TestUsageMessage(t *testing.T) {
 	orgs := os.Args
 	t.Cleanup(func() { os.Args = orgs })
 
-	os.Args = []string{"progname", "-p", "88", "-i", "localhost"}
+	os.Args = []string{"progname", "-p", "88", "-i", "127.0.0.1"}
 	parser, buffer := setupArgParser(t)
 
 	exp := "hallo"
@@ -56,7 +58,7 @@ func TestValidArguments(t *testing.T) {
 	oldArgs := os.Args
 	t.Cleanup(func() { os.Args = oldArgs })
 
-	os.Args = []string{"progname", "-p", "88", "-i", "localhost"}
+	os.Args = []string{"progname", "-p", "88", "-i", "127.0.0.1"}
 	parser, err := argParse()
 	args := parser.Args()
 
@@ -89,7 +91,7 @@ func TestInvalidPortArgument(t *testing.T) {
 }
 
 func TestInvalidIPArgument(t *testing.T) {
-	rawArgs := [...]string{"progname", "-p", "-88", "-i", "localhost"}
+	rawArgs := [...]string{"progname", "-p", "-88", "-i", "127.0.0.1"}
 	parser, err := rawArgParse(rawArgs[:])
 
 	if parser.Args() != nil {

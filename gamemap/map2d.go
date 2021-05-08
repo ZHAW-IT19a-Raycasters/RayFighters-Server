@@ -40,7 +40,9 @@ func (map2d *Map2d) MapElementAt(x int, y int) MapElement {
 	if x >= d || y >= d || x < 0 || y < 0 {
 		return Floor
 	}
-	return map2d.map2d[x][y]
+	// as per definition seen in
+	// https://github.zhaw.ch/raycasters/docs/wiki/Map
+	return map2d.map2d[y][x]
 }
 
 // GetMapDimension returns map dimension

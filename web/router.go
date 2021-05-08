@@ -2,8 +2,6 @@ package web
 
 import (
 	"context"
-	"crypto/rand"
-	"crypto/rsa"
 	"errors"
 	"fmt"
 	"net/http"
@@ -24,8 +22,8 @@ import (
 
 const (
 	hubsCount           int           = 3
-	serverTimeout       time.Duration = 15 * time.Second
 	websocketBufferSize int           = 1024
+	serverTimeout       time.Duration = 15 * time.Second
 )
 
 var logger = log.Log()
@@ -33,35 +31,28 @@ var logger = log.Log()
 // Server holds all endpoints for a server
 type Server struct {
 	endpoint *http.Server
+	auth     authenticationManager
+	conf     *webconfig.WebConfig
 }
 
 // ErrRoomIdUnavailable can be thrown when a room is requested that cannot currently be accessed.
 var ErrRoomIdUnavailable = errors.New("no Room available for the given ID")
 
-// TODO: Read this from the configuration
-var jwtKey *rsa.PrivateKey = initKey()
-var authMIddleware = authenticationMiddleware{jwtKey}
-
-func initKey() *rsa.PrivateKey {
-	// generate private key
-	privKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		logger.Warnf("failed to generate private key: %s", err)
-		str := fmt.Sprintf("Was not able to initialize the random key - [%s]", err.Error())
-		panic(str)
-	}
-	return privKey
-}
-
 // NewServer registers routes for all exposed endpoints
 // and attaches the appropriate routehandler functions
-func NewServer(conf *webconfig.WebConfig) *Server {
+func NewServer(conf *webconfig.WebConfig) (*Server, error) {
 	// instantiate hubs
 	var hubs [hubsCount]*room.Hub
 	var i int = 0
 	for ; i < hubsCount; i++ {
 		hubs[i] = room.NewHub(i)
 		go hubs[i].Run()
+	}
+
+	auth, err := newAuthManager(conf.JWTConfig.RsaPrivateKey)
+
+	if err != nil {
+		return nil, err
 	}
 
 	// init global jwt decoding
@@ -71,16 +62,18 @@ func NewServer(conf *webconfig.WebConfig) *Server {
 
 	// serve /auth without authentication middleware
 	router.Path("/auth").
-		Handler(http.HandlerFunc(authMIddleware.ServeAuthWithKey())).
+		Handler(http.HandlerFunc(auth.ServeAuthWithKey())).
 		Methods(http.MethodPost, http.MethodOptions)
 
 	// create a sub router for the blocked paths
 	api := router.PathPrefix("/").Subrouter()
-	api.Use(authMIddleware.Middleware)
+	api.Use(auth.Middleware)
 
 	api.HandleFunc("/", serveRoot)
 
-	api.HandleFunc("/ws/{roomID:[0-9]+}", func(w http.ResponseWriter, r *http.Request) {
+	wsPath := fmt.Sprintf("/ws/{%s:[0-9]+}", helpers.RoomIdParameter)
+
+	api.HandleFunc(wsPath, func(w http.ResponseWriter, r *http.Request) {
 		// TODO: get a hub reference from handler function via HubManager
 		// handle with a wrapper lambda for now
 		serveWs(hubs[:], w, r)
@@ -91,15 +84,7 @@ func NewServer(conf *webconfig.WebConfig) *Server {
 	// for more information about the topic
 	corsHandler := cors.New(
 		cors.Options{
-			// TODO: add allowed domains from config
-			AllowedOrigins: []string{
-				// this system
-				"http://127.0.0.1:8080",
-				"http://localhost:8080",
-				// frontend
-				"http://127.0.0.1:9000",
-				"http://localhost:9000",
-			},
+			AllowedOrigins:   conf.CORS.Domains,
 			AllowedMethods:   []string{http.MethodGet, http.MethodPost, http.MethodOptions},
 			AllowCredentials: true,
 		},
@@ -107,14 +92,16 @@ func NewServer(conf *webconfig.WebConfig) *Server {
 
 	httpServer := &http.Server{
 		Handler:      corsHandler.Handler(router),
-		Addr:         conf.String(),
+		Addr:         conf.Address(),
 		WriteTimeout: serverTimeout,
 		ReadTimeout:  serverTimeout,
 	}
 
 	return &Server{
 		endpoint: httpServer,
-	}
+		auth:     auth,
+		conf:     conf,
+	}, nil
 }
 
 // Start starts listening and serving the configured server.
@@ -143,6 +130,7 @@ func serveWs(hubs []*room.Hub, w http.ResponseWriter, r *http.Request) {
 
 	logger.Debug("http connection received")
 	roomID, err := helpers.ParseRoomID(r)
+
 	if err != nil {
 		logger.Error(err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -154,55 +142,8 @@ func serveWs(hubs []*room.Hub, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// get cookie from request
-	jwtCookie, err := r.Cookie(JwtCookieName)
+	user, err := parseUserInformation(w, r)
 	if err != nil {
-		logger.Debugf("no JWT token found in cookie")
-		http.Error(w, "no JWT found in Cookies", http.StatusForbidden)
-		return
-	}
-
-	// unmarshal the token
-	// error is not needed as it is directly send from here
-	// and validated previously.
-	token, _ := jwt.ParseString(jwtCookie.Value)
-	usernameI, userOk := token.Get(JwtUserName)
-	uuidI, uuidOk := token.Get(JwtUUID)
-
-	if !(userOk && uuidOk) {
-		logger.Debug("incorrect JWT token found in token cookie")
-		http.Error(w, "incorrect JWT token found in Cookies", http.StatusBadRequest)
-		return
-	}
-
-	username, userOk := usernameI.(string)
-
-	const unexpectedError = "unexpected error happened - please contact the service administrator"
-
-	if !userOk {
-		logger.Debugf("unable to string convert the user name")
-		http.Error(w, unexpectedError, http.StatusInternalServerError)
-		return
-	}
-
-	// as the uuid might be both a string as well as a uuid unit
-	// using e type switch here to figure its type out
-
-	var uuidVal uuid.UUID
-
-	switch parserd := uuidI.(type) {
-	case string:
-		uuidVal, err = uuid.Parse(parserd)
-		if err != nil {
-			logger.Debugf("unable to parse the uuid from [%s]", parserd)
-			http.Error(w, unexpectedError, http.StatusInternalServerError)
-			return
-		}
-	case uuid.UUID:
-		uuidVal = parserd
-	default:
-		logger.Debugf("unable to string convert the user uuid")
-		http.Error(w, unexpectedError, http.StatusInternalServerError)
 		return
 	}
 
@@ -237,8 +178,9 @@ func serveWs(hubs []*room.Hub, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cm := client.NewClientMeta(uuidVal, username, conn)
-	logger.Debug("Created client meta for ID [", cm.GetId(), "]")
+	cm := client.NewClientMeta(user.uid, user.name, conn)
+	logger.Debugf("Created client meta for ID [% X]", cm.GetId())
+
 	err = hubs[roomID].RegisterClient(cm)
 
 	if err != nil {
@@ -247,5 +189,5 @@ func serveWs(hubs []*room.Hub, w http.ResponseWriter, r *http.Request) {
 		conn.Close()
 		return
 	}
-	logger.Infof("user %s with uuid %s joined room %d", username, uuidVal, roomID)
+	logger.Infof("user [%s] with uuid [%s] joined room [%d]", user.name, user.uid, roomID)
 }

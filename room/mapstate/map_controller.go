@@ -1,7 +1,7 @@
 package mapstate
 
 import (
-	"fmt"
+	"github.zhaw.ch/raycasters/server/log"
 	"math"
 	"math/rand"
 	"sync"
@@ -9,8 +9,10 @@ import (
 	"github.zhaw.ch/raycasters/server/gamemap"
 )
 
+var logger = log.Log()
+
 type MapController struct {
-	clients     map[uint8]gamemap.Coordinate
+	clients     map[uint8]*gamemap.Coordinate
 	spawingarea []gamemap.Coordinate
 	map2d       gamemap.Map2d
 	getNextInt  func(int) int
@@ -20,74 +22,91 @@ type MapController struct {
 func NewMapController(filePath string) (MapController, error) {
 	map2d, err := gamemap.LoadMap2d(filePath)
 	if err != nil {
-		// TODO: Write wrapper for this error
 		return MapController{}, err
 	}
 	return MapController{
 		spawingarea: map2d.GetLegalSpawns(),
 		map2d:       map2d,
-		clients:     make(map[uint8]gamemap.Coordinate),
+		clients:     make(map[uint8]*gamemap.Coordinate),
 		getNextInt:  rand.Intn,
 		lock:        &sync.RWMutex{},
 	}, nil
 }
 
-func (mc *MapController) AddClient(id uint8) error {
-	// TODO: Clean up
-	mc.lock.Lock()
-	defer mc.lock.Unlock()
-
+// clientExists will check if the client already exists.
+// Attention this function locks on its own.
+func (mc *MapController) clientExists(id uint8) bool {
+	mc.lock.RLock()
+	defer mc.lock.RUnlock()
 	_, ok := mc.clients[id]
+	return ok
+}
 
+// AddClient will add a new client to the game map
+func (mc *MapController) AddClient(id uint8) (gamemap.Coordinate, error) {
+
+	ok := mc.clientExists(id)
 	if ok {
-		return ErrClientExists{
+		return gamemap.Coordinate{}, ErrClientExists{
 			id: id,
 		}
 	}
 
 	nextRand := mc.getNextInt(len(mc.spawingarea))
 	spawn := mc.spawingarea[nextRand]
-	mc.clients[id] = gamemap.NewCoordinate(spawn.X(), spawn.Y(), 0)
-	return nil
+	coord := gamemap.NewCoordinate(spawn.X(), spawn.Y(), 0)
+	pCoord := &coord
+
+	mc.lock.Lock()
+	defer mc.lock.Unlock()
+
+	mc.clients[id] = pCoord
+	return coord, nil
 }
 
 // RemoveClient will remove a client if possible
 func (mc *MapController) RemoveClient(id uint8) error {
-	mc.lock.Lock()
-	defer mc.lock.Unlock()
-	_, ok := mc.clients[id]
+
+	ok := mc.clientExists(id)
 	if !ok {
 		return ErrClientDoesNotExist{
 			id: id,
 		}
 	}
+
+	mc.lock.Lock()
+	defer mc.lock.Unlock()
+
 	delete(mc.clients, id)
 	return nil
 }
 
+// MoveClient will move the specified client to the given location
 func (mc *MapController) MoveClient(id uint8, x, y, angle float64) (gamemap.Coordinate, error) {
-	mc.lock.Lock()
-	defer mc.lock.Unlock()
+
+	// no lock is needed here as
+	// there the coordinate has
+	// its own.
 	client, ok := mc.clients[id]
 	if !ok {
 		return gamemap.Coordinate{}, ErrClientExists{
 			id: id,
 		}
 	}
+
 	coordinates := gamemap.NewCoordinate(x, y, angle)
 	mapCoordinates := coordinates.GetMapCoordinate()
 	element := mc.map2d.MapElementAt(mapCoordinates.X(), mapCoordinates.Y())
 
 	if element == gamemap.Wall {
-		return client, ErrWalkedIntoWall{id: id}
+		return *client, ErrWalkedIntoWall{id: id}
 	}
+
 	client.SetX(x)
 	client.SetY(y)
 	client.SetAngle(angle)
 
-	mc.clients[id] = client
-
-	return client, nil
+	return coordinates, nil
 }
 
 // GetClient will return a the state of a specific client.
@@ -99,7 +118,7 @@ func (mc *MapController) getClient(id uint8) (gamemap.Coordinate, bool) {
 	if !ok {
 		return gamemap.Coordinate{}, ok
 	}
-	return c, ok
+	return *c, ok
 }
 
 func (mc *MapController) GetPosition(userId uint8) (x float64, y float64, ok bool) {
@@ -107,7 +126,7 @@ func (mc *MapController) GetPosition(userId uint8) (x float64, y float64, ok boo
 	if !ok {
 		return 0, 0, ok
 	}
-	return c.Y(), c.Y(), ok
+	return c.X(), c.Y(), ok
 }
 
 func (mc *MapController) GetMapCoordinates(userId uint8) (x int, y int, ok bool) {
@@ -135,7 +154,7 @@ func (mc *MapController) GetHit(shooterID uint8, shotAngle, xShooter, yShooter f
 	b := 1.0
 	c := slope*xShooter - yShooter
 	// defines target size
-	margin := 0.5
+	margin := 0.15
 	hit := false
 	targetID := uint8(0)
 	distToRay := 0.0
@@ -155,9 +174,10 @@ func (mc *MapController) GetHit(shooterID uint8, shotAngle, xShooter, yShooter f
 		}
 		xTarget = coord.X()
 		yTarget = coord.Y()
+		logger.Debugf("Target position: x-%f, y-%f", xTarget, yTarget)
 		// if area around target intersects the ray -> hit
 		distToRay = calcDistToShotTrajectory(a, b, c, xTarget, yTarget)
-		fmt.Println("Distance ", distToRay)
+		logger.Debugf("ID-%d distance from shot: %f", targetID, distToRay)
 		if distToRay <= margin {
 			// Invariant: target intersects the trajectory of shot
 			if isShotInDirectionOfTarget(xTarget, yTarget, xShooter, yShooter, shotAngle) {
@@ -209,7 +229,7 @@ func calcDistToShotTrajectory(a, b, c, xTarget, yTarget float64) float64 {
 // raycasting return true if some player was hit and uid of victim, else (false, 0) is returnedx
 // shotAngle is in radians
 func (mc *MapController) CheckShooting(shooterId uint8, shotAngle float64) (bool, uint8) {
-	fmt.Println(180 / math.Pi * shotAngle)
+	logger.Debugf("Shot angle: %f°", 180/math.Pi*shotAngle)
 	// y axes directed vertically downwards
 	// x axes directed horizontally to the right
 	// STEP 1: Get candidate
@@ -218,7 +238,9 @@ func (mc *MapController) CheckShooting(shooterId uint8, shotAngle float64) (bool
 	//rayStartX, rayStartY, _ := mc.GetPosition(shooterId)
 	//hit, targetID, targetX, targetY := mc.GetHit(shooterId, shotAngle, rayStartX, rayStartY)
 	rayStartX, rayStartY, _ := mc.GetPosition(shooterId)
+	logger.Debugf("Ray origin: x-%f, y-%f", rayStartX, rayStartY)
 	hit, targetID, _, _ := mc.GetHit(shooterId, shotAngle, rayStartX, rayStartY)
+	logger.Debugf("Shooter: %d Hit: %v", shooterId, hit)
 	if !hit {
 		return false, 0
 	}

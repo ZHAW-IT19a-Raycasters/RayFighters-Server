@@ -1,10 +1,5 @@
 package setup
 
-import (
-	"errors"
-	"fmt"
-)
-
 // Setup is the struct that handles all the setup required
 // by the system.
 type Setup struct {
@@ -31,7 +26,7 @@ func writeArgsToConfig(conf *Configuration, args *commandlineArguments) {
 	}
 
 	if *args.Port > -1 {
-		conf.Web.Port = uint16(*args.Port)
+		conf.Web.Port = *args.Port
 	}
 }
 
@@ -51,7 +46,6 @@ func (s Setup) Configuration() *Configuration {
 	conf, err := confParser.Parse()
 
 	if err != nil {
-		err = fmt.Errorf("%s -> %w", err.Error(), errors.Unwrap(err))
 		argParser.Usage(err)
 		return nil
 	}

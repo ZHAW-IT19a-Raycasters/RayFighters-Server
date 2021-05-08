@@ -1,12 +1,12 @@
 package web
 
 import (
-	"crypto/rand"
 	"crypto/rsa"
 	"encoding/json"
 	"fmt"
 	"html"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"time"
 	"unicode/utf8"
@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/lestrrat-go/jwx/jwa"
 	"github.com/lestrrat-go/jwx/jwt"
+	"github.zhaw.ch/raycasters/server/utils"
 )
 
 const (
@@ -22,25 +23,85 @@ const (
 	JwtUUID       string = "uuid"
 )
 
+// errParseCookie is the error that happens on a parse error
+type errParseCookie struct {
+	logMsg, httpMsg string
+	status          int
+}
+
+// ErrAuthManagerFailour is the error that is returned once
+// there is an authentication error of any kind.
+type ErrAuthManagerFailure struct {
+	internal error
+}
+
+// Error satisfies the error interface
+func (err ErrAuthManagerFailure) Error() string {
+	return fmt.Sprintf("an error happend while creating the auth manager [%s]", err.Unwrap().Error())
+}
+
+// Is satisfies the errors.Is interface
+func (err ErrAuthManagerFailure) Is(target error) bool {
+	_, ok := target.(ErrAuthManagerFailure)
+	return ok
+}
+
+// Unwrap satisfies the errors.Unwrap functionality.
+func (err ErrAuthManagerFailure) Unwrap() error {
+	return err.internal
+}
+
 // Create a struct to read the username and password from the request body
 type Credentials struct {
 	Username string `json:"username"`
 }
 
 // holds information needed for validating provided authentication
-type authenticationMiddleware struct {
-	privateKey *rsa.PrivateKey
+type authenticationManager struct {
+	privateKeyPath string
+	privateKey     *rsa.PrivateKey
 }
 
-func newAuthMiddleware() (*authenticationMiddleware, error) {
-	// generate private key
-	privKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		logger.Error("Failed to create the auth middlwares random key")
-		return nil, err
+// newAuthManager will create a new auth manager
+// using either the given path or creating a new
+// internally used RSA private key.
+func newAuthManager(privateKeyPath string) (authenticationManager, error) {
+	// special case where a new rsa key has to be generated
+	if privateKeyPath == "" {
+		logger.Debug("Generating a temporary RSA PRIVATE KEY")
+		key, err := utils.GenerateRSA()
+		if err != nil {
+			return authenticationManager{},
+				ErrAuthManagerFailure{
+					internal: err,
+				}
+		}
+		return authenticationManager{
+			privateKeyPath: privateKeyPath,
+			privateKey:     key,
+		}, nil
 	}
-	return &authenticationMiddleware{
-		privateKey: privKey,
+
+	logger.Debug("reading the RSA PRIVATE KEY")
+
+	data, err := ioutil.ReadFile(privateKeyPath)
+
+	if err != nil {
+		return authenticationManager{}, ErrAuthManagerFailure{
+			internal: err,
+		}
+	}
+	key, err := utils.ParseRSA(data)
+
+	if err != nil {
+		return authenticationManager{}, ErrAuthManagerFailure{
+			internal: err,
+		}
+	}
+
+	return authenticationManager{
+		privateKeyPath: privateKeyPath,
+		privateKey:     key,
 	}, nil
 }
 
@@ -48,8 +109,9 @@ func newAuthMiddleware() (*authenticationMiddleware, error) {
 // returns a route handler that
 // creates a JWT, signs it with the provided key
 // and adds it to the Response Header via Set-Cookie
-func (auth *authenticationMiddleware) ServeAuthWithKey() (HandleFunc func(w http.ResponseWriter, r *http.Request)) {
+func (auth *authenticationManager) ServeAuthWithKey() (HandleFunc func(w http.ResponseWriter, r *http.Request)) {
 	return func(w http.ResponseWriter, r *http.Request) {
+		// check if there already is a valid JWT token
 
 		var creds Credentials
 		err := parseToCredentialsFromJSON(&creds, r.Body)
@@ -74,7 +136,7 @@ func (auth *authenticationMiddleware) ServeAuthWithKey() (HandleFunc func(w http
 	}
 }
 
-func (auth *authenticationMiddleware) createCookie(creds *Credentials) (*http.Cookie, error) {
+func (auth *authenticationManager) createCookie(creds *Credentials) (*http.Cookie, error) {
 	// create new client uuid
 	uuidStr := uuid.NewString()
 
@@ -100,24 +162,42 @@ func (auth *authenticationMiddleware) createCookie(creds *Credentials) (*http.Co
 	}, nil
 }
 
-// Middleware checks if user is authenticated via valid token
-func (amw *authenticationMiddleware) Middleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		logger.Debug(r.Cookies())
-		// get cookie from request
-		jwtCookie, err := r.Cookie(JwtCookieName)
-		if err != nil {
-			logger.Warnf("no JWT found in request Cookies %s", err)
-			http.Error(w, "no JWT found in Cookies", http.StatusUnauthorized)
-			return
+// parseCookie will parse the cookie if possible to
+// check for its validity.
+func (amw *authenticationManager) parseCookie(r *http.Request) (jwt.Token, *errParseCookie) {
+	logger.Debug(r.Cookies())
+	// get cookie from request
+	jwtCookie, err := r.Cookie(JwtCookieName)
+	if err != nil {
+		return nil, &errParseCookie{
+			logMsg:  fmt.Sprintf("no JWT found in request Cookies %s", err.Error()),
+			httpMsg: "no JWT found in Cookies",
+			status:  http.StatusUnauthorized,
 		}
-		logger.Debug(*jwtCookie)
+	}
 
-		token, err := jwt.ParseString(jwtCookie.Value, jwt.WithVerify(jwa.RS512, amw.privateKey.PublicKey))
+	logger.Debug(*jwtCookie)
 
-		if err != nil {
-			logger.Warnf("unauthenticated request %s", err)
-			http.Error(w, err.Error(), http.StatusUnauthorized)
+	token, err := jwt.ParseString(jwtCookie.Value, jwt.WithVerify(jwa.RS512, amw.privateKey.PublicKey))
+
+	if err != nil {
+		return nil, &errParseCookie{
+			logMsg:  fmt.Sprintf("unauthenticated request %s", err.Error()),
+			httpMsg: "unauthenticated request",
+			status:  http.StatusUnauthorized,
+		}
+	}
+	return token, nil
+}
+
+// Middleware checks if user is authenticated via valid token
+func (amw *authenticationManager) Middleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		token, errHandler := amw.parseCookie(r)
+
+		if errHandler != nil {
+			logger.Info(errHandler.httpMsg)
+			http.Error(w, errHandler.httpMsg, errHandler.status)
 			return
 		}
 
@@ -149,4 +229,82 @@ func validUsername(str string) (string, error) {
 func parseToCredentialsFromJSON(creds *Credentials, r io.Reader) error {
 	err := json.NewDecoder(r).Decode(&creds)
 	return err
+}
+
+// userInfo is an internal struct used
+// to transport the user information out
+// of the parse funtion.
+type userInfo struct {
+	uid  uuid.UUID
+	name string
+}
+
+// parseUserInformation will parse the user information
+func parseUserInformation(w http.ResponseWriter, r *http.Request) (userInfo, error) {
+
+	// get cookie from request
+	jwtCookie, err := r.Cookie(JwtCookieName)
+	if err != nil {
+		logger.Debugf("no JWT token found in cookie")
+		http.Error(w, "no JWT found in Cookies", http.StatusForbidden)
+		return userInfo{}, nil
+	}
+
+	// unmarshal the token
+	// error is not needed as it is directly send from here
+	// and validated previously.
+	token, _ := jwt.ParseString(jwtCookie.Value)
+	usernameI, userOk := token.Get(JwtUserName)
+	uuidI, uuidOk := token.Get(JwtUUID)
+
+	if !(userOk && uuidOk) {
+		logger.Debug("incorrect JWT token found in token cookie")
+		http.Error(w, "incorrect JWT token found in Cookies", http.StatusBadRequest)
+
+		return userInfo{}, nil
+	}
+
+	username, userOk := usernameI.(string)
+
+	const unexpectedError = "unexpected error happened - please contact the service administrator"
+
+	if !userOk {
+		logger.Debugf("unable to string convert the user name")
+		http.Error(w, unexpectedError, http.StatusInternalServerError)
+		return userInfo{}, nil
+	}
+
+	// check for username length and escape it
+	username, err = validUsername(username)
+
+	if err != nil {
+		logger.Debugf("unable to string convert the user name")
+		http.Error(w, unexpectedError, http.StatusInternalServerError)
+		return userInfo{}, err
+	}
+
+	// as the uuid might be both a string as well as a uuid unit
+	// using e type switch here to figure its type out
+
+	var uuidVal uuid.UUID
+
+	switch parserd := uuidI.(type) {
+	case string:
+		uuidVal, err = uuid.Parse(parserd)
+		if err != nil {
+			logger.Debugf("unable to parse the uuid from [%s]", parserd)
+			http.Error(w, unexpectedError, http.StatusInternalServerError)
+			return userInfo{}, nil
+		}
+	case uuid.UUID:
+		uuidVal = parserd
+	default:
+		logger.Debugf("unable to string convert the user uuid")
+		http.Error(w, unexpectedError, http.StatusInternalServerError)
+		return userInfo{}, nil
+	}
+	return userInfo{
+		name: username,
+		uid:  uuidVal,
+	}, nil
 }

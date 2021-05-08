@@ -85,10 +85,10 @@ func Test_getDistance(t *testing.T) {
 		{name: "point on point", args: args{1.0, 1.0, 1.0, 1.0}, want: 0.0},
 		{name: "point on point", args: args{-7.0, -4.0, 17.0, 6.5}, want: 26.196},
 	}
-	tol := 1e-4
+	tol := 1e-3
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := getDistance(tt.args.x1, tt.args.y1, tt.args.x2, tt.args.y2); math.Abs(got-tt.want) <= tol {
+			if got := getDistance(tt.args.x1, tt.args.y1, tt.args.x2, tt.args.y2); math.Abs(got-tt.want) > tol {
 				t.Errorf("getDistance() = %v, want %v", got, tt.want)
 			}
 		})
