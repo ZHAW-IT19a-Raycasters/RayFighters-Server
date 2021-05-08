@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.zhaw.ch/raycasters/server/room/controller"
 	"net/http"
 	"time"
 
@@ -13,7 +14,6 @@ import (
 	"github.com/lestrrat-go/jwx/jwt"
 	"github.com/rs/cors"
 	"github.zhaw.ch/raycasters/server/log"
-	"github.zhaw.ch/raycasters/server/room"
 	"github.zhaw.ch/raycasters/server/room/client"
 	"github.zhaw.ch/raycasters/server/web/helpers"
 
@@ -42,10 +42,10 @@ var ErrRoomIdUnavailable = errors.New("no Room available for the given ID")
 // and attaches the appropriate routehandler functions
 func NewServer(conf *webconfig.WebConfig) (*Server, error) {
 	// instantiate hubs
-	var hubs [hubsCount]*room.Hub
+	var hubs [hubsCount]*controller.Hub
 	var i int = 0
 	for ; i < hubsCount; i++ {
-		hubs[i] = room.NewHub(i)
+		hubs[i] = controller.NewHub(i)
 		go hubs[i].Run()
 	}
 
@@ -126,7 +126,7 @@ func serveRoot(writer http.ResponseWriter, request *http.Request) {
 // serveWs upgrades HTTP request to WebSocket connection
 // parses desired roomID from the request URL
 // and registers the client to the hub
-func serveWs(hubs []*room.Hub, w http.ResponseWriter, r *http.Request) {
+func serveWs(hubs []*controller.Hub, w http.ResponseWriter, r *http.Request) {
 
 	logger.Debug("http connection received")
 	roomID, err := helpers.ParseRoomID(r)
