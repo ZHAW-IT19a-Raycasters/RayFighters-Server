@@ -3,6 +3,7 @@ package gamemap
 import (
 	"io/ioutil"
 	"os"
+	"reflect"
 	"testing"
 )
 
@@ -113,5 +114,28 @@ func TestCompareDifferentDimension(t *testing.T) {
 	actual := map2dOne.Compare(&map2dTwo)
 	if expected != actual {
 		t.Errorf("false result: (expected: %v; actual: %v)", expected, actual)
+	}
+}
+
+func TestNewFlatMap2d(t *testing.T) {
+	type args struct {
+		mapDimension int
+	}
+	tests := []struct {
+		name string
+		args args
+		want Map2d
+	}{
+		{name: "Map of dimension 4", args: args{4}, want: struct {
+			dim   int
+			map2d [][]MapElement
+		}{dim: 4, map2d: [][]MapElement{{Floor, Floor, Floor, Floor}, {Floor, Floor, Floor, Floor}, {Floor, Floor, Floor, Floor}, {Floor, Floor, Floor, Floor}}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := NewFlatMap2d(tt.args.mapDimension); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("NewFlatMap2d() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
