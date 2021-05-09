@@ -264,7 +264,7 @@ func (mc *MapController) CheckShooting(shooterID uint8, shotAngle float64) (hit 
 			// some obstacle on the way was found
 			// Check if obstacle lies
 			// between target and shooter
-			if isCorrectMiddle(rayStartX, float64(xObstacle), targetX) && isCorrectMiddle(rayStartY, float64(yObstacle), targetY) {
+			if isTargetProtected(rayStartX, float64(xObstacle), targetX) && isTargetProtected(rayStartY, float64(yObstacle), targetY) {
 				// obstacle lies between shooter and target
 				// target is safe
 				// for now:)
@@ -273,6 +273,12 @@ func (mc *MapController) CheckShooting(shooterID uint8, shotAngle float64) (hit 
 		}
 	}
 	return true, targetID
+}
+
+// isTargetProtected verifies if for given parameters target will be protected by obstacle
+// Example y:(2.5,2.0,2,5) -> true
+func isTargetProtected(coordShooter, coordObstacle, coordTarget float64) bool {
+	return math.Floor(coordShooter) <= coordObstacle && coordObstacle <= math.Floor(coordTarget) || math.Floor(coordTarget) <= coordObstacle && coordObstacle <= math.Floor(coordShooter)
 }
 
 func (mc *MapController) GetNearestObstacleOnTrajectoryInShotDirection(shooterID uint8, shotAngle, rayStartX, rayStartY float64) (foundObstacle bool, xObstacle int, yObstacle int) {
@@ -355,11 +361,6 @@ func (mc *MapController) GetNearestObstacleOnTrajectoryInShotDirection(shooterID
 			return true, mapX, mapY
 		}
 	}
-}
-
-// isCorrectMiddle verifies if "middle" lies between var1 and middle
-func isCorrectMiddle(var1, middle, var2 float64) bool {
-	return var1 < middle && middle < var2 || var2 < middle && middle < var1
 }
 
 // CreateCustomClientMap is a helper function used in testing. Coordinates will be ordered to given id's
