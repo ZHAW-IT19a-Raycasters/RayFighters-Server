@@ -3,6 +3,7 @@ package mapstate
 import (
 	"github.zhaw.ch/raycasters/server/gamemap"
 	"math"
+	"reflect"
 	"sync"
 	"testing"
 )
@@ -214,6 +215,54 @@ func TestMapController_GetNearestObstacleOnTrajectoryInShotDirection(t *testing.
 				if got2 != tt.want_yObstacle {
 					t.Errorf("GetNearestObstacleOnTrajectoryInShotDirection() got_yObstacle = %v, want_yObstacle %v", got2, tt.want_yObstacle)
 				}
+			}
+		})
+	}
+}
+
+func Test_CreateCustomClientMap(t *testing.T) {
+	type args struct {
+		ids    []uint8
+		coords []float64
+	}
+	tests := []struct {
+		name string
+		args args
+		want *map[uint8]*gamemap.Coordinate
+	}{
+		{name: "", args: args{
+			ids:    []uint8{0, 2, 3},
+			coords: []float64{1.0, 1.0, 2.5, 1.0, 3.0, 1.0},
+		}, want: &map[uint8]*gamemap.Coordinate{0: gamemap.NewCustomCoordinate(1.0, 1.0), 2: gamemap.NewCustomCoordinate(2.5, 1.0), 3: gamemap.NewCustomCoordinate(3.0, 1.0)}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := CreateCustomClientMap(tt.args.ids, tt.args.coords); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("CreateCustomClientMap() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_isCorrectMiddle(t *testing.T) {
+	type args struct {
+		var1   float64
+		middle float64
+		var2   float64
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		{name: "Correct middle", args: args{1, 2, 3}, want: true},
+		{name: "Correct middle", args: args{3, 2, 1}, want: true},
+		{name: "False middle", args: args{2, 9, 1}, want: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isCorrectMiddle(tt.args.var1, tt.args.middle, tt.args.var2); got != tt.want {
+				t.Errorf("isCorrectMiddle() = %v, want %v", got, tt.want)
 			}
 		})
 	}
