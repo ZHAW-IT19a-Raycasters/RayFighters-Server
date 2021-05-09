@@ -363,3 +363,27 @@ func Test_CreateCustomClientMap(t *testing.T) {
 		})
 	}
 }
+
+func Test_isCorrectMiddle(t *testing.T) {
+	type args struct {
+		var1   float64
+		middle float64
+		var2   float64
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		{name: "Correct middle", args: args{1, 2, 3}, want: true},
+		{name: "Correct middle", args: args{3, 2, 1}, want: true},
+		{name: "False middle", args: args{2, 9, 1}, want: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isCorrectMiddle(tt.args.var1, tt.args.middle, tt.args.var2); got != tt.want {
+				t.Errorf("isCorrectMiddle() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
