@@ -95,3 +95,73 @@ func Test_getDistance(t *testing.T) {
 		})
 	}
 }
+func TestMapController_GetNearestHit(t *testing.T) {
+	shooterID := uint8(0)
+	shooterX := 1.0
+	shooterY := 1.0
+
+	type fields struct {
+		clients map[uint8]*gamemap.Coordinate
+		map2d   gamemap.Map2d
+	}
+	type args struct {
+		shooterID uint8
+		shotAngle float64
+		xShooter  float64
+		yShooter  float64
+	}
+	tests := []struct {
+		name        string
+		fields      fields
+		args        args
+		want        bool
+		wantID      uint8
+		wantTargetX float64
+		wantTargetY float64
+	}{
+		{name: "Someone got hit", fields: fields{
+			clients: *CreateCustomClientMap([]uint8{0, 1}, []float64{shooterX, shooterY, 2.5, 1.0}),
+			map2d:   gamemap.NewFlatMap2d(4),
+		}, args: args{shooterID, 0, shooterX, shooterY}, want: true, wantID: 1, wantTargetX: 2.5, wantTargetY: 1.0},
+		{name: "Nearest test: 2 Players inline", fields: fields{
+			clients: *CreateCustomClientMap([]uint8{0, 6, 10}, []float64{shooterX, shooterY, 3.0, shooterY, 2.5, shooterY}),
+			map2d:   gamemap.NewFlatMap2d(4),
+		}, args: args{shooterID, 0, shooterX, shooterY}, want: true, wantID: 10, wantTargetX: 2.5, wantTargetY: shooterY},
+		{name: "2 Players inline one behind", fields: fields{
+			clients: *CreateCustomClientMap([]uint8{0, 6, 10, 77}, []float64{shooterX, shooterY, 3.0, shooterY, 2.5, shooterY, 0.0, shooterY}),
+			map2d:   gamemap.NewFlatMap2d(4),
+		}, args: args{shooterID, 0, shooterX, shooterY}, want: true, wantID: 10, wantTargetX: 2.5, wantTargetY: 1.0},
+		{name: "Direction test: player behind is near", fields: fields{
+			clients: *CreateCustomClientMap([]uint8{007, 13, 77}, []float64{shooterX, shooterY, 3.0, shooterY, 0.0, shooterY}),
+			map2d:   gamemap.NewFlatMap2d(4),
+		}, args: args{shooterID, 0, shooterX, shooterY}, want: true, wantID: 13, wantTargetX: 3.0, wantTargetY: 1.0},
+		{name: "Direction test: one behind", fields: fields{
+			clients: *CreateCustomClientMap([]uint8{0, 88}, []float64{shooterX, shooterY, 0.0, shooterY}),
+			map2d:   gamemap.NewFlatMap2d(4),
+		}, args: args{shooterID, 0, shooterX, shooterY}, want: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mc := &MapController{
+				clients: tt.fields.clients,
+				map2d:   tt.fields.map2d,
+			}
+			got, got1, got2, got3 := mc.GetNearestHit(tt.args.shooterID, tt.args.shotAngle, tt.args.xShooter, tt.args.yShooter)
+			if got != tt.want {
+				t.Errorf("GetNearestHit() got = %v, wantHit %v", got, tt.want)
+			}
+			if got {
+				// This part only if hit was positive
+				if got1 != tt.wantID {
+					t.Errorf("GetNearestHit() gotID = %v, wantID %v", got1, tt.wantID)
+				}
+				if got2 != tt.wantTargetX {
+					t.Errorf("GetNearestHit() gotTargetX = %v, wantTargetX %v", got2, tt.wantTargetX)
+				}
+				if got3 != tt.wantTargetY {
+					t.Errorf("GetNearestHit() gotTargetY = %v, wantTargetY %v", got3, tt.wantTargetY)
+				}
+			}
+		})
+	}
+}
