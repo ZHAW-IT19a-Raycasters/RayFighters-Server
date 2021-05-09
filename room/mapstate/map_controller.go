@@ -264,7 +264,7 @@ func (mc *MapController) CheckShooting(shooterID uint8, shotAngle float64) (bool
 			// some obstacle on the way was found
 			// Check if obstacle lies
 			// between target and shooter
-			if inGivenOrder(rayStartX, float64(xObstacle), targetX) && inGivenOrder(rayStartY, float64(yObstacle), targetY) {
+			if isCorrectMiddle(rayStartX, float64(xObstacle), targetX) && isCorrectMiddle(rayStartY, float64(yObstacle), targetY) {
 				return false, 0
 			}
 		}
@@ -355,9 +355,9 @@ func (mc *MapController) GetNearestObstacleOnTrajectoryInShotDirection(shooterID
 	}
 }
 
-// true if values are in the give order
-func inGivenOrder(var1, var2, var3 float64) bool {
-	return var1 < var2 && var2 < var3
+// isCorrectMiddle verifies if "middle" lies between var1 and middle
+func isCorrectMiddle(var1, middle, var2 float64) bool {
+	return var1 < middle && middle < var2 || var2 < middle && middle < var1
 }
 
 // CreateCustomClientMap is a helper function used in testing. Coordinates will be ordered to given id's
