@@ -33,6 +33,16 @@ func NewMapController(filePath string) (MapController, error) {
 	}, nil
 }
 
+/*
+func NewMapCustomMapController() (MapController, error) {
+	return MapController{
+		spawingarea: map2d.GetLegalSpawns(),
+		map2d:       map2d,
+		clients:     make(map[uint8]*gamemap.Coordinate),
+		getNextInt:  rand.Intn,
+		lock:        &sync.RWMutex{},
+	}, nil
+}*/
 // clientExists will check if the client already exists.
 // Attention this function locks on its own.
 func (mc *MapController) clientExists(id uint8) bool {
@@ -172,21 +182,23 @@ func (mc *MapController) GetNearestHit(shooterID uint8, shotAngle, xShooter, ySh
 			// shooter itself should be skipped
 			continue
 		}
-		xTarget = coord.X()
-		yTarget = coord.Y()
+		x := coord.X()
+		y := coord.Y()
 		// if area around target intersects the ray -> hit
-		distToRay = calcDistToShotTrajectory(a, b, c, xTarget, yTarget)
+		distToRay = calcDistToShotTrajectory(a, b, c, x, y)
 		if distToRay <= margin {
 			// Invariant: target intersects the trajectory of shot
 
-			if isShotInDirectionOfTarget(xTarget, yTarget, xShooter, yShooter, shotAngle) {
+			if isShotInDirectionOfTarget(x, y, xShooter, yShooter, shotAngle) {
 				// pick the nearest target
-				d := getDistance(xShooter, yShooter, xTarget, yTarget)
+				d := getDistance(xShooter, yShooter, x, y)
 				if distToShooter > d {
 					hit = true
 					// save the best result
 					targetID = id
 					distToShooter = d
+					xTarget = x
+					yTarget = y
 				}
 			}
 		}
@@ -334,4 +346,14 @@ func (mc *MapController) CheckShooting(shooterId uint8, shotAngle float64) (bool
 // true if values are in the give order
 func inOrder(var1, var2, var3 float64) bool {
 	return var1 < var2 && var2 < var3
+}
+
+// CreateCustomClientMap is a helper function used in testing. Coordinates will be ordered to given id's
+// Example uint8[2,4], float64[]{2.1,2.2,4.1,4.2} -> [2]->[2.1,2.2], [4]->[4.1,4.2]
+func CreateCustomClientMap(ids []uint8, coords []float64) *map[uint8]*gamemap.Coordinate {
+	clientsMap := make(map[uint8]*gamemap.Coordinate)
+	for i := range ids {
+		clientsMap[ids[i]] = gamemap.NewCustomCoordinate(coords[i*2], coords[i*2+1])
+	}
+	return &clientsMap
 }

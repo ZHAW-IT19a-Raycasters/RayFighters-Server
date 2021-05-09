@@ -1,6 +1,7 @@
 package mapstate
 
 import (
+	"github.zhaw.ch/raycasters/server/gamemap"
 	"math"
 	"testing"
 )
