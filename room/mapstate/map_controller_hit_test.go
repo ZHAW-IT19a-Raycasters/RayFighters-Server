@@ -267,3 +267,47 @@ func Test_isCorrectMiddle(t *testing.T) {
 		})
 	}
 }
+
+func Test_CheckShooting(t *testing.T) {
+	flatMap := gamemap.NewFlatMap2d(4)
+	mapWithObstacle := gamemap.NewFlatMap2d(4)
+	mapWithObstacle.SetMapElement(2, 2, gamemap.Wall)
+	type fields struct {
+		clients map[uint8]*gamemap.Coordinate
+		map2d   gamemap.Map2d
+	}
+	type args struct {
+		shooterID uint8
+		shotAngle float64
+	}
+	tests := []struct {
+		name         string
+		fields       fields
+		args         args
+		wantHit      bool
+		wantVictimID uint8
+	}{
+		{name: "Missing on flat map", fields: fields{*CreateCustomClientMap([]uint8{0, 77}, []float64{0, 0, 3, 3}), flatMap}, args: args{0, 0}, wantHit: false, wantVictimID: 0},
+		{name: "Hit on flat map", fields: fields{*CreateCustomClientMap([]uint8{0, 77}, []float64{0, 0, 0.9, 0.9}), flatMap}, args: args{0, 0.785398}, wantHit: true, wantVictimID: 77},
+		{name: "Hit on flat map", fields: fields{*CreateCustomClientMap([]uint8{0, 77}, []float64{0, 0, 3, 3}), flatMap}, args: args{0, 0.785398}, wantHit: true, wantVictimID: 77},
+		{name: "Miss on map with obstacle", fields: fields{*CreateCustomClientMap([]uint8{0, 77}, []float64{0, 0, 3.1, 3.1}), mapWithObstacle}, args: args{0, 0.785398}, wantHit: false, wantVictimID: 77},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mc := &MapController{
+				clients: tt.fields.clients,
+				map2d:   tt.fields.map2d,
+				lock:    &sync.RWMutex{},
+			}
+			hit, victimID := mc.CheckShooting(tt.args.shooterID, tt.args.shotAngle)
+			if hit != tt.wantHit {
+				t.Errorf("CheckShooting() hit = %v, want %v", hit, tt.wantHit)
+			}
+			if hit {
+				if victimID != tt.wantVictimID {
+					t.Errorf("CheckShooting() victimID = %v, want %v", victimID, tt.wantVictimID)
+				}
+			}
+		})
+	}
+}
