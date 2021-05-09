@@ -240,7 +240,7 @@ func calcDistToShotTrajectory(a, b, c, xTarget, yTarget float64) float64 {
 
 // raycasting return true if some player was hit and uid of victim, else (false, 0) is returnedx
 // shotAngle is in radians
-func (mc *MapController) CheckShooting(shooterID uint8, shotAngle float64) (bool, uint8) {
+func (mc *MapController) CheckShooting(shooterID uint8, shotAngle float64) (hit bool, victimID uint8) {
 	logger.Debugf("Shot angle: %f°", 180/math.Pi*shotAngle)
 	// y axes directed vertically downwards
 	// x axes directed horizontally to the right
@@ -258,18 +258,20 @@ func (mc *MapController) CheckShooting(shooterID uint8, shotAngle float64) (bool
 	} else {
 		foundObstacle, xObstacle, yObstacle := mc.GetNearestObstacleOnTrajectoryInShotDirection(shooterID, shotAngle, rayStartX, rayStartY)
 		if !foundObstacle {
-			// someone is got hit :(
+			// someone got hit :(
 			return true, targetID
 		} else {
 			// some obstacle on the way was found
 			// Check if obstacle lies
 			// between target and shooter
 			if isCorrectMiddle(rayStartX, float64(xObstacle), targetX) && isCorrectMiddle(rayStartY, float64(yObstacle), targetY) {
+				// obstacle lies between shooter and target
+				// target is safe
+				// for now:)
 				return false, 0
 			}
 		}
 	}
-
 	return true, targetID
 }
 
