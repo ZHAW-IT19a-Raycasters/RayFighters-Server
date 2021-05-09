@@ -3,6 +3,7 @@ package mapstate
 import (
 	"github.zhaw.ch/raycasters/server/gamemap"
 	"math"
+	"sync"
 	"testing"
 )
 
@@ -160,6 +161,58 @@ func TestMapController_GetNearestHit(t *testing.T) {
 				}
 				if got3 != tt.wantTargetY {
 					t.Errorf("GetNearestHit() gotTargetY = %v, wantTargetY %v", got3, tt.wantTargetY)
+				}
+			}
+		})
+	}
+}
+
+func TestMapController_GetNearestObstacleOnTrajectoryInShotDirection(t *testing.T) {
+	flatMap := gamemap.NewFlatMap2d(4)
+	map2d := gamemap.NewFlatMap2d(4)
+	map2d.SetMapElement(2, 0, gamemap.Wall)
+	map2d.SetMapElement(3, 3, gamemap.Wall)
+	map2d.SetMapElement(0, 3, gamemap.Wall)
+	type fields struct {
+		clients map[uint8]*gamemap.Coordinate
+		map2d   gamemap.Map2d
+	}
+	type args struct {
+		shooterID uint8
+		shotAngle float64
+		rayStartX float64
+		rayStartY float64
+	}
+	tests := []struct {
+		name               string
+		fields             fields
+		args               args
+		want_foundObstacle bool
+		want_xObstacle     int
+		want_yObstacle     int
+	}{
+		{name: "Shot in x-direction hits the wall", fields: fields{*CreateCustomClientMap([]uint8{0}, []float64{0.5, 0.5}), map2d}, args: args{0, 0, 0.5, 0.5}, want_foundObstacle: true, want_xObstacle: 2, want_yObstacle: 0},
+		{name: "Diagonal shot hits the wall", fields: fields{*CreateCustomClientMap([]uint8{0}, []float64{1, 1}), map2d}, args: args{0, 0.7853, 1, 1}, want_foundObstacle: true, want_xObstacle: 3, want_yObstacle: 3},
+		{name: "Shot in y-direction hits the wall ", fields: fields{*CreateCustomClientMap([]uint8{0}, []float64{0.5, 0.5}), map2d}, args: args{0, 1.5708, 0.5, 0.5}, want_foundObstacle: true, want_xObstacle: 0, want_yObstacle: 3},
+		{name: "Flat map: no hit", fields: fields{*CreateCustomClientMap([]uint8{0}, []float64{1, 1}), flatMap}, args: args{0, 0.7853, 1, 1}, want_foundObstacle: false, want_xObstacle: 3, want_yObstacle: 3},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mc := &MapController{
+				clients: tt.fields.clients,
+				map2d:   tt.fields.map2d,
+				lock:    &sync.RWMutex{},
+			}
+			got, got1, got2 := mc.GetNearestObstacleOnTrajectoryInShotDirection(tt.args.shooterID, tt.args.shotAngle, tt.args.rayStartX, tt.args.rayStartY)
+			if got != tt.want_foundObstacle {
+				t.Errorf("GetNearestObstacleOnTrajectoryInShotDirection() got = %v, foundObstacle %v", got, tt.want_foundObstacle)
+			}
+			if got {
+				if got1 != tt.want_xObstacle {
+					t.Errorf("GetNearestObstacleOnTrajectoryInShotDirection() got_xObstacle = %v, want_xObstacle %v", got1, tt.want_xObstacle)
+				}
+				if got2 != tt.want_yObstacle {
+					t.Errorf("GetNearestObstacleOnTrajectoryInShotDirection() got_yObstacle = %v, want_yObstacle %v", got2, tt.want_yObstacle)
 				}
 			}
 		})
