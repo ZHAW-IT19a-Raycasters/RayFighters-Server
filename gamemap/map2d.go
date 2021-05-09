@@ -29,7 +29,7 @@ func LoadMap2d(filePath string) (Map2d, error) {
 	return newMap2d(len(map2dSlice), map2dSlice), nil
 }
 
-// newMap2d is inpackage convinience function for creatin Map2d using passed parameters.
+// newMap2d is package convenience function for creating Map2d using passed parameters.
 func newMap2d(mDim int, lMap [][]MapElement) Map2d {
 	return Map2d{dim: mDim, map2d: lMap}
 }
@@ -87,4 +87,16 @@ func (map2d *Map2d) IsMapBoundary(x int, y int) bool {
 // IsPenetrable true if a bullet can pass through it
 func (map2d *Map2d) IsPenetrable(x int, y int) bool {
 	return map2d.MapElementAt(x, y) != Wall
+}
+
+// NewFlatMap2d creates squared 2D-map without walls
+func NewFlatMap2d(mapDimension int) Map2d {
+	map2d := make([][]MapElement, mapDimension)
+	for i := range map2d {
+		map2d[i] = make([]MapElement, mapDimension)
+		for j := range map2d[i] {
+			map2d[i][j] = Floor
+		}
+	}
+	return newMap2d(mapDimension, map2d)
 }
