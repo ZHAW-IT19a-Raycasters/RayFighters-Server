@@ -246,23 +246,24 @@ func Test_CreateCustomClientMap(t *testing.T) {
 
 func Test_isCorrectMiddle(t *testing.T) {
 	type args struct {
-		var1   float64
-		middle float64
-		var2   float64
+		coordShooter  float64
+		coordObstacle float64
+		coordTarget   float64
 	}
 	tests := []struct {
 		name string
 		args args
 		want bool
 	}{
-		{name: "Correct middle", args: args{1, 2, 3}, want: true},
-		{name: "Correct middle", args: args{3, 2, 1}, want: true},
-		{name: "False middle", args: args{2, 9, 1}, want: false},
+		{name: "Target is hidden", args: args{1, 2, 3}, want: true},
+		{name: "Target is hidden", args: args{3, 2, 1}, want: true},
+		{name: "Target is not hidden", args: args{2, 9, 1}, want: false},
+		{name: "Target is hidden", args: args{2.5, 2, 2.5}, want: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := isCorrectMiddle(tt.args.var1, tt.args.middle, tt.args.var2); got != tt.want {
-				t.Errorf("isCorrectMiddle() = %v, want %v", got, tt.want)
+			if got := isTargetProtected(tt.args.coordShooter, tt.args.coordObstacle, tt.args.coordTarget); got != tt.want {
+				t.Errorf("isTargetProtected() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -291,6 +292,8 @@ func Test_CheckShooting(t *testing.T) {
 		{name: "Hit on flat map", fields: fields{*CreateCustomClientMap([]uint8{0, 77}, []float64{0, 0, 0.9, 0.9}), flatMap}, args: args{0, 0.785398}, wantHit: true, wantVictimID: 77},
 		{name: "Hit on flat map", fields: fields{*CreateCustomClientMap([]uint8{0, 77}, []float64{0, 0, 3, 3}), flatMap}, args: args{0, 0.785398}, wantHit: true, wantVictimID: 77},
 		{name: "Miss on map with obstacle", fields: fields{*CreateCustomClientMap([]uint8{0, 77}, []float64{0, 0, 3.1, 3.1}), mapWithObstacle}, args: args{0, 0.785398}, wantHit: false, wantVictimID: 77},
+		{name: "Miss on map with obstacle", fields: fields{*CreateCustomClientMap([]uint8{0, 88}, []float64{1.5, 1.5, 3.5, 1.5}), mapWithObstacle}, args: args{0, 0}, wantHit: true, wantVictimID: 88},
+		{name: "Miss on map with obstacle", fields: fields{*CreateCustomClientMap([]uint8{0, 88}, []float64{1.5, 2.5, 3.5, 2.5}), mapWithObstacle}, args: args{0, 0}, wantHit: false, wantVictimID: 88},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
