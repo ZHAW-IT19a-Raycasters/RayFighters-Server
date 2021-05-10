@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/json"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -13,7 +14,6 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/lestrrat-go/jwx/jwa"
 	"github.com/lestrrat-go/jwx/jwt"
-	"github.zhaw.ch/raycasters/server/utils"
 )
 
 const RsaPrivateKey = `-----BEGIN RSA PRIVATE KEY-----
@@ -44,12 +44,6 @@ EPyrPSXPxV5CVt2oIgVSu/x0bBFZWP09zduxxn8j3kFhKYYulVUOWSruSS9x7GvR
 62k2mGlqKYAbUfkIEHi2PdR67jX8GH2DpRDFH4jbczLYENWaMKw=
 -----END RSA PRIVATE KEY-----`
 
-func newAuthManager() authenticationManager {
-
-	rsaKey, _ := utils.ParseRSA([]byte(RsaPrivateKey))
-
-	return authenticationManager{rsaKey}
-}
 func TestAuthTokenIssueing(t *testing.T) {
 
 	// generate key
@@ -91,22 +85,47 @@ func TestAuthTokenIssueing(t *testing.T) {
 }
 
 func TestAuthRequestWithValidJson(t *testing.T) {
-	postBody, _ := json.Marshal(map[string]string{
-		"username": "Phil",
-	})
-	req := httptest.NewRequest("POST", "/auth", bytes.NewBuffer(postBody))
-	rr := httptest.NewRecorder()
+	check := func(auth authenticationManager) {
+		postBody, _ := json.Marshal(map[string]string{
+			"username": "Phil",
+		})
+		req := httptest.NewRequest("POST", "/auth", bytes.NewBuffer(postBody))
+		rr := httptest.NewRecorder()
 
-	router := mux.NewRouter()
-	auth := newAuthManager()
+		router := mux.NewRouter()
 
-	router.HandleFunc("/auth", auth.ServeAuthWithKey())
-	router.ServeHTTP(rr, req)
-	res := rr.Result()
-	if res.StatusCode != http.StatusOK {
-		t.Errorf("handler returned wrong status code: got %v want %v",
-			res.StatusCode, http.StatusOK)
+		router.HandleFunc("/auth", auth.ServeAuthWithKey())
+		router.ServeHTTP(rr, req)
+		res := rr.Result()
+		if res.StatusCode != http.StatusOK {
+			t.Errorf("handler returned wrong status code: got %v want %v",
+				res.StatusCode, http.StatusOK)
+			t.SkipNow()
+		}
 	}
+
+	auth, _ := newAuthManager("")
+	check(auth)
+
+	// write to tmp file
+	tmpFile, err := ioutil.TempFile("", "*rsaKey")
+	if err != nil {
+		t.Errorf("unexpected error happend [%s]", err.Error())
+		t.SkipNow()
+	}
+
+	err = ioutil.WriteFile(tmpFile.Name(), []byte(RsaPrivateKey), 0666)
+	if err != nil {
+		t.Errorf("unexpected error happend [%s]", err.Error())
+		t.SkipNow()
+	}
+
+	auth, err = newAuthManager(tmpFile.Name())
+	if err != nil {
+		t.Errorf("unexpected error happend [%s]", err.Error())
+		t.SkipNow()
+	}
+	check(auth)
 }
 
 func TestAuthTokenResponseVaild(t *testing.T) {
@@ -117,7 +136,7 @@ func TestAuthTokenResponseVaild(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	router := mux.NewRouter()
-	auth := newAuthManager()
+	auth, _ := newAuthManager("")
 
 	router.HandleFunc("/auth", auth.ServeAuthWithKey())
 	router.ServeHTTP(rr, req)

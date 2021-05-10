@@ -41,6 +41,14 @@ func NewCoordinate(x, y, angle float64) Coordinate {
 	}
 }
 
+// NewCustomCoordinate is convenience function used for testing purposes
+func NewCustomCoordinate(x, y float64) *Coordinate {
+	return &Coordinate{
+		x:    x,
+		y:    y,
+		lock: &sync.RWMutex{},
+	}
+}
 func (c *Coordinate) GetMapCoordinate() MapCoordinate {
 	// x = 1.1 => 1.0
 	c.lock.RLock()

@@ -70,6 +70,13 @@ NeNcxDYgME1X7ruvj6BnjgMErInFIr6D5MCDe0vwCw==
 
 	if !pubKeyParsed.Equal(pubParsed) {
 		t.Error("keys should be equals")
+		return
+	}
+
+	// Attention this line is pretty useless it only servers for better coverage
+	_, err = utils.GenerateRSA()
+	if err != nil {
+		t.Errorf("How did a call to the std. lib fail? [%s]", err.Error())
 	}
 }
 

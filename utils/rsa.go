@@ -1,12 +1,15 @@
 package utils
 
 import (
+	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
 	"fmt"
 )
+
+const RSABitSize int = 2048
 
 // ErrInvalidRSAData is the state that happens, when the rsa data
 // is not valid PEM encoding.
@@ -61,4 +64,13 @@ func ParseRSA(data []byte) (*rsa.PrivateKey, error) {
 		}
 	}
 	return pKey, nil
+}
+
+// GenerateRSA can generate a private rsa key of
+// RSABitSize.
+// Attention only use this function for testing
+// do not use this line in production as it can
+// not guarantie a long lasting private key.
+func GenerateRSA() (*rsa.PrivateKey, error) {
+	return rsa.GenerateKey(rand.Reader, RSABitSize)
 }
