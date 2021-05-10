@@ -498,12 +498,12 @@ func (hc *HubController) handleMovement(message []byte, id uint8) protocol.Bytef
 
 func (hc *HubController) handleShooting(t []byte, shooterId uint8) protocol.Bytefy {
 	shot, err := pclient.NewShootingBytes(t)
-	shotAngle := shot.AngPl()
 	if err != nil {
 		logger.Info(err)
 		newUnknown := server.NewUnknown()
 		return newUnknown
 	}
+	shotAngle := shot.AngPl()
 	hit, victimId := hc.mapController.CheckShooting(shooterId, shotAngle)
 	var death server.PlayerDeath
 	aShot := server.NewShootingPlayer(shooterId, shotAngle)
