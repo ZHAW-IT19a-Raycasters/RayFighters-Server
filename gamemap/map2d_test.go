@@ -3,6 +3,7 @@ package gamemap
 import (
 	"io/ioutil"
 	"os"
+	"reflect"
 	"testing"
 )
 
@@ -19,7 +20,7 @@ func TestLoadMap2dValid(t *testing.T) {
 	expectedMap2d := newMap2d(2, [][]MapElement{{Floor, Floor}, {Floor, Floor}})
 	file.WriteString(intoMapString(2, []string{"00", "00"}))
 	actualMap2d, err := LoadMap2d(file.Name())
-	if err != ErrMap2dNotSq && err != nil {
+	if err != ErrorMapIsNotSquared && err != nil {
 		t.Errorf(err.Error())
 		return
 	}
@@ -43,11 +44,11 @@ func TestLoadMap2dNotSquared(t *testing.T) {
 
 	file.WriteString(intoMapString(2, []string{"00", "000"}))
 	_, err = LoadMap2d(file.Name())
-	if err != ErrMap2dNotSq && err != nil {
+	if err != ErrorMapIsNotSquared && err != nil {
 		t.Errorf(err.Error())
 		return
 	}
-	if err != ErrMap2dNotSq {
+	if err != ErrorMapIsNotSquared {
 		t.Error("an error should have been raised")
 	}
 }
@@ -113,5 +114,60 @@ func TestCompareDifferentDimension(t *testing.T) {
 	actual := map2dOne.Compare(&map2dTwo)
 	if expected != actual {
 		t.Errorf("false result: (expected: %v; actual: %v)", expected, actual)
+	}
+}
+
+func TestNewFlatMap2d(t *testing.T) {
+	type args struct {
+		mapDimension int
+	}
+	tests := []struct {
+		name string
+		args args
+		want Map2d
+	}{
+		{name: "Map of dimension 4", args: args{4}, want: struct {
+			dim   int
+			map2d [][]MapElement
+		}{dim: 4, map2d: [][]MapElement{{Floor, Floor, Floor, Floor}, {Floor, Floor, Floor, Floor}, {Floor, Floor, Floor, Floor}, {Floor, Floor, Floor, Floor}}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := NewFlatMap2d(tt.args.mapDimension); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("NewFlatMap2d() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestMap2d_SetMapElement(t *testing.T) {
+	type fields struct {
+		dim   int
+		map2d [][]MapElement
+	}
+	type args struct {
+		x          int
+		y          int
+		mapElement MapElement
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   Map2d
+	}{
+		{name: "", fields: fields{4, [][]MapElement{{Floor, Floor, Floor, Floor}, {Floor, Floor, Floor, Floor}, {Floor, Floor, Floor, Floor}, {Floor, Floor, Floor, Floor}}}, args: args{2, 2, Wall}, want: newMap2d(4, [][]MapElement{{Floor, Floor, Floor, Floor}, {Floor, Floor, Floor, Floor}, {Floor, Floor, Wall, Floor}, {Floor, Floor, Floor, Floor}})},
+		{name: "", fields: fields{3, [][]MapElement{{Floor, Floor, Floor}, {Floor, Floor, Floor}, {Floor, Floor, Floor}}}, args: args{2, 0, Wall}, want: newMap2d(3, [][]MapElement{{Floor, Floor, Wall}, {Floor, Floor, Floor}, {Floor, Floor, Floor}})},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			map2d := Map2d{
+				dim:   tt.fields.dim,
+				map2d: tt.fields.map2d,
+			}
+			if map2d.SetMapElement(tt.args.x, tt.args.y, tt.args.mapElement); !reflect.DeepEqual(map2d, tt.want) {
+				t.Errorf("NewFlatMap2d() = %v, want %v", map2d, tt.want)
+			}
+		})
 	}
 }
