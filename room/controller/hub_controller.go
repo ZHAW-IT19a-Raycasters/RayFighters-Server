@@ -102,6 +102,9 @@ func NewHubController() *HubController {
 
 	hc.timeoutClientQueue = client.NewHubTimer(helpers.IdCountLimit, cTimeoutCallback)
 
+	// TODO: handle error
+	hc.timeoutClientQueue.Run()
+
 	// client respawn callbacks
 	cRespawnCallback := func(id uint8) {
 		// error is not important for execution
@@ -114,16 +117,21 @@ func NewHubController() *HubController {
 
 	hc.respawnHandler = client.NewHubRespawnHandler(helpers.IdCountLimit, cRespawnCallback)
 
+	// TODO: handle error
+	hc.respawnHandler.Run()
+
 	return &hc
 }
 
 func (hc *HubController) respawnPlayer(id uint8) error {
+	logger.Debugf("trying to respawn player [%d]", id)
 	// check if the player is stil active
 	// only respawn if the client is still
 	// active.
 	err := hc.checkClientState(id, client.Active)
 
 	if err != nil {
+		logger.Errorf("something unexpected happend while checking for the player respawn state [%s]", err.Error())
 		return err
 	}
 
@@ -133,6 +141,9 @@ func (hc *HubController) respawnPlayer(id uint8) error {
 
 	// teleport the player back into the game
 	tp := server.NewTeleportPlayer(id, coord.X(), coord.Y())
+
+	logger.Debugf("player [%d] teleported to x: [%f] y: [%f]", id, tp.CoorX(), tp.CoorY())
+
 	hc.broadCast(tp, helpers.NewIdSet())
 
 	return nil
@@ -421,7 +432,7 @@ func (hc *HubController) Shutdown(cxt context.Context) {
 			return nil
 		},
 		hc.timeoutClientQueue.Shutdown,
-		hc.timeoutItemQueue.Shutdown,
+		hc.respawnHandler.Shutdown,
 	}
 
 	wg.Add(len(shutdowns))
@@ -547,21 +558,27 @@ func (hc *HubController) handleShooting(t []byte, shooterId uint8) protocol.Byte
 		newUnknown := server.NewUnknown()
 		return newUnknown
 	}
+
 	shotAngle := shot.AngPl()
 	hit, victimId := hc.mapController.CheckShooting(shooterId, shotAngle)
-	var death server.PlayerDeath
+
 	aShot := server.NewShootingPlayer(shooterId, shotAngle)
+
 	// add id's to be ignored by broadcasting
 	ignoreId := helpers.NewIdSet()
 	ignoreId.Add(shooterId)
+
 	// inform the police and players about shooting
 	hc.broadCast(aShot, ignoreId)
+
 	// someone is dead :(
 	if hit {
-		death = server.NewPlayerDeath(shooterId, victimId)
+		death := server.NewPlayerDeath(shooterId, victimId)
 		// broadcast the death to all players
-		// ??? if i understand correctly everyone should be informed
 		hc.broadCast(death, helpers.NewIdSet())
+
+		// register the dead player for respawn
+		hc.respawnHandler.RegisterRespawn(victimId)
 	}
 	// As the shooting opcode does not require an answer to be sent back
 	return nil
