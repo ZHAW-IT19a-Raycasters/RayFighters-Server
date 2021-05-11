@@ -35,7 +35,11 @@ type HubController struct {
 	mapController mapstate.MapController
 	// timeoutClientQueue stores the currently timedout clients
 	// so that they can be removed once the timeout runs out.
-	timeoutClientQueue client.HubTimer
+	timeoutClientQueue client.HubTimeoutHandler
+	// respawnHandler stores and later on handles
+	// the currently killed players so that they
+	// can be reborn once the timeout runs out.
+	respawnHandler client.HubRespawnHandler
 	// timeoutItemQueue stores the currently timedout map elements
 	// so that they can be respawned once the timeout runs out.
 	timeoutItemQueue items.ItemTimer
@@ -84,41 +88,90 @@ func NewHubController() *HubController {
 		lock:          sync.RWMutex{},
 	}
 
-	// TODO: implement item timer callbacks (blocked by missing map implementation)
+	// implement item timer callbacks (blocked by missing map implementation)
+	// Attention this is not done anymore, but the comment is kept here as
+	// a reminder for possible continued developement.
 
 	// client timer callbacks
-	cTimerCallback := func(id uint8) {
+	cTimeoutCallback := func(id uint8) {
 		// error is not important for execution
 		// as it only says if there was an
 		// execution or not
-		_ = hc.RemoveClientIfTimeout(id)
+		_ = hc.removeClientIfTimeout(id)
 	}
 
-	hc.timeoutClientQueue = client.NewHubTimer(helpers.IdCountLimit, cTimerCallback)
+	hc.timeoutClientQueue = client.NewHubTimer(helpers.IdCountLimit, cTimeoutCallback)
+
+	// TODO: handle error
+	hc.timeoutClientQueue.Run()
+
+	// client respawn callbacks
+	cRespawnCallback := func(id uint8) {
+		// error is not important for execution
+		// as it only says if there was an
+		// execution or not
+		logger.Debugf("spawning player [%d] back into the map", id)
+
+		_ = hc.respawnPlayer(id)
+	}
+
+	hc.respawnHandler = client.NewHubRespawnHandler(helpers.IdCountLimit, cRespawnCallback)
+
+	// TODO: handle error
+	hc.respawnHandler.Run()
 
 	return &hc
 }
 
-// RemoveClientIfTimeout will remove a client only
-// if the client is timedout
-func (hc *HubController) RemoveClientIfTimeout(id uint8) error {
-	checkState := func() error {
-		hc.lock.RLock()
-		defer hc.lock.RUnlock()
-		status, ok := hc.clientManager.GetClientStatus(id)
-		if !ok {
-			return ErrClientDoesNotExist{
-				id: id,
-			}
-		} else if status != client.Timeout {
-			return ErrClientNotTimedOut{
-				id: id,
-			}
-		}
-		return nil
+func (hc *HubController) respawnPlayer(id uint8) error {
+	logger.Debugf("trying to respawn player [%d]", id)
+	// check if the player is stil active
+	// only respawn if the client is still
+	// active.
+	err := hc.checkClientState(id, client.Active)
+
+	if err != nil {
+		logger.Errorf("something unexpected happend while checking for the player respawn state [%s]", err.Error())
+		return err
 	}
 
-	err := checkState()
+	// error not needed here as we previously already
+	// checked if the player exists or not.
+	coord, _ := hc.mapController.RandomSpawn(id)
+
+	// teleport the player back into the game
+	tp := server.NewTeleportPlayer(id, coord.X(), coord.Y())
+
+	logger.Debugf("player [%d] teleported to x: [%f] y: [%f]", id, tp.CoorX(), tp.CoorY())
+
+	hc.broadCast(tp, helpers.NewIdSet())
+
+	return nil
+}
+
+func (hc *HubController) checkClientState(id uint8, expectedState client.ConnectionStatus) error {
+	hc.lock.RLock()
+	defer hc.lock.RUnlock()
+	status, ok := hc.clientManager.GetClientStatus(id)
+	if !ok {
+		return ErrClientDoesNotExist{
+			id: id,
+		}
+	} else if status != expectedState {
+		return ErrClientUnexpectedState{
+			state: expectedState,
+			id:    id,
+		}
+	}
+	return nil
+}
+
+// removeClientIfTimeout will remove a client only
+// if the client is timedout
+func (hc *HubController) removeClientIfTimeout(id uint8) error {
+
+	err := hc.checkClientState(id, client.Timeout)
+
 	if err != nil {
 		return err
 	}
@@ -221,6 +274,8 @@ func (hc *HubController) RegisterClient(meta client.ClientMeta) error {
 	if err != nil {
 		return err
 	}
+
+	logger.Debugf("Spawning player [%d] at x : [%f] y : [%f]", id, coord.X(), coord.Y())
 
 	// add the queue to the controller
 	hc.lock.Lock()
@@ -377,7 +432,7 @@ func (hc *HubController) Shutdown(cxt context.Context) {
 			return nil
 		},
 		hc.timeoutClientQueue.Shutdown,
-		hc.timeoutItemQueue.Shutdown,
+		hc.respawnHandler.Shutdown,
 	}
 
 	wg.Add(len(shutdowns))
@@ -503,21 +558,27 @@ func (hc *HubController) handleShooting(t []byte, shooterId uint8) protocol.Byte
 		newUnknown := server.NewUnknown()
 		return newUnknown
 	}
+
 	shotAngle := shot.AngPl()
 	hit, victimId := hc.mapController.CheckShooting(shooterId, shotAngle)
-	var death server.PlayerDeath
+
 	aShot := server.NewShootingPlayer(shooterId, shotAngle)
+
 	// add id's to be ignored by broadcasting
 	ignoreId := helpers.NewIdSet()
 	ignoreId.Add(shooterId)
+
 	// inform the police and players about shooting
 	hc.broadCast(aShot, ignoreId)
+
 	// someone is dead :(
 	if hit {
-		death = server.NewPlayerDeath(shooterId, victimId)
+		death := server.NewPlayerDeath(shooterId, victimId)
 		// broadcast the death to all players
-		// ??? if i understand correctly everyone should be informed
 		hc.broadCast(death, helpers.NewIdSet())
+
+		// register the dead player for respawn
+		hc.respawnHandler.RegisterRespawn(victimId)
 	}
 	// As the shooting opcode does not require an answer to be sent back
 	return nil
