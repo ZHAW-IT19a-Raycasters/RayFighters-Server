@@ -158,7 +158,7 @@ func setupMock(mock *MockedConnection) (blockChan, chanFuncReader, chanFuncWrite
 	return done, funcTransferReader, funcTransferWriter
 }
 
-func helpTimeout() (HubTimer, func(id uint8) ClientTimer) {
+func helpTimeout() (HubTimeoutHandler, func(id uint8) ClientTimer) {
 
 	// empty callback as it make no sense in this context
 	callback := func(id uint8) {}

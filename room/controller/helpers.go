@@ -1,22 +1,27 @@
 package controller
 
-import "fmt"
+import (
+	"fmt"
 
-// ErrClientNotTimedOut will be returned in cases
+	"github.zhaw.ch/raycasters/server/room/client"
+)
+
+// ErrClientUnexpectedState will be returned in cases
 // where the specified client is not in a timed out
 // state.
-type ErrClientNotTimedOut struct {
-	id uint8
+type ErrClientUnexpectedState struct {
+	state client.ConnectionStatus
+	id    uint8
 }
 
 // Error satisfies the error
-func (err ErrClientNotTimedOut) Error() string {
-	return fmt.Sprintf("the client [%d] is currently not timedout", err.id)
+func (err ErrClientUnexpectedState) Error() string {
+	return fmt.Sprintf("the client [%d] is currently not in the expected state [%d]", err.id, err.state)
 }
 
 // Is satisfies the error.Is configuration
-func (err ErrClientNotTimedOut) Is(target error) bool {
-	_, ok := target.(ErrClientNotTimedOut)
+func (err ErrClientUnexpectedState) Is(target error) bool {
+	_, ok := target.(ErrClientUnexpectedState)
 	return ok
 }
 

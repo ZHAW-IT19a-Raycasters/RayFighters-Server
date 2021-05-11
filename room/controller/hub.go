@@ -136,7 +136,6 @@ func (h *Hub) Run() error {
 	// add two runners
 	h.wg.Add(workerCount)
 
-	// go h.runTimer()
 	go h.runRegistration()
 
 	return nil
