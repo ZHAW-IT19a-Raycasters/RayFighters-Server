@@ -9,10 +9,15 @@ import (
 	"time"
 )
 
+// rawLogger is the most innner data structure
+// that does directly interact with the
+// underlying logger structure.
 type rawLogger struct {
-	ilogger    *log.Logger
-	level      Level
-	bufferPool sync.Pool
+	ilogger *log.Logger
+	level   Level
+	// bPool will help out with not having to handle as many
+	// byte buffer allocations during a busy period
+	bPool sync.Pool
 }
 
 // newRawLogger will create the actual internal logger instance,
@@ -22,7 +27,7 @@ func newRawLogger(level Level, out io.Writer) *rawLogger {
 	return &rawLogger{
 		ilogger: log.New(out, "", 0),
 		level:   level,
-		bufferPool: sync.Pool{
+		bPool: sync.Pool{
 			New: func() interface{} {
 				return new(bytes.Buffer)
 			},
@@ -45,14 +50,8 @@ func (log *rawLogger) checkLevel(level Level) bool {
 
 func (log *rawLogger) prepateBuilder(level Level) *bytes.Buffer {
 	// using a string builder for faster concatination
-	// this convertion is per definition safe as there
-	// are ever only strings Builders added to the pool.
-	builder := log.bufferPool.Get().(*bytes.Buffer)
-
-	// will force the builder to be empty
-	// Attention this keeps the underlying
+	builder := log.bPool.Get().(*bytes.Buffer)
 	builder.Reset()
-
 	// calculate the base size of the builder
 	// to avoid some unneded allocations
 	size := 0
@@ -83,11 +82,9 @@ func (log *rawLogger) prepateBuilder(level Level) *bytes.Buffer {
 
 // print will write the builder out to the internal logging
 // instance.
-// Additionally it will retuen the string builder back to the
-// sync pool
 func (log *rawLogger) print(builder *bytes.Buffer) {
 	log.ilogger.Println(builder.String())
-	log.bufferPool.Put(builder)
+	log.bPool.Put(builder)
 }
 
 // Log logs all the levels requested.
