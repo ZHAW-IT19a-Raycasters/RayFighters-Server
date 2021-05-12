@@ -36,27 +36,7 @@ func (log rawLogger) checkLevel(level Level) bool {
 	return level >= log.Level()
 }
 
-// Log logs all the levels requested.
-func (log rawLogger) log(level Level, v ...interface{}) {
-
-	// check if logged level is lower of higher then the set version
-	if !log.checkLevel(level) {
-		return
-	}
-
-	// insert before the values
-	v = prependLevel(level, v)
-
-	log.ilogger.Println(v...)
-}
-
-// Logf logs all the levels and formats the interfaces values.
-func (log rawLogger) logf(level Level, format string, v ...interface{}) {
-	// check if logged level is lower of higher then the set version
-	if !log.checkLevel(level) {
-		return
-	}
-
+func (log rawLogger) prepateBuilder(level Level) strings.Builder {
 	// using a string builder for faster concatination
 	var builder strings.Builder
 
@@ -83,11 +63,35 @@ func (log rawLogger) logf(level Level, format string, v ...interface{}) {
 	for i := 0; i < neededLen; i += 1 {
 		fmt.Fprint(&builder, " ")
 	}
+	return builder
+}
+
+// Log logs all the levels requested.
+func (log rawLogger) log(level Level, v ...interface{}) {
+
+	// check if logged level is lower of higher then the set version
+	if !log.checkLevel(level) {
+		return
+	}
+
+	builder := log.prepateBuilder(level)
+
+	fmt.Fprint(&builder, v...)
+
+	log.ilogger.Println(v...)
+}
+
+// Logf logs all the levels and formats the interfaces values.
+func (log rawLogger) logf(level Level, format string, v ...interface{}) {
+	// check if logged level is lower of higher then the set version
+	if !log.checkLevel(level) {
+		return
+	}
+
+	builder := log.prepateBuilder(level)
 
 	// add the user defined format
 	fmt.Fprintf(&builder, format, v...)
-
-	//log.ilogger.Printf(fmt.Sprintf("[%s] %s %s", date, level.String(), format), v...)
 
 	log.ilogger.Println(builder.String())
 }
