@@ -46,12 +46,11 @@ func (b *builder) Build() error {
 
 // Reset will forcefully reset the configuration
 // of the global logger.
-// Attention this does not reset the
-// builder configuration.
-// Attention use this function with
-// caution as it will create issues
-// if used. It should only be used
-// for tests.
+// Attention this does not reset the builder 
+// configuration.
+// Attention use this function with caution as 
+// might create unexpectd issues if used. It 
+// should only be used for tests.
 func (b *builder) Reset() {
 	iLogger.reset()
 }

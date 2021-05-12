@@ -16,11 +16,9 @@ type rawLogger struct {
 // newRawLogger will create the actual internal logger instance,
 // used for all logging.
 func newRawLogger(level Level, out io.Writer) *rawLogger {
-	// using 0 as flag to get full controll
-	lg := log.New(out, "", 0)
-	lg.SetOutput(out)
+	// using 0 as flag to get no prepared output
 	return &rawLogger{
-		ilogger: lg,
+		ilogger: log.New(out, "", 0),
 		level:   level,
 	}
 }
@@ -33,10 +31,12 @@ func (log rawLogger) Level() Level {
 // checkLevel is the function that checks if the requested level
 // is allowed to be used per configuration.
 func (log rawLogger) checkLevel(level Level) bool {
+    // using the fact that the level enum represents an integer
+    // to simplify the check functionality.
 	return level >= log.Level()
 }
 
-func (log rawLogger) prepateBuilder(level Level) strings.Builder {
+func (log rawLogger) prepateBuilder(level Level) *strings.Builder {
 	// using a string builder for faster concatination
 	var builder strings.Builder
 
@@ -57,13 +57,21 @@ func (log rawLogger) prepateBuilder(level Level) strings.Builder {
 	fmt.Fprintf(&builder, "[%d-%02d-%02d %02d:%02d:%02d %04d  % 4s]", now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second(), now.Nanosecond(), zone)
 
 	fmt.Fprintf(&builder, " [%s]", level.String())
-	neededLen := maxPrefixLen - len(level.String())
+    // + 1 is needed for the spacing at the end 
+	neededLen := maxPrefixLen - len(level.String()) + 1
 
 	// fill up the string with the missing spacing
 	for i := 0; i < neededLen; i += 1 {
 		fmt.Fprint(&builder, " ")
 	}
-	return builder
+
+	return &builder
+}
+
+// print will write the builder out to the internal logging
+// instance.
+func (log rawLogger) print(builder *strings.Builder) {
+    log.ilogger.Println(builder.String())
 }
 
 // Log logs all the levels requested.
@@ -76,9 +84,9 @@ func (log rawLogger) log(level Level, v ...interface{}) {
 
 	builder := log.prepateBuilder(level)
 
-	fmt.Fprint(&builder, v...)
+	fmt.Fprint(builder, v...)
 
-	log.ilogger.Println(v...)
+    log.print(builder)
 }
 
 // Logf logs all the levels and formats the interfaces values.
@@ -91,7 +99,7 @@ func (log rawLogger) logf(level Level, format string, v ...interface{}) {
 	builder := log.prepateBuilder(level)
 
 	// add the user defined format
-	fmt.Fprintf(&builder, format, v...)
+	fmt.Fprintf(builder, format, v...)
 
-	log.ilogger.Println(builder.String())
+    log.print(builder)
 }
