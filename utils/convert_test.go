@@ -57,3 +57,35 @@ func TestBinaryToFloat(t *testing.T) {
 		t.Errorf("incorrect conversion of number")
 	}
 }
+
+func TestIntToBinary(t *testing.T) {
+	// 1174EFEDAB186000
+	// 1257894000000000000
+	var exp int64 = 1257894000000000000
+	rawData := [...]byte{
+		// 1174EFEDAB186000
+		0x00, 0x60, 0x18, 0xAB, 0xED, 0xEF, 0x74, 0x11,
+	}
+
+	got := utils.BinaryToInt64(rawData[:])
+
+	if exp != got {
+		t.Errorf("incorrect conversion of number")
+	}
+}
+
+func TestBinaryToInt(t *testing.T) {
+	// 1174EFEDAB186000
+	// 1257894000000000000
+
+	var exp int64 = 1257894000000000000
+	expData := [...]byte{
+		// 1174EFEDAB186000
+		0x00, 0x60, 0x18, 0xAB, 0xED, 0xEF, 0x74, 0x11,
+	}
+
+	gotData := make([]byte, 8)
+	utils.Int64ToBinary(exp, gotData)
+
+	compareByteArrays(expData[:], gotData, t)
+}
