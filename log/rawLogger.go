@@ -1,16 +1,18 @@
 package log
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"log"
-	"strings"
+	"sync"
 	"time"
 )
 
 type rawLogger struct {
-	ilogger *log.Logger
-	level   Level
+	ilogger    *log.Logger
+	level      Level
+	bufferPool sync.Pool
 }
 
 // newRawLogger will create the actual internal logger instance,
@@ -20,25 +22,36 @@ func newRawLogger(level Level, out io.Writer) *rawLogger {
 	return &rawLogger{
 		ilogger: log.New(out, "", 0),
 		level:   level,
+		bufferPool: sync.Pool{
+			New: func() interface{} {
+				return new(bytes.Buffer)
+			},
+		},
 	}
 }
 
 // Level will return the level used by the raw logger
-func (log rawLogger) Level() Level {
+func (log *rawLogger) Level() Level {
 	return log.level
 }
 
 // checkLevel is the function that checks if the requested level
 // is allowed to be used per configuration.
-func (log rawLogger) checkLevel(level Level) bool {
-    // using the fact that the level enum represents an integer
-    // to simplify the check functionality.
+func (log *rawLogger) checkLevel(level Level) bool {
+	// using the fact that the level enum represents an integer
+	// to simplify the check functionality.
 	return level >= log.Level()
 }
 
-func (log rawLogger) prepateBuilder(level Level) *strings.Builder {
+func (log *rawLogger) prepateBuilder(level Level) *bytes.Buffer {
 	// using a string builder for faster concatination
-	var builder strings.Builder
+	// this convertion is per definition safe as there
+	// are ever only strings Builders added to the pool.
+	builder := log.bufferPool.Get().(*bytes.Buffer)
+
+	// will force the builder to be empty
+	// Attention this keeps the underlying
+	builder.Reset()
 
 	// calculate the base size of the builder
 	// to avoid some unneded allocations
@@ -54,28 +67,31 @@ func (log rawLogger) prepateBuilder(level Level) *strings.Builder {
 	// prepare the date time now
 	now := time.Now()
 	zone, _ := now.Zone()
-	fmt.Fprintf(&builder, "[%d-%02d-%02d %02d:%02d:%02d %04d  % 4s]", now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second(), now.Nanosecond(), zone)
+	fmt.Fprintf(builder, "[%d-%02d-%02d %02d:%02d:%02d %04d  % 4s]", now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second(), now.Nanosecond(), zone)
 
-	fmt.Fprintf(&builder, " [%s]", level.String())
-    // + 1 is needed for the spacing at the end 
+	fmt.Fprintf(builder, " [%s]", level.String())
+	// + 1 is needed for the spacing at the end
 	neededLen := maxPrefixLen - len(level.String()) + 1
 
 	// fill up the string with the missing spacing
 	for i := 0; i < neededLen; i += 1 {
-		fmt.Fprint(&builder, " ")
+		fmt.Fprint(builder, " ")
 	}
 
-	return &builder
+	return builder
 }
 
 // print will write the builder out to the internal logging
 // instance.
-func (log rawLogger) print(builder *strings.Builder) {
-    log.ilogger.Println(builder.String())
+// Additionally it will retuen the string builder back to the
+// sync pool
+func (log *rawLogger) print(builder *bytes.Buffer) {
+	log.ilogger.Println(builder.String())
+	log.bufferPool.Put(builder)
 }
 
 // Log logs all the levels requested.
-func (log rawLogger) log(level Level, v ...interface{}) {
+func (log *rawLogger) log(level Level, v ...interface{}) {
 
 	// check if logged level is lower of higher then the set version
 	if !log.checkLevel(level) {
@@ -86,11 +102,11 @@ func (log rawLogger) log(level Level, v ...interface{}) {
 
 	fmt.Fprint(builder, v...)
 
-    log.print(builder)
+	log.print(builder)
 }
 
 // Logf logs all the levels and formats the interfaces values.
-func (log rawLogger) logf(level Level, format string, v ...interface{}) {
+func (log *rawLogger) logf(level Level, format string, v ...interface{}) {
 	// check if logged level is lower of higher then the set version
 	if !log.checkLevel(level) {
 		return
@@ -101,5 +117,5 @@ func (log rawLogger) logf(level Level, format string, v ...interface{}) {
 	// add the user defined format
 	fmt.Fprintf(builder, format, v...)
 
-    log.print(builder)
+	log.print(builder)
 }
