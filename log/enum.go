@@ -12,9 +12,11 @@ const (
 const (
 	debugStr string = "DEBUG"
 	infoStr  string = "INFO"
-	warnStr  string = "WARNING"
+	warnStr  string = "WARN"
 	errorStr string = "ERROR"
 )
+
+const maxPrefixLen int = 5
 
 // String will return the strign representation
 func (l Level) String() string {
