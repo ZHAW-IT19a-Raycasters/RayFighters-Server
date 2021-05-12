@@ -31,6 +31,7 @@ func TestOpcodeString(t *testing.T) {
 		"Disconnect",
 		"Unknown",
 		"WhoAmI",
+		"AckMap",
 		"Movement",
 		"Shooting",
 		"RequestOtherPlayers",
@@ -308,6 +309,33 @@ func TestRequestPlayerKDError(t *testing.T) {
 		client.RequestPlayerKDOpcode.Value(), 44,
 	}
 	_, err := client.NewRequestPlayerKDByte(data)
+	if err == nil {
+		t.Error("Incorrect bytesize was accepted as correct")
+		return
+	} else if !strings.HasSuffix(err.Error(), "[must be only [1] bytes long is [2]]") {
+		t.Error("Incorrect suffix has been used")
+		return
+	}
+}
+
+func TestAckMap(t *testing.T) {
+	data := []byte{
+		client.AckMapOpcode.Value(),
+	}
+
+	_, err := client.NewAckMapBytes(data)
+
+	if err != nil {
+		t.Error("valid bytes where flaged")
+	}
+}
+
+func TestAckMapError(t *testing.T) {
+
+	data := []byte{
+		client.AckMapOpcode.Value(), 44,
+	}
+	_, err := client.NewAckMapBytes(data)
 	if err == nil {
 		t.Error("Incorrect bytesize was accepted as correct")
 		return

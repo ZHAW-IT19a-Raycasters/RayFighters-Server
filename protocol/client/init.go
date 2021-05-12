@@ -15,6 +15,7 @@ const (
 	DisconnectOpcode          ClientOpcode = 0x00
 	UnknownOpcode             ClientOpcode = 0x01
 	WhoAmIOpcode              ClientOpcode = 0x02
+	AckMapOpcode              ClientOpcode = 0x03
 	MovementOpcode            ClientOpcode = 0x0A
 	ShootingOpcode            ClientOpcode = 0x14
 	RequestOtherPlayersOpcode ClientOpcode = 0x1E
@@ -25,6 +26,7 @@ var Overview = [...]ClientOpcode{
 	DisconnectOpcode,
 	UnknownOpcode,
 	WhoAmIOpcode,
+	AckMapOpcode,
 	MovementOpcode,
 	ShootingOpcode,
 	RequestOtherPlayersOpcode,
@@ -48,6 +50,8 @@ func (o ClientOpcode) String() string {
 		return "Unknown"
 	case WhoAmIOpcode:
 		return "WhoAmI"
+	case AckMapOpcode:
+		return "AckMap"
 	case MovementOpcode:
 		return "Movement"
 	case ShootingOpcode:
@@ -75,6 +79,9 @@ func (o ClientOpcode) ByteSize() int {
 		// Opcode
 		return 1
 	case WhoAmIOpcode:
+		// Opcode
+		return 1
+	case AckMapOpcode:
 		// Opcode
 		return 1
 	case MovementOpcode:
@@ -269,14 +276,6 @@ func NewShootingBytes(data []byte) (*Shooting, error) {
 	return &val, nil
 }
 
-// RequestOtherPlayers is the opcode that Requests the name and id of the other players.
-type RequestOtherPlayers struct{}
-
-// NewRequestOtherPlayers creates a new RequestOtherPlayers instance.
-func NewRequestOtherPlayers() RequestOtherPlayers {
-	return RequestOtherPlayers{}
-}
-
 // Disconnect represents a request for a Player.
 type RequestPlayerKD struct{}
 
@@ -298,6 +297,14 @@ func NewRequestPlayerKDByte(data []byte) (*RequestPlayerKD, error) {
 	return &val, nil
 }
 
+// RequestOtherPlayers is the opcode that Requests the name and id of the other players.
+type RequestOtherPlayers struct{}
+
+// NewRequestOtherPlayers creates a new RequestOtherPlayers instance.
+func NewRequestOtherPlayers() RequestOtherPlayers {
+	return RequestOtherPlayers{}
+}
+
 // NewRequestOtherPlayersBytes returns a pointer from a new RequestOtherPlayers object based on data
 // If an error occurs Nil will be returned
 func NewRequestOtherPlayersBytes(data []byte) (*RequestOtherPlayers, error) {
@@ -308,6 +315,21 @@ func NewRequestOtherPlayersBytes(data []byte) (*RequestOtherPlayers, error) {
 	}
 
 	val := NewRequestOtherPlayers()
+	return &val, nil
+}
+
+type AckMap struct{}
+
+func NewAckMap() AckMap {
+	return AckMap{}
+}
+
+func NewAckMapBytes(data []byte) (*AckMap, error) {
+	if err := checkOpcodeHelper(AckMapOpcode, data); err != nil {
+		return nil, err
+	}
+
+	val := NewAckMap()
 	return &val, nil
 }
 
