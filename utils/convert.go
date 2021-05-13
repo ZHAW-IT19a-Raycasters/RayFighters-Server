@@ -31,3 +31,16 @@ func FloatToBinary(num float64, data []byte) {
 	// write data back
 	binary.LittleEndian.PutUint64(data, intRep)
 }
+
+// Int64ToBinary will change the int64 into
+// its binary format.
+func Int64ToBinary(num int64, data []byte) {
+	binary.LittleEndian.PutUint64(data, uint64(num))
+}
+
+// BinaryToInt64 will parse the binary into its
+// integer format.
+// Attention this is only used for testing.
+func BinaryToInt64(data []byte) int64 {
+	return int64(binary.LittleEndian.Uint64(data))
+}

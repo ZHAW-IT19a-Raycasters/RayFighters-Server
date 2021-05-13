@@ -17,7 +17,8 @@ const (
 // As per definition if there is a config file in here
 // It must implement the CheckConfig interface.
 type Configuration struct {
-	Web webconfig.WebConfig `toml:"Webconfig"`
+	Web    webconfig.WebConfig `toml:"Webconfig"`
+	Logger LoggerConfig        `toml:"Logging"`
 }
 
 // CheckIfConfigIsLegal will check that the configurated values are legal

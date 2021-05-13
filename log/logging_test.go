@@ -77,6 +77,7 @@ func setupLogger(handlers []BuildLogHandler, t *testing.T) error {
 	}
 
 	err := b.Build()
+
 	if err != nil {
 		return err
 	}
@@ -215,7 +216,7 @@ func TestAllLevels(t *testing.T) {
 		res := strings.TrimSpace(buffer.String())
 
 		if !strings.HasSuffix(res, exp) {
-			t.Errorf("The buffer should be filled with %s", exp)
+			t.Errorf("The buffer should be filled with [%s], but contains [%s]", exp, res)
 			return false
 		}
 		return true
@@ -223,43 +224,43 @@ func TestAllLevels(t *testing.T) {
 
 	debug := func() string {
 		logger.Debug("some random text")
-		return "DEBUG some random text"
+		return "[DEBUG] some random text"
 	}
 
 	debugf := func() string {
 		logger.Debugf("a number that annoyed me [%d]", 666)
-		return "DEBUG a number that annoyed me [666]"
+		return "[DEBUG] a number that annoyed me [666]"
 	}
 
 	// the info functions
 	info := func() string {
 		logger.Info("test")
-		return "INFO test"
+		return " [INFO]  test"
 	}
 
 	infof := func() string {
 		logger.Infof("a string %d", 23)
-		return "INFO a string 23"
+		return " [INFO]  a string 23"
 	}
 
 	warn := func() string {
 		logger.Warn("some terrible message threatening mankind")
-		return "WARNING some terrible message threatening mankind"
+		return "[WARN]  some terrible message threatening mankind"
 	}
 
 	warnf := func() string {
 		logger.Warnf("some terrible message threatening mankind: [%s]", "with an addition")
-		return "WARNING some terrible message threatening mankind: [with an addition]"
+		return "[WARN]  some terrible message threatening mankind: [with an addition]"
 	}
 
 	erf := func() string {
 		logger.Error("well I almost crashed... HELP")
-		return "ERROR well I almost crashed... HELP"
+		return "[ERROR] well I almost crashed... HELP"
 	}
 
 	errf := func() string {
 		logger.Errorf("I am still alive, have some useless numbers: [0x%x]", 0x42)
-		return "ERROR I am still alive, have some useless numbers: [0x42]"
+		return "[ERROR] I am still alive, have some useless numbers: [0x42]"
 	}
 
 	for _, f := range [...]func() string{debug, debugf, info, infof, warn, warnf, erf, errf} {
