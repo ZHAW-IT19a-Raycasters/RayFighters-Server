@@ -102,12 +102,15 @@ func (h *Hub) RegisterClient(meta client.ClientMeta) error {
 	// manager, then the player count has to be
 	// incremented.
 	if !h.controller.ClientExists(meta) {
+
 		// increment the counter
 		// if the counter already is maxed out
 		// this will return an error
 		err := h.controller.Acquire()
 
 		if err != nil {
+			// close the connection
+			logger.Debug("hub already full")
 			return ErrHubIsFull
 		}
 
@@ -154,7 +157,11 @@ func (h *Hub) runRegistration() {
 		select {
 		case meta := <-h.input:
 			logger.Debugf("Adding a new player to hub [%d]", h.id)
-			h.controller.RegisterClient(meta)
+			err := h.controller.RegisterClient(meta)
+			if err != nil {
+				meta.Close()
+				logger.Debugf("unable to register client because [%s]", err.Error())
+			}
 		case <-h.shutdown:
 			logger.Infof("Shutting down hub [%d]", h.id)
 			return

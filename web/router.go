@@ -62,7 +62,7 @@ func NewServer(conf *webconfig.WebConfig) (*Server, error) {
 
 	// serve /auth without authentication middleware
 	router.Path("/auth").
-		Handler(http.HandlerFunc(auth.ServeAuthWithKey())).
+		Handler(http.HandlerFunc(auth.AuthConnection())).
 		Methods(http.MethodPost, http.MethodOptions)
 
 	// create a sub router for the blocked paths

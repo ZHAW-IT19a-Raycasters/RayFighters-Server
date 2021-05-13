@@ -91,7 +91,7 @@ func setupTestServer(t *testing.T) ([]*room.Hub, *httptest.Server, error) {
 
 	auth, _ := newAuthManager("")
 
-	router.HandleFunc("/auth", auth.ServeAuthWithKey())
+	router.HandleFunc("/auth", auth.AuthConnection())
 	router.HandleFunc("/ws/{roomID:[0-9]+}", func(rw http.ResponseWriter, r *http.Request) {
 		serveWs(hubs, rw, r)
 	})
