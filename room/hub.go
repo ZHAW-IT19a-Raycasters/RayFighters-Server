@@ -94,6 +94,13 @@ func (h *Hub) Full() bool {
 	return h.controller.IsFull()
 }
 
+// ClientState checks for the current client state.
+// Attention this allows a meta object, where the
+// connection is nil.
+func (h *Hub) ClientState(meta client.ClientMeta) (client.ConnectionStatus, bool) {
+	return h.controller.ClientState(meta)
+}
+
 // RegisterClient will use the meta information given
 // by the parameter to check if the player
 func (h *Hub) RegisterClient(meta client.ClientMeta) error {
@@ -101,7 +108,8 @@ func (h *Hub) RegisterClient(meta client.ClientMeta) error {
 	// if the client does not have an entry in the
 	// manager, then the player count has to be
 	// incremented.
-	if !h.controller.ClientExists(meta) {
+	_, ok := h.ClientState(meta)
+	if ok {
 
 		// increment the counter
 		// if the counter already is maxed out

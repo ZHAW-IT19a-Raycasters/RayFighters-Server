@@ -151,11 +151,21 @@ func serveWs(hubs []*room.Hub, w http.ResponseWriter, r *http.Request) {
 	// until the connection build up is done, but this can handle some
 	// wrong connection creations, especially under heavy load.
 	if hubs[roomID].Full() {
-		w.WriteHeader(http.StatusConflict)
+		logger.Debugf("Room [%d] not available", roomID)
+		http.Error(w, "Room full", http.StatusBadRequest)
 		return
 	}
 
 	logger.Debug("correct token received upgrading the connection")
+
+	cm := client.NewClientMeta(user.uid, user.name, nil)
+	state, _ := hubs[roomID].ClientState(cm)
+	if state == client.Active {
+		s := fmt.Sprintf("client [% X] already is connected to the system", cm.GetId())
+		logger.Debug(s)
+		http.Error(w, s, http.StatusBadRequest)
+		return
+	}
 
 	// upgrade HTTP to Websocket connection
 	var upgrader = websocket.Upgrader{
@@ -178,7 +188,7 @@ func serveWs(hubs []*room.Hub, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cm := client.NewClientMeta(user.uid, user.name, conn)
+	cm = client.NewClientMeta(user.uid, user.name, conn)
 	logger.Debugf("Created client meta for ID [% X]", cm.GetId())
 
 	err = hubs[roomID].RegisterClient(cm)

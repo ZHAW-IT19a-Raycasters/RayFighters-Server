@@ -211,16 +211,23 @@ func (hc *HubController) IsFull() bool {
 	return hc.semaphore.Full()
 }
 
-// ClientExists checks if the client has a place on the map or
+// ClientState checks if the client has a place on the map or
 // not.
-func (hc *HubController) ClientExists(meta client.ClientMeta) bool {
+func (hc *HubController) ClientState(meta client.ClientMeta) (client.ConnectionStatus, bool) {
 	// check the meta information, so that
 	// there never can be a double increment
 	// per added client.
+	c := client.Offline
+
 	hc.lock.RLock()
 	defer hc.lock.RUnlock()
-	_, ok := hc.clientManager.MapId(meta)
-	return ok
+	id, ok := hc.clientManager.MapId(meta)
+	if !ok {
+		return c, ok
+	}
+	// okay is not needed here as we know the clinet already exists.
+	c, _ = hc.clientManager.GetClientStatus(id)
+	return c, ok
 }
 
 // RegisterClient will add the client to the controller
@@ -361,7 +368,8 @@ func (hc *HubController) runClientConnection(hqueue client.HubQueue, id uint8) {
 // Attention decrementing the client may only happen
 // in a case, that there actually was a client removed.
 func (hc *HubController) removeClient(meta client.ClientMeta) error {
-	if !hc.ClientExists(meta) {
+	_, ok := hc.ClientState(meta)
+	if !ok {
 		return client.NewErrClientDoesntExist(meta)
 	}
 
