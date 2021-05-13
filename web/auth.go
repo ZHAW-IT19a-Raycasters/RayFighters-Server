@@ -164,7 +164,7 @@ func (amw *authenticationManager) checkIfCookieValid(r *http.Request) error {
 	logger.Debug("Checking for a cookie")
 	cookie, err := amw.findCookie(r)
 	if err != nil {
-		return nil
+		return err
 	}
 
 	logger.Debug("cookie found")
