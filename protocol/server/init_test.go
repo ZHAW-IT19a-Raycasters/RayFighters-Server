@@ -447,3 +447,21 @@ func TestPlayersKD(t *testing.T) {
 
 	compareByteArrays(data[:], got, t)
 }
+
+func TestMapChange(t *testing.T) {
+	const player uint8 = 0x1
+	const time int64 = 1257894000000000000
+
+	mc := server.NewMapChange(player, time)
+
+	exp := [...]byte{
+		server.MapChangeOpcode.Value(),
+		player,
+		// time
+		0x00, 0x60, 0x18, 0xab, 0xed, 0xef, 0x74, 0x11,
+	}
+
+	got := mc.Bytes()
+
+	compareByteArrays(exp[:], got, t)
+}
