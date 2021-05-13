@@ -36,6 +36,7 @@ const (
 	YouAreCalledOpcode      ServerOpcode = 0x7C
 	SendAllPlayerInfoOpcode ServerOpcode = 0x82
 	SendAllPlayerKDOpcode   ServerOpcode = 0x83
+	MapChangeOpcode         ServerOpcode = 0x8C
 )
 
 var Overview = [...]ServerOpcode{
@@ -50,6 +51,7 @@ var Overview = [...]ServerOpcode{
 	YouAreCalledOpcode,
 	SendAllPlayerInfoOpcode,
 	SendAllPlayerKDOpcode,
+	MapChangeOpcode,
 }
 
 // Value returns the internal value representation as a uint8.
@@ -580,17 +582,23 @@ func (p *SendAllPlayerInfo) Players() []Player {
 	return p.players
 }
 
-// Bytes will return a correct byte stream with all the required
-// player information.
-func (p *SendAllPlayerInfo) Bytes() []byte {
+func (p *SendAllPlayerInfo) ByteSize() int {
 	// precalculate bytesize
 	size := 1 // opcode
 	size += 1 // player count
 	for _, player := range p.players {
 		size += player.ByteSize()
 	}
+
+	return size
+}
+
+// Bytes will return a correct byte stream with all the required
+// player information.
+func (p *SendAllPlayerInfo) Bytes() []byte {
+
 	// initialize buffer
-	buffer := make([]byte, size)
+	buffer := make([]byte, p.ByteSize())
 
 	buffer[0] = SendAllPlayerInfoOpcode.Value()
 	buffer[1] = uint8(len(p.players))
@@ -602,4 +610,37 @@ func (p *SendAllPlayerInfo) Bytes() []byte {
 	}
 
 	return buffer
+}
+
+// MapChange is the opcode that will tell the
+// frontend what map is currently chosen
+// and at what time it was chosen.
+type MapChange struct {
+	mapId    uint8
+	unixTime int64
+}
+
+// NewMapChange will create a new map change opcode
+func NewMapChange(mapId uint8, unixTime int64) MapChange {
+	return MapChange{
+		mapId:    mapId,
+		unixTime: unixTime,
+	}
+}
+
+func (p MapChange) ByteSize() int {
+	// Opcode + MapId + time
+	return 1 + 1 + 8
+}
+
+// Bytes will return a correct byte stream with all the required
+// map change information.
+func (m MapChange) Bytes() []byte {
+	data := make([]byte, m.ByteSize())
+	data[0] = MapChangeOpcode.Value()
+	data[1] = m.mapId
+
+	utils.Int64ToBinary(m.unixTime, data[2:])
+
+	return data
 }
