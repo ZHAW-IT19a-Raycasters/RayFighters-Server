@@ -76,7 +76,7 @@ func (fc FileConfig) CheckConfiguration() error {
 	// file might be newly created.
 	fc.FilePath = strings.TrimSpace(fc.FilePath)
 	if fc.FilePath == "" {
-
+		return ErrEmptyPath
 	}
 
 	// check of the parent directory
