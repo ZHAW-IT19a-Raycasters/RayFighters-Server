@@ -10,7 +10,7 @@ port = 8080
 
 [Logging]
     [Logging.Console]
-    Level = "Debug"
+    Level = "Info"
 
     [Logging.File]
     Level = "Info"

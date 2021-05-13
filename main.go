@@ -20,7 +20,7 @@ import (
 var logger = log.Log()
 
 // setupLogger will configure the logger
-func setupLogger(lg setup.LoggerConfig) error {
+func setupLogger(conf setup.LoggerConfig) error {
 	b := log.NewBuilder()
 
 	// register file handler
@@ -28,10 +28,9 @@ func setupLogger(lg setup.LoggerConfig) error {
 	// this error is impossible to get as incorrect
 	// configuration should be stoped before
 	// the programm arrives here
-	lv, _ := log.LevelDetect(lg.File.Level)
+	lv, _ := log.LevelDetect(conf.File.Level)
 
-	fh := log.NewFileHandler(lv, lg.File.FilePath)
-	fmt.Println(lg.File.FilePath)
+	fh := log.NewFileHandler(lv, conf.File.FilePath)
 	err := b.RegisterHandler(fh)
 
 	// there might have been an error while
@@ -41,7 +40,8 @@ func setupLogger(lg setup.LoggerConfig) error {
 	}
 
 	// register console handler
-	ch := log.NewConsoleHandler(log.Debug)
+	lv, _ = log.LevelDetect(conf.Console.Level)
+	ch := log.NewConsoleHandler(lv)
 
 	// new console handler will never return an error
 	// on registraction.
