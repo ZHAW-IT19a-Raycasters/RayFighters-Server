@@ -33,7 +33,11 @@ func (b *builder) RegisterHandler(handler BuildLogHandler) error {
 	if err != nil {
 		return err
 	}
-	b.handlers = append(b.handlers, lh)
+	// filter out the NONE logger levels as they are
+	// not really valid.
+	if !lh.checkLevel(None) {
+		b.handlers = append(b.handlers, lh)
+	}
 	return nil
 }
 
@@ -46,12 +50,11 @@ func (b *builder) Build() error {
 
 // Reset will forcefully reset the configuration
 // of the global logger.
-// Attention this does not reset the
-// builder configuration.
-// Attention use this function with
-// caution as it will create issues
-// if used. It should only be used
-// for tests.
+// Attention this does not reset the builder
+// configuration.
+// Attention use this function with caution as
+// might create unexpected issues if used. It
+// should only be used for tests.
 func (b *builder) Reset() {
 	iLogger.reset()
 }
@@ -98,12 +101,12 @@ func (log logger) Infof(format string, v ...interface{}) {
 
 // Info will write an info message.
 func (log logger) Warn(v ...interface{}) {
-	log.Log(Warning, v...)
+	log.Log(Warn, v...)
 }
 
 // Infof will write and format an info message.
 func (log logger) Warnf(format string, v ...interface{}) {
-	log.Logf(Warning, format, v...)
+	log.Logf(Warn, format, v...)
 }
 
 // Error will write an error message.
