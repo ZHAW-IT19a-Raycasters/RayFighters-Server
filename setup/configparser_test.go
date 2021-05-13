@@ -80,6 +80,7 @@ func writeRSAFile(t *testing.T) string {
 
 func newConfigurationLegal(t *testing.T) Configuration {
 	rsaFile := writeRSAFile(t)
+	logFile := tmpFileSetup(t)
 	return Configuration{
 		Web: webconfig.WebConfig{
 			Ip:   "127.0.0.1",
@@ -96,6 +97,15 @@ func newConfigurationLegal(t *testing.T) Configuration {
 					"http://127.0.0.1:9000",
 					"http://localhost:9000",
 				},
+			},
+		},
+		Logger: LoggerConfig{
+			Console: ConsoleConfig{
+				Level: "debug",
+			},
+			File: FileConfig{
+				Level:    "debug",
+				FilePath: logFile,
 			},
 		},
 	}
