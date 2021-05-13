@@ -84,7 +84,7 @@ type authenticationManager struct {
 func newAuthManager(privateKeyPath string) (authenticationManager, error) {
 	// special case where a new rsa key has to be generated
 	if privateKeyPath == "" {
-		logger.Debug("Generating a temporary RSA PRIVATE KEY")
+		logger.Warn("Generating a temporary RSA PRIVATE KEY")
 		key, err := utils.GenerateRSA()
 		if err != nil {
 			return authenticationManager{},
