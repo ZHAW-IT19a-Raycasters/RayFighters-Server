@@ -74,6 +74,16 @@ func TestCheckJwtConf(t *testing.T) {
 	}
 }
 
+func TestCheckJwtConfNoRSA(t *testing.T) {
+	conf := JwtConfig{
+		RsaPrivateKey: "",
+	}
+
+	err := conf.CheckConfiguration()
+	if err != nil {
+		t.Error("there should not be an error here, as the example is valid")
+	}
+}
 func TestFixLinuxPaths(t *testing.T) {
 	const hiddenDirName = ".ssh"
 	const rawfileName = "id_rsa"
