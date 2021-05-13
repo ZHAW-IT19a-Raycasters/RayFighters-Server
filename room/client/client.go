@@ -106,6 +106,8 @@ func NewClient(id uint8, meta ClientMeta, queue ClientQueue, tq ClientTimer) *Cl
 
 // GetStatus will return the current connection status of the client
 func (c *Client) GetStatus() ConnectionStatus {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
 	return c.status
 }
 
