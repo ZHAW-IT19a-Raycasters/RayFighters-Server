@@ -71,7 +71,7 @@ func (p Position) GetY() float64 {
 type ClientGame struct {
 	kills     uint32
 	deaths	  uint32
-	isDead	  utils.AtomicBool
+	IsDead	  utils.AtomicBool
 }
 
 // NewClientGame creates the default client object.
@@ -79,7 +79,7 @@ func NewClientGame() ClientGame {
 	return ClientGame{
 		kills:    0,
 		deaths:   0,
-		isDead:	  utils.NewAtomicBool(false),
+		IsDead:	  utils.NewAtomicBool(false),
 	}
 }
 
@@ -104,7 +104,7 @@ func (cg *ClientGame) IncKills() {
 // IncDeaths will increment the
 // death counter by one
 func (cg *ClientGame) IncDeaths() {
-	if cg.isDead.SetTrue() {
+	if cg.IsDead.SetTrue() {
 		atomic.AddUint32(&cg.deaths, 1)
 	}
 }

@@ -82,6 +82,7 @@ func (hc *HubController) NewMap(newMapPath string) error {
 
 	}
 	_, err := hc.mapController.ChangeMap(newMapPath)
+
 	if err != nil {
 		return err
 	}
@@ -605,6 +606,7 @@ func (hc *HubController) handleShooting(t []byte, shooterId uint8) protocol.Byte
 	shotAngle := shot.AngPl()
 	hit, victimId := hc.mapController.CheckShooting(shooterId, shotAngle)
 
+
 	aShot := server.NewShootingPlayer(shooterId, shotAngle)
 
 	// add id's to be ignored by broadcasting
@@ -616,6 +618,10 @@ func (hc *HubController) handleShooting(t []byte, shooterId uint8) protocol.Byte
 
 	// someone is dead :(
 	if hit {
+		victim, ok := hc.gameState.GetClient(victimId)
+		if !ok || victim.IsDead.Get() {
+			return nil
+		}
 		death := server.NewPlayerDeath(shooterId, victimId)
 		// broadcast the death to all players
 		hc.broadCast(death, helpers.NewIdSet())
