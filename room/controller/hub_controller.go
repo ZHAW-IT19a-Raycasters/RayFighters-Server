@@ -78,8 +78,7 @@ func (hc *HubController) NewMap(newMapPath string) error {
 	hc.lock.Lock()
 	defer hc.lock.Unlock()
 	if hc.mapController != nil {
-		// TODO: make magic
-
+		// TODO: shutdown Timer and other used stuff
 	}
 	_, err := hc.mapController.ChangeMap(newMapPath)
 

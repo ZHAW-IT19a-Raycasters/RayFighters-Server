@@ -5,7 +5,7 @@ import "fmt"
 // ErrHubExists is the error that will be returned
 // if the given client does already exists.
 type ErrHubExists struct {
-	id uint8
+	id int
 }
 
 // Error satisfies the error
