@@ -627,6 +627,8 @@ func (hc *HubController) handleShooting(t []byte, shooterId uint8) protocol.Byte
 		death := server.NewPlayerDeath(shooterId, victimId)
 		// broadcast the death to all players
 		hc.broadCast(death, helpers.NewIdSet())
+		hc.gameState.IncDeaths(victimId)
+		hc.gameState.IncKill(shooterId)
 
 		// register the dead player for respawn
 		hc.respawnHandler.RegisterRespawn(victimId)
