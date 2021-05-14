@@ -57,8 +57,10 @@ func (mi *MapIterator) GetMap() gamemap.MapMeta {
 }
 
 func parseJSON(jsonContent []byte) (mapList, error) {
-	ml := mapList{}
-	err := json.Unmarshal(jsonContent, &ml)
+	ml := mapList{
+		maps: make([]gamemap.MapMeta, 0),
+	}
+	err := json.Unmarshal(jsonContent, &ml.maps)
 	return ml, err
 }
 

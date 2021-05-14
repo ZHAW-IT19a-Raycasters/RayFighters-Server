@@ -104,9 +104,7 @@ func (cg *ClientGame) IncKills() {
 // IncDeaths will increment the
 // death counter by one
 func (cg *ClientGame) IncDeaths() {
-	if cg.IsDead.SetTrue() {
-		atomic.AddUint32(&cg.deaths, 1)
-	}
+	atomic.AddUint32(&cg.deaths, 1)
 }
 
 // ClientMeta contains the shared meta information of a

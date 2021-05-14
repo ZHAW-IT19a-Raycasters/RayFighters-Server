@@ -5,22 +5,18 @@ type MapMeta struct {
 	name, filePath 	string
 }
 
-func NewMapMeta(id uint8, name, filePath string) MapMeta {
-	return MapMeta{
-		id:       id,
-		name:     name,
-		filePath: filePath,
-	}
+func (mm MapMeta) GetId() uint8 {
+	return mm.id
 }
 
-func (mm MapMeta) GetId() {
-	
+func (mm MapMeta) GetName() string {
+	return mm.name
 }
 
-func (mm MapMeta) GetName() {
-
+func (mm MapMeta) GetFilePath() string {
+	return mm.filePath
 }
 
-func (mm MapMeta) GetFilePath() {
-
+func (mm MapMeta) LoadFile() (Map2d, error) {
+	return LoadMap2d(mm.GetFilePath())
 }

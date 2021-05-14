@@ -21,12 +21,12 @@ import (
 )
 
 // HubController is the main brain of the hub
-// it is soley responsible for all the interactions
+// it is solely responsible for all the interactions
 // done by the user.
 type HubController struct {
 	// The manager of the different client with the different connections.
 	clientManager client.ClientManager
-	// connections stores the hub queues the soley connection
+	// connections stores the hub queues the solely connection
 	// points to the clients.
 	connections map[uint8]client.HubQueue
 	// gameState stores the current state of the game
@@ -41,10 +41,10 @@ type HubController struct {
 	// the currently killed players so that they
 	// can be reborn once the timeout runs out.
 	respawnHandler client.HubRespawnHandler
-	// timeoutItemQueue stores the currently timedout map elements
+	// timeoutItemQueue stores the currently timeout map elements
 	// so that they can be respawned once the timeout runs out.
 	timeoutItemQueue items.ItemTimer
-	// mapChaning will be set True when the Map is being reloaded
+	// mapChanging will be set True when the Map is being reloaded
 	// so we know when to reset everything to restart the game
 	mapChanging utils.AtomicBool
 	// Semaphore, counts the totally active
@@ -113,7 +113,7 @@ func NewHubController() *HubController {
 
 	// implement item timer callbacks (blocked by missing map implementation)
 	// Attention this is not done anymore, but the comment is kept here as
-	// a reminder for possible continued developement.
+	// a reminder for possible continued development.
 
 	// client timer callbacks
 	cTimeoutCallback := func(id uint8) {
@@ -148,7 +148,7 @@ func NewHubController() *HubController {
 
 func (hc *HubController) respawnPlayer(id uint8) error {
 	logger.Debugf("trying to respawn player [%d]", id)
-	// check if the player is stil active
+	// check if the player is still active
 	// only respawn if the client is still
 	// active.
 	err := hc.checkClientState(id, client.Active)
@@ -164,6 +164,10 @@ func (hc *HubController) respawnPlayer(id uint8) error {
 
 	// teleport the player back into the game
 	tp := server.NewTeleportPlayer(id, coord.X(), coord.Y())
+
+	// revive player
+	victim, _ := hc.gameState.GetClient(id)
+	victim.IsDead.SetFalse()
 
 	logger.Debugf("player [%d] teleported to x: [%f] y: [%f]", id, tp.CoorX(), tp.CoorY())
 
@@ -190,7 +194,7 @@ func (hc *HubController) checkClientState(id uint8, expectedState client.Connect
 }
 
 // removeClientIfTimeout will remove a client only
-// if the client is timedout
+// if the client is timeout
 func (hc *HubController) removeClientIfTimeout(id uint8) error {
 
 	err := hc.checkClientState(id, client.Timeout)
@@ -604,7 +608,6 @@ func (hc *HubController) handleShooting(t []byte, shooterId uint8) protocol.Byte
 
 	shotAngle := shot.AngPl()
 	hit, victimId := hc.mapController.CheckShooting(shooterId, shotAngle)
-
 
 	aShot := server.NewShootingPlayer(shooterId, shotAngle)
 
