@@ -248,14 +248,17 @@ func (manager *ClientManager) SetClientState(meta ClientMeta, newState Connectio
 // RemoveClient will remove the given client from the manager, this will return an error
 // if the given client does not exist.
 func (manager *ClientManager) RemoveClient(meta ClientMeta) error {
+
+	manager.lock.Lock()
 	id, ok := manager.MapId(meta)
 	if !ok {
+		manager.lock.Unlock()
 		return NewErrClientDoesntExist(meta)
 	}
 
-	manager.lock.RLock()
+	// lock the system and remove stuff,
+	// try to keep the lock for as short as possible
 	val := manager.clients[id]
-	manager.lock.RUnlock()
 
 	// make sure it is shutdown, at most wait for the timeout
 	// afterwards kill it.
@@ -271,27 +274,14 @@ func (manager *ClientManager) RemoveClient(meta ClientMeta) error {
 		close(waiter)
 	}()
 
-	// this is run in an internal function, as to
-	// keep the lock for as short as possible
-	// due to the waiter possibly waiting for about 1s
-	remove := func() {
-		// lock the system and remove stuff,
-		// try to keep the lock for as short as possible
-		manager.lock.Lock()
-		defer manager.lock.Unlock()
-		// remove from mapping
-		delete(manager.mapping, meta.id)
-		delete(manager.clients, id)
-	}
-
-	remove()
+	// remove from mapping
+	delete(manager.mapping, meta.id)
+	delete(manager.clients, id)
+	manager.lock.Unlock()
 
 	<-waiter
 
 	cancel()
-
-	// remove client from manager
-	defer manager.wg.Done()
 
 	// free the id as the last point
 	// at the end of the process
@@ -308,6 +298,8 @@ func (manager *ClientManager) RemoveClient(meta ClientMeta) error {
 		panic(str)
 	}
 
+	// remove client from manager
+	manager.wg.Done()
 	return nil
 }
 

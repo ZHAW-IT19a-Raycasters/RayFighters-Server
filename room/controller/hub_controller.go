@@ -16,7 +16,6 @@ import (
 	pclient "github.zhaw.ch/raycasters/server/protocol/client"
 	"github.zhaw.ch/raycasters/server/room/client"
 	"github.zhaw.ch/raycasters/server/room/helpers"
-	"github.zhaw.ch/raycasters/server/room/items"
 )
 
 // HubController is the main brain of the hub
@@ -42,7 +41,8 @@ type HubController struct {
 	respawnHandler client.HubRespawnHandler
 	// timeoutItemQueue stores the currently timedout map elements
 	// so that they can be respawned once the timeout runs out.
-	timeoutItemQueue items.ItemTimer
+	// timeoutItemQueue items.ItemTimer
+
 	// Semaphore, counts the totally active
 	// player connections, although that number is already available
 	// via the client map length, is would have to be accessed
@@ -369,7 +369,7 @@ func (hc *HubController) runClientConnection(hqueue client.HubQueue, id uint8) {
 			hqueue.Enqueue(toSend)
 
 			if toSend[0] == server.UnknownOpcode.Value() {
-				return
+				rClient(id)
 			}
 		}()
 	}
