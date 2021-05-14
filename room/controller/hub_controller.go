@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"runtime"
@@ -11,8 +12,8 @@ import (
 
 	"github.zhaw.ch/raycasters/server/protocol/server"
 	"github.zhaw.ch/raycasters/server/utils"
-
 	"github.zhaw.ch/raycasters/server/protocol"
+	
 	pclient "github.zhaw.ch/raycasters/server/protocol/client"
 	"github.zhaw.ch/raycasters/server/room/client"
 	"github.zhaw.ch/raycasters/server/room/helpers"
@@ -32,7 +33,7 @@ type HubController struct {
 	// such as player kills and their deaths.
 	gameState GameState
 	// mapManager is a Manager controlling the events of the map
-	mapController mapstate.MapController
+	mapController *mapstate.MapController
 	// timeoutClientQueue stores the currently timedout clients
 	// so that they can be removed once the timeout runs out.
 	timeoutClientQueue client.HubTimeoutHandler
@@ -43,6 +44,9 @@ type HubController struct {
 	// timeoutItemQueue stores the currently timedout map elements
 	// so that they can be respawned once the timeout runs out.
 	timeoutItemQueue items.ItemTimer
+	//
+	mapChanging utils.AtomicBool
+	//
 	// Semaphore, counts the totally active
 	// player connections, although that number is already available
 	// via the client map length, is would have to be accessed
@@ -58,13 +62,31 @@ type HubController struct {
 	lock sync.RWMutex
 }
 
-func getMap() string {
+func getMap(filePath string) string {
 	_, filename, _, _ := runtime.Caller(0)
 	p := filepath.Dir(filename)
 	p = filepath.Dir(p)
 	p = filepath.Dir(p)
 
-	return filepath.Join(p, "maps", "desert.txt")
+	return filepath.Join(p, "maps", filePath)
+}
+
+func (hc *HubController) NewMap(newMapPath string) error {
+	if !hc.mapChanging.SetTrue() {
+		return errors.New("Atomic Fail True")
+	}
+	hc.lock.Lock()
+	defer hc.lock.Unlock()
+	if hc.mapController != nil {
+		// TODO: make magic
+
+	}
+	/*clients, err := hc.mapController.ChangeMap(newMapPath)
+	if err != nil {
+		return err
+	}*/
+	hc.mapChanging.SetFalse()
+	return nil
 }
 
 // NewHubController will create a new controller
@@ -72,7 +94,7 @@ func NewHubController() *HubController {
 	// TODO: handle error
 	// TODO: fix issue with file paths...
 	// TODO: remove panics :(
-	path := getMap()
+	path := getMap("desert.txt")
 	mapController, err := mapstate.NewMapController(path)
 	if err != nil {
 		panic(fmt.Sprintf("error happend while opening the map controller [%s]", err.Error()))
@@ -82,7 +104,8 @@ func NewHubController() *HubController {
 		clientManager: client.NewClientManager(),
 		connections:   make(map[uint8]client.HubQueue),
 		gameState:     NewGameState(),
-		mapController: mapController,
+		mapController: &mapController,
+		mapChanging:   utils.NewAtomicBool(false),
 		semaphore:     utils.NewCountingSemaphore(uint32(helpers.IdCountLimit)),
 		wg:            sync.WaitGroup{},
 		lock:          sync.RWMutex{},

@@ -161,7 +161,7 @@ func TestMapControllerRemoveClient(t *testing.T) {
 		return
 	}
 
-	_, ok := mapController.getClient(1)
+	_, ok := mapController.GetClient(1)
 	if !ok {
 		t.Error("GetClient returned an error")
 		return
@@ -173,7 +173,7 @@ func TestMapControllerRemoveClient(t *testing.T) {
 		return
 	}
 
-	_, ok = mapController.getClient(1)
+	_, ok = mapController.GetClient(1)
 	if ok {
 		t.Error("Client wasn't removed")
 	}
@@ -286,7 +286,7 @@ func TestGetUnExistingClient(t *testing.T) {
 		return
 	}
 
-	_, ok := mapController.getClient(1)
+	_, ok := mapController.GetClient(1)
 
 	if ok {
 		t.Error("Client shouldn't exist in GetUnExistingClient")
@@ -327,7 +327,7 @@ func TestSpawningPointAddClient(t *testing.T) {
 		return
 	}
 
-	coordinate, ok := mapController.getClient(1)
+	coordinate, ok := mapController.GetClient(1)
 	if !ok {
 		t.Error("Client 1 wasn't created")
 		return

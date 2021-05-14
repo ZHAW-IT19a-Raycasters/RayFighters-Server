@@ -43,6 +43,21 @@ func NewMapCustomMapController() (MapController, error) {
 		lock:        &sync.RWMutex{},
 	}, nil
 }*/
+
+// ChangeMap reloads map2d and spawningarea when the map is changing
+func (mc *MapController) ChangeMap(filePath string) (map[uint8]*gamemap.Coordinate, error) {
+	mc.lock.Lock()
+	defer mc.lock.Unlock()
+	map2d, err := gamemap.LoadMap2d(filePath)
+	if err != nil {
+		return nil, err
+	}
+	mc.map2d = map2d
+	mc.spawingarea = map2d.GetLegalSpawns()
+
+	return mc.clients, nil
+}
+
 // clientExists will check if the client already exists.
 // Attention this function locks on its own.
 func (mc *MapController) clientExists(id uint8) bool {
@@ -149,7 +164,7 @@ func (mc *MapController) MoveClient(id uint8, x, y, angle float64) (gamemap.Coor
 
 // GetClient will return a the state of a specific client.
 // And if the client could not be found false will be returned
-func (mc *MapController) getClient(id uint8) (gamemap.Coordinate, bool) {
+func (mc *MapController) GetClient(id uint8) (gamemap.Coordinate, bool) {
 	mc.lock.RLock()
 	defer mc.lock.RUnlock()
 	c, ok := mc.clients[id]
@@ -160,7 +175,7 @@ func (mc *MapController) getClient(id uint8) (gamemap.Coordinate, bool) {
 }
 
 func (mc *MapController) GetPosition(userId uint8) (x float64, y float64, ok bool) {
-	c, ok := mc.getClient(userId)
+	c, ok := mc.GetClient(userId)
 	if !ok {
 		return 0, 0, ok
 	}
@@ -168,7 +183,7 @@ func (mc *MapController) GetPosition(userId uint8) (x float64, y float64, ok boo
 }
 
 func (mc *MapController) GetMapCoordinates(userId uint8) (x int, y int, ok bool) {
-	c, ok := mc.getClient(userId)
+	c, ok := mc.GetClient(userId)
 	if !ok {
 		return 0, 0, ok
 	}

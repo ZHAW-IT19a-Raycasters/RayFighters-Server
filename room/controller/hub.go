@@ -3,7 +3,6 @@ package controller
 import (
 	"context"
 	"errors"
-	"github.zhaw.ch/raycasters/server/room"
 	"math"
 	"sync"
 
@@ -45,7 +44,7 @@ var (
 // different modules like the map or the client manager.
 type Hub struct {
 	// id is the designated hub identifier
-	id uint8
+	id int
 	// controller is the struct responsible for running all the client opcodes
 	// and handling all the io.
 	controller *HubController
@@ -66,7 +65,7 @@ type Hub struct {
 // NewHub will initiate a new hub struct.
 // The hubId needs to be unique over all
 // the data structures.
-func NewHub(hubId uint8) *Hub {
+func NewHub(hubId int) *Hub {
 	h := &Hub{
 		input:      make(chan client.ClientMeta),
 		controller: NewHubController(),
@@ -111,7 +110,7 @@ func (h *Hub) RegisterClient(meta client.ClientMeta) error {
 			return ErrHubIsFull
 		}
 
-		room.Logger.Debugf("adding client to hub [%d]", h.id)
+		logger.Debugf("adding client to hub [%d]", h.id)
 	}
 
 	// add the client to the queue to be added into the system
@@ -129,7 +128,7 @@ func (h *Hub) Run() error {
 	// check if the hub is active
 	if !h.isActive.SetTrue() {
 		// do not restart the hub, if it's already running
-		room.Logger.Warnf("Hub [%d] is already running", h.id)
+		logger.Warnf("Hub [%d] is already running", h.id)
 		return ErrHubIsAlreadyRunning
 	}
 
@@ -153,10 +152,10 @@ func (h *Hub) runRegistration() {
 	for {
 		select {
 		case meta := <-h.input:
-			room.Logger.Debugf("Adding a new player to hub [%d]", h.id)
+			logger.Debugf("Adding a new player to hub [%d]", h.id)
 			h.controller.RegisterClient(meta)
 		case <-h.shutdown:
-			room.Logger.Infof("Shutting down hub [%d]", h.id)
+			logger.Infof("Shutting down hub [%d]", h.id)
 			return
 		}
 	}
@@ -189,9 +188,9 @@ func (h *Hub) Shutdown(cxt context.Context) error {
 
 	select {
 	case <-cxt.Done():
-		room.Logger.Infof("Hub [%d] was forcefully shutdown", h.id)
+		logger.Infof("Hub [%d] was forcefully shutdown", h.id)
 	case <-waitCompletion:
-		room.Logger.Infof("Hub [%d] was successfully shutdown", h.id)
+		logger.Infof("Hub [%d] was successfully shutdown", h.id)
 	}
 
 	return nil
