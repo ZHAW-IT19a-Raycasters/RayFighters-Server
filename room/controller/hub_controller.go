@@ -13,7 +13,7 @@ import (
 	"github.zhaw.ch/raycasters/server/protocol/server"
 	"github.zhaw.ch/raycasters/server/utils"
 	"github.zhaw.ch/raycasters/server/protocol"
-	
+
 	pclient "github.zhaw.ch/raycasters/server/protocol/client"
 	"github.zhaw.ch/raycasters/server/room/client"
 	"github.zhaw.ch/raycasters/server/room/helpers"
@@ -26,7 +26,7 @@ import (
 type HubController struct {
 	// The manager of the different client with the different connections.
 	clientManager client.ClientManager
-	// connections stores the hub queues the soley conneciton
+	// connections stores the hub queues the soley connection
 	// points to the clients.
 	connections map[uint8]client.HubQueue
 	// gameState stores the current state of the game
@@ -34,7 +34,7 @@ type HubController struct {
 	gameState GameState
 	// mapManager is a Manager controlling the events of the map
 	mapController *mapstate.MapController
-	// timeoutClientQueue stores the currently timedout clients
+	// timeoutClientQueue stores the currently timeout clients
 	// so that they can be removed once the timeout runs out.
 	timeoutClientQueue client.HubTimeoutHandler
 	// respawnHandler stores and later on handles
@@ -44,9 +44,9 @@ type HubController struct {
 	// timeoutItemQueue stores the currently timedout map elements
 	// so that they can be respawned once the timeout runs out.
 	timeoutItemQueue items.ItemTimer
-	//
+	// mapChaning will be set True when the Map is being reloaded
+	// so we know when to reset everything to restart the game
 	mapChanging utils.AtomicBool
-	//
 	// Semaphore, counts the totally active
 	// player connections, although that number is already available
 	// via the client map length, is would have to be accessed
@@ -54,7 +54,7 @@ type HubController struct {
 	// while asynchronously adding a new client. So to avoid the given
 	// overhead an atomic counting semaphore implementation is here used.
 	semaphore utils.CountingSemaphore
-	// wg is the wait group used for counting the ammout
+	// wg is the wait group used for counting the amount
 	// of active hub workers.
 	wg sync.WaitGroup
 	// lock is used to limit the access to the connections.
@@ -81,10 +81,10 @@ func (hc *HubController) NewMap(newMapPath string) error {
 		// TODO: make magic
 
 	}
-	/*clients, err := hc.mapController.ChangeMap(newMapPath)
+	_, err := hc.mapController.ChangeMap(newMapPath)
 	if err != nil {
 		return err
-	}*/
+	}
 	hc.mapChanging.SetFalse()
 	return nil
 }
@@ -493,28 +493,48 @@ func (hc *HubController) handleRead(data []byte, id uint8) protocol.Bytefy {
 	if len(data) == 0 {
 		return hc.handleUnknown(id)
 	}
-	switch pclient.Detect(data[0]) {
-	case pclient.DisconnectOpcode:
-		// Received a Disconnect request from client
-		return hc.handleDisconnect(data, id)
-	case pclient.WhoAmIOpcode:
-		// Received a WhoAmI request from client
-		return hc.handleWhoAmI(data, id)
-	case pclient.MovementOpcode:
-		// Received a Movement request from client
-		return hc.handleMovement(data, id)
-	case pclient.ShootingOpcode:
-		// Received a Shooting request from client
-		return hc.handleShooting(data, id)
-	case pclient.RequestOtherPlayersOpcode:
-		// Received a RequestOtherPlayers request from client
-		return hc.handleRequestOtherPlayer(data)
-	case pclient.RequestPlayerKDOpcode:
-		// Received a RequestOtherPlayers request from client
-		return hc.handleRequestPlayerKD(data)
-	default:
-		// Received Unknown Code from client
-		return hc.handleUnknown(id)
+	if !hc.mapChanging.Get() {
+		switch pclient.Detect(data[0]) {
+		case pclient.DisconnectOpcode:
+			// Received a Disconnect request from client
+			return hc.handleDisconnect(data, id)
+		case pclient.WhoAmIOpcode:
+			// Received a WhoAmI request from client
+			return hc.handleWhoAmI(data, id)
+		case pclient.MovementOpcode:
+			// Received a Movement request from client
+			return hc.handleMovement(data, id)
+		case pclient.ShootingOpcode:
+			// Received a Shooting request from client
+			return hc.handleShooting(data, id)
+		case pclient.RequestOtherPlayersOpcode:
+			// Received a RequestOtherPlayers request from client
+			return hc.handleRequestOtherPlayer(data)
+		case pclient.RequestPlayerKDOpcode:
+			// Received a RequestOtherPlayers request from client
+			return hc.handleRequestPlayerKD(data)
+		default:
+			// Received Unknown Code from client
+			return hc.handleUnknown(id)
+		}
+	} else {
+		switch pclient.Detect(data[0]) {
+		case pclient.DisconnectOpcode:
+			// Received a Disconnect request from client
+			return hc.handleDisconnect(data, id)
+		case pclient.WhoAmIOpcode:
+			// Received a WhoAmI request from client
+			return hc.handleWhoAmI(data, id)
+		case pclient.RequestOtherPlayersOpcode:
+			// Received a RequestOtherPlayers request from client
+			return hc.handleRequestOtherPlayer(data)
+		case pclient.RequestPlayerKDOpcode:
+			// Received a RequestOtherPlayers request from client
+			return hc.handleRequestPlayerKD(data)
+		default:
+			// Received Unknown Code from client
+			return hc.handleUnknown(id)
+		}
 	}
 }
 
