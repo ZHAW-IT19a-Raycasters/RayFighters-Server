@@ -160,6 +160,7 @@ func serveWs(hubs []*room.Hub, w http.ResponseWriter, r *http.Request) {
 
 	cm := client.NewClientMeta(user.uid, user.name, nil)
 	state, _ := hubs[roomID].ClientState(cm)
+
 	if state == client.Active {
 		s := fmt.Sprintf("client [% X] already is connected to the system", cm.GetId())
 		logger.Debug(s)

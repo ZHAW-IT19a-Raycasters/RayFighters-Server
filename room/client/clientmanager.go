@@ -232,6 +232,19 @@ func (manager *ClientManager) AddClient(meta ClientMeta, queue ClientQueue, time
 	return nil
 }
 
+func (manager *ClientManager) SetClientState(meta ClientMeta, newState ConnectionStatus) error {
+	manager.lock.RLock()
+	defer manager.lock.RUnlock()
+	id, ok := manager.MapId(meta)
+	if !ok {
+		return NewErrClientDoesntExist(meta)
+	}
+
+	// timeout client
+	manager.clients[id].SetStatus(newState)
+	return nil
+}
+
 // RemoveClient will remove the given client from the manager, this will return an error
 // if the given client does not exist.
 func (manager *ClientManager) RemoveClient(meta ClientMeta) error {
