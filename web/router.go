@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.zhaw.ch/raycasters/server/room"
 	"github.zhaw.ch/raycasters/server/room/controller"
 	"net/http"
 	"time"
@@ -40,7 +41,7 @@ var ErrRoomIdUnavailable = errors.New("no Room available for the given ID")
 
 // NewServer registers routes for all exposed endpoints
 // and attaches the appropriate routehandler functions
-func NewServer(conf *webconfig.WebConfig) (*Server, error) {
+func NewServer(conf *webconfig.WebConfig, mapConfig *room.MapConfig) (*Server, error) {
 	// instantiate hubs
 	var hubs [hubsCount]*controller.Hub
 	var i int = 0

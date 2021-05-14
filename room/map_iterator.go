@@ -34,12 +34,7 @@ type MapIterator struct {
 
 func NewMapIteratorManager(filePath string) (MapIteratorManager, error) {
 	// TODO: Read Content
-	content, err := ioutil.ReadFile(filePath)
-	if err != nil {
-		return MapIteratorManager{}, err
-	}
-
-	ml, err := parseJSON(content)
+	ml, err := readJSON(filePath)
 	if err != nil {
 		return MapIteratorManager{}, err
 	}
@@ -61,8 +56,17 @@ func (mi *MapIterator) GetMap() gamemap.MapMeta {
 	return m
 }
 
-func parseJSON(jsonContent []byte) (mapList, error){
+func parseJSON(jsonContent []byte) (mapList, error) {
 	ml := mapList{}
 	err := json.Unmarshal(jsonContent, &ml)
 	return ml, err
+}
+
+func readJSON(jsonContent string) (mapList, error) {
+	content, err := ioutil.ReadFile(jsonContent)
+	if err != nil {
+		return mapList{}, err
+	}
+
+	return parseJSON(content)
 }

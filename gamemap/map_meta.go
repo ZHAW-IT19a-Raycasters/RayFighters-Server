@@ -14,7 +14,7 @@ func NewMapMeta(id uint8, name, filePath string) MapMeta {
 }
 
 func (mm MapMeta) GetId() {
-
+	
 }
 
 func (mm MapMeta) GetName() {
