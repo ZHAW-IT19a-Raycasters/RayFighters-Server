@@ -7,12 +7,17 @@ const (
 	handlerStartLen = 0
 )
 
+// internalLogger is the internal instance 
+// of the logger that is responsible for 
+// multiplexing the given debug information.
 type internalLogger struct {
 	lock     sync.Mutex
 	isSetup  bool
 	handlers []LogHandler
 }
 
+// newInternalLogger will as the name implies 
+// create a new internal logger object.
 func newInternalLogger() internalLogger {
 	return internalLogger{
 		handlers: nil,
@@ -21,6 +26,8 @@ func newInternalLogger() internalLogger {
 	}
 }
 
+// copy copy the log handler from the parameter
+// into the logger setup. 
 func (lg *internalLogger) copy(from []LogHandler) error {
 	if lg.isSetup {
 		return ErrLoggerAlreadySetup
@@ -39,6 +46,7 @@ func (lg *internalLogger) copy(from []LogHandler) error {
 	return nil
 }
 
+// reset will force an internal reset of all values.
 func (lg *internalLogger) reset() {
 	iLogger.lock.Lock()
 	defer iLogger.lock.Unlock()
@@ -46,13 +54,21 @@ func (lg *internalLogger) reset() {
 	lg.isSetup = false
 }
 
+// log will log a message of the given type.
 func (lg *internalLogger) log(level Level, v ...interface{}) {
+    // this is valid as if the handler array is nil 
+    // it is translated to be of lenght zero, so 
+    // this loop will do nothing
 	for _, handler := range lg.handlers {
 		handler.log(level, v...)
 	}
 }
 
+// logf will first format and then log a given message. 
 func (lg *internalLogger) logf(level Level, format string, v ...interface{}) {
+    // this is valid as if the handler array is nil 
+    // it is translated to be of lenght zero, so 
+    // this loop will do nothing
 	for _, handler := range lg.handlers {
 		handler.logf(level, format, v...)
 	}
