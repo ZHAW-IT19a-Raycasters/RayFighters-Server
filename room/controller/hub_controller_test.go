@@ -386,13 +386,15 @@ func TestHandleReadRequestPlayerKD(t *testing.T) {
 	hub := NewHubController()
 	defer hub.Shutdown(context.TODO())
 
-	client2Meta, _ := getClientMeta(2)
+	client2Meta, mock2 := getClientMeta(2)
+	_, _, _ = setupMock(mock2)
 
 	hub.RegisterClient(client2Meta)
 
 	userId2, _ := hub.clientManager.MapId(client2Meta)
+	client1Meta, mock1 := getClientMeta(1)
+	_, _, _ = setupMock(mock1)
 
-	client1Meta, _ := getClientMeta(1)
 	hub.RegisterClient(client1Meta)
 
 	userId1, _ := hub.clientManager.MapId(client1Meta)
@@ -418,6 +420,7 @@ func TestHandleReadRequestPlayerKD(t *testing.T) {
 		t.Error("there should be a returned value on Send All PlayersKD request")
 		return
 	}
+
 	actualBytes := actual.Bytes()
 	var expected1 [12]byte
 	var expected2 [12]byte

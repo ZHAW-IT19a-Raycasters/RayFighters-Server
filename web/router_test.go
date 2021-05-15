@@ -233,6 +233,10 @@ func TestWsFirstOpcodes(t *testing.T) {
 	t.Logf("connecting to %s\n", url.String())
 
 	ws, resp, err := dialer.Dial(urlPath, nil)
+	// close the websocket
+	defer func() {
+		_ = ws.Close()
+	}()
 
 	if resp.StatusCode != http.StatusSwitchingProtocols {
 		t.Errorf("incorrect status was used exp : [%d] got: [%d]", http.StatusAccepted, resp.StatusCode)
@@ -299,6 +303,9 @@ func TestWsMovement(t *testing.T) {
 	t.Logf("connecting to %s\n", url.String())
 
 	ws, resp, err := dialer.Dial(urlPath, nil)
+	defer func() {
+		_ = ws.Close()
+	}()
 
 	if resp.StatusCode != http.StatusSwitchingProtocols {
 		t.Errorf("incorrect status was used exp : [%d] got: [%d]", http.StatusAccepted, resp.StatusCode)
