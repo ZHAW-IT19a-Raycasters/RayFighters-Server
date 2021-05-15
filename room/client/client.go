@@ -347,9 +347,13 @@ func (c *Client) recvDataHandler(messageType int, message io.Reader) error {
 // recvConnectionErrHandler will handle the different error cases
 // possibly received by the server from the front end
 func (c *Client) recvConnectionErrHandler(err error) {
-	logger.Debugf("handling connection error for [%d]", c.meta.id)
-
-	if websocket.IsCloseError(err, websocket.CloseAbnormalClosure) {
+	if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
+		// the case that either
+		// - the connection was correctly closed by the client side web socket
+		// - the connection was incorrectly closed by a closed browser instance
+		//   or the browser having navigated away from the page withe the connection.
+		logger.Infof("Connection to client [%d] was shutdown by client", c.meta.id)
+	} else if websocket.IsCloseError(err, websocket.CloseAbnormalClosure) {
 		// the case that there was an unexpected close event
 		// such as internet connection problems and similar.
 		// Given that case the client has to be set into its
@@ -357,15 +361,6 @@ func (c *Client) recvConnectionErrHandler(err error) {
 		// new connection can be established.
 		logger.Warnf("Client [%d] lost connection, setting to timeout", c.meta.id)
 		c.registerTimeout()
-		return
-	}
-
-	if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
-		// the case that either
-		// - the connection was correctly closed by the client side web socket
-		// - the connection was incorrectly closed by a closed browser instance
-		//   or the browser having navigated away from the page withe the connection.
-		logger.Infof("Connection to client [%d] was shutdown by client", c.meta.id)
 	} else {
 		// every other unexpected case
 		logger.Warnf("unexpected web socket closure error received for client [%d] "+
@@ -444,12 +439,6 @@ func (c *Client) shutdownHandler() {
 	c.queue.Shutdown()
 }
 
-func (c *Client) SetStatus(newState ConnectionStatus) {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-	c.status = newState
-}
-
 // Shutdown will shutdown the client and the queue.
 // Attention this is a blocking call until the
 // context expires.
@@ -476,8 +465,6 @@ func (c *Client) Shutdown(ctx context.Context) {
 	// make a channel on which, we can wait on.
 	runs := make(chan struct{})
 
-	logger.Debugf("waiting for shutdown of client [%d]", c.meta.eId)
-
 	// Make a waiter that will (hopefully) shutdown soon.
 	go func() {
 		// close the connection
@@ -486,8 +473,6 @@ func (c *Client) Shutdown(ctx context.Context) {
 		_ = c.meta.conn.Close()
 
 		c.queue.Shutdown()
-
-		logger.Debugf("waiting for worker shutdown of client [%d]", c.meta.eId)
 
 		// wait until the work group reaches zero
 		c.wg.Wait()

@@ -188,9 +188,6 @@ func (hc *HubController) removeClientIfTimeout(id uint8) error {
 			id: id,
 		}
 	}
-
-	hc.clientManager.SetClientState(meta, client.Offline)
-
 	return hc.removeClient(meta)
 }
 
@@ -228,9 +225,8 @@ func (hc *HubController) ClientState(meta client.ClientMeta) (client.ConnectionS
 	if !ok {
 		return c, ok
 	}
-
 	// okay is not needed here as we know the clinet already exists.
-	c, ok = hc.clientManager.GetClientStatus(id)
+	c, _ = hc.clientManager.GetClientStatus(id)
 	return c, ok
 }
 
@@ -324,22 +320,7 @@ func (hc *HubController) RegisterClient(meta client.ClientMeta) error {
 // client.
 func (hc *HubController) runClientConnection(hqueue client.HubQueue, id uint8) {
 	var wg sync.WaitGroup
-
-	rClient := func(id uint8) {
-		// We ignore the ok because this function can't be called without the user already existing
-		meta, ok := hc.clientManager.MapMeta(id)
-
-		if !ok {
-			return
-		}
-		// We ignore the error here, as it is impossible per definition
-		_ = hc.removeClient(meta)
-	}
-
-	defer func() {
-		wg.Wait()
-		rClient(id)
-	}()
+	defer wg.Wait()
 
 	for {
 		// if there was an error this means
@@ -369,6 +350,10 @@ func (hc *HubController) runClientConnection(hqueue client.HubQueue, id uint8) {
 			hqueue.Enqueue(toSend)
 
 			if toSend[0] == server.UnknownOpcode.Value() {
+				// We ignore the ok because this function can't be called without the user already existing
+				meta, _ := hc.clientManager.MapMeta(id)
+				// We ignore the error here, as it is impossible per definition
+				_ = hc.removeClient(meta)
 				return
 			}
 		}()
@@ -383,12 +368,9 @@ func (hc *HubController) runClientConnection(hqueue client.HubQueue, id uint8) {
 // Attention decrementing the client may only happen
 // in a case, that there actually was a client removed.
 func (hc *HubController) removeClient(meta client.ClientMeta) error {
-
-	state, ok := hc.ClientState(meta)
+	_, ok := hc.ClientState(meta)
 	if !ok {
 		return client.NewErrClientDoesntExist(meta)
-	} else if state == client.Timeout {
-		return nil
 	}
 
 	// error is not needed as per definition the client has to exists
