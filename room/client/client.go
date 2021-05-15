@@ -383,6 +383,7 @@ func (c *Client) recvConnectionErrHandler(err error) bool {
 		// special attention simply return here.
 		return false
 	}
+
 	// get inner
 	err = errors.Unwrap(err)
 
@@ -480,15 +481,15 @@ func (c *Client) shutdownHandler() {
 
 	logger.Debugf("shutting down client [%d]", c.meta.id)
 
+	// terminate the queue
+	c.queue.Shutdown()
+
 	// Error here is not important as the connections already died
 	// before reaching this position.
 	err := c.meta.conn.Close()
 	if err != nil {
 		logger.Debugf("error happend here [%s] for client [%d]", err.Error(), c.meta.id)
 	}
-
-	// terminate the queue
-	c.queue.Shutdown()
 }
 
 // Shutdown will shutdown the client and the queue.

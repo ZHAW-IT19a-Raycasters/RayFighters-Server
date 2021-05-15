@@ -242,10 +242,9 @@ func (manager *ClientManager) RemoveClient(meta ClientMeta) error {
 		logger.Debugf("client [%d] does not exist", meta.id)
 		return NewErrClientDoesntExist(meta)
 	}
+	manager.lock.Lock()
 
-	manager.lock.RLock()
 	val := manager.clients[id]
-	manager.lock.RUnlock()
 
 	// make sure it is shutdown, at most wait for the timeout
 	// afterwards kill it.
@@ -267,7 +266,6 @@ func (manager *ClientManager) RemoveClient(meta ClientMeta) error {
 	// try to keep the lock for as short as possible
 	logger.Debugf("removing client [%d] from mappings", meta.id)
 
-	manager.lock.Lock()
 	// remove from mapping
 	delete(manager.mapping, meta.id)
 	delete(manager.clients, id)

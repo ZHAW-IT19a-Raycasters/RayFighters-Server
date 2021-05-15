@@ -421,7 +421,7 @@ func (hc *HubController) removeClient(meta client.ClientMeta) error {
 		return nil
 	}
 
-	logger.Debugf("removing client [%d] from hub", meta.GetId())
+	logger.Debugf("removing client [%s] from hub", meta.GetId())
 
 	// error is not needed as per definition the client has to exists
 	// at this point
@@ -442,24 +442,28 @@ func (hc *HubController) removeClient(meta client.ClientMeta) error {
 
 	_ = hc.clientManager.RemoveClient(meta)
 
-	hc.broadCast(server.NewPlayerLeft(id), helpers.NewIdSet())
+	hc.unsafeBroadCast(server.NewPlayerLeft(id), helpers.NewIdSet())
 
 	// decrement the counter
 	// error here is impossible due to the checks above
 	_ = hc.Release()
 
 	return nil
+	// defer
 }
 
 // BroadCast will as the name implies broadcast a given
 // byte interface to a given client.
 func (hc *HubController) broadCast(msg protocol.Bytefy, except helpers.IdSet) {
-	// get the bytes first
-	data := msg.Bytes()
 
 	hc.lock.RLock()
 	defer hc.lock.RUnlock()
+	hc.unsafeBroadCast(msg, except)
+}
 
+func (hc *HubController) unsafeBroadCast(msg protocol.Bytefy, except helpers.IdSet) {
+	// get the bytes first
+	data := msg.Bytes()
 	for id, clientQueue := range hc.connections {
 		if except.Has(id) {
 			continue

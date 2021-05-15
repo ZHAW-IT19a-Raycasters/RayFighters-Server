@@ -109,8 +109,7 @@ func (h *Hub) RegisterClient(meta client.ClientMeta) error {
 	// manager, then the player count has to be
 	// incremented.
 	_, ok := h.ClientState(meta)
-	if ok {
-
+	if !ok {
 		// increment the counter
 		// if the counter already is maxed out
 		// this will return an error

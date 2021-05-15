@@ -172,6 +172,7 @@ func (amw *authenticationManager) checkIfCookieValid(r *http.Request) error {
 	if err != nil {
 		logger.Debug("valid cookie found")
 	}
+
 	return err
 }
 
@@ -274,10 +275,11 @@ func validUsername(str string) (string, error) {
 	if !utf8.ValidString(str) {
 		return "", fmt.Errorf("invalid utf-8 runes in username %s", str)
 	}
-
-	if utf8.RuneCountInString(str) > maxUsernameLength {
+	strLen := utf8.RuneCountInString(str)
+	if strLen == 0 || strLen > maxUsernameLength {
 		return "", fmt.Errorf("username contains too many runes %d, %s", utf8.RuneCountInString(str), str)
 	}
+
 	escaped := html.EscapeString(str)
 	return escaped, nil
 }
