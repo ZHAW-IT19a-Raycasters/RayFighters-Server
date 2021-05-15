@@ -55,6 +55,10 @@ func (mc *MapController) ChangeMap(filePath string) (map[uint8]*gamemap.Coordina
 	mc.map2d = map2d
 	mc.spawingarea = map2d.GetLegalSpawns()
 
+	for id := range mc.clients {
+		mc.unsafeRandomSpawn(id)
+	}
+
 	return mc.clients, nil
 }
 
@@ -92,9 +96,6 @@ func (mc *MapController) unsafeRandomSpawn(id uint8) gamemap.Coordinate {
 	coord := gamemap.NewCoordinate(spawn.X(), spawn.Y(), 0)
 	pCoord := &coord
 
-	mc.lock.Lock()
-	defer mc.lock.Unlock()
-
 	mc.clients[id] = pCoord
 
 	return coord
@@ -102,9 +103,9 @@ func (mc *MapController) unsafeRandomSpawn(id uint8) gamemap.Coordinate {
 
 // RandomSpawn will move a players location as to respawn it into the game.
 func (mc *MapController) RandomSpawn(id uint8) (gamemap.Coordinate, error) {
-	// no lock is needed here as
-	// there the coordinate has
-	// its own.
+	mc.lock.Lock()
+	defer mc.lock.Unlock()
+
 	_, ok := mc.clients[id]
 	if !ok {
 		return gamemap.Coordinate{}, ErrClientDoesNotExist{

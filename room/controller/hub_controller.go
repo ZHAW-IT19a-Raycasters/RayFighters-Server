@@ -10,14 +10,13 @@ import (
 
 	"github.zhaw.ch/raycasters/server/room/mapstate"
 
+	"github.zhaw.ch/raycasters/server/protocol"
 	"github.zhaw.ch/raycasters/server/protocol/server"
 	"github.zhaw.ch/raycasters/server/utils"
-	"github.zhaw.ch/raycasters/server/protocol"
 
 	pclient "github.zhaw.ch/raycasters/server/protocol/client"
 	"github.zhaw.ch/raycasters/server/room/client"
 	"github.zhaw.ch/raycasters/server/room/helpers"
-	"github.zhaw.ch/raycasters/server/room/items"
 )
 
 // HubController is the main brain of the hub
@@ -43,7 +42,10 @@ type HubController struct {
 	respawnHandler client.HubRespawnHandler
 	// timeoutItemQueue stores the currently timeout map elements
 	// so that they can be respawned once the timeout runs out.
-	timeoutItemQueue items.ItemTimer
+	/** timeoutItemQueue items.ItemTimer**/
+	// timeoutItemQueue stores the currently timeout map elements
+	// so that they can be respawned once the timeout runs out.
+	timeoutMapQueue MapTimer
 	// mapChanging will be set True when the Map is being reloaded
 	// so we know when to reset everything to restart the game
 	mapChanging utils.AtomicBool
@@ -80,7 +82,13 @@ func (hc *HubController) NewMap(newMapPath string) error {
 	if hc.mapController != nil {
 		// TODO: shutdown Timer and other used stuff
 	}
-	_, err := hc.mapController.ChangeMap(newMapPath)
+	clients, err := hc.mapController.ChangeMap(newMapPath)
+	emptySet := helpers.NewIdSet()
+	for id, lClient := range clients {
+		// teleport the player back into the game
+		tp := server.NewTeleportPlayer(id, lClient.X(), lClient.Y())
+		hc.broadCast(tp, emptySet)
+	}
 
 	if err != nil {
 		return err
@@ -101,15 +109,24 @@ func NewHubController() *HubController {
 	}
 
 	hc := HubController{
-		clientManager: client.NewClientManager(),
-		connections:   make(map[uint8]client.HubQueue),
-		gameState:     NewGameState(),
-		mapController: &mapController,
-		mapChanging:   utils.NewAtomicBool(false),
-		semaphore:     utils.NewCountingSemaphore(uint32(helpers.IdCountLimit)),
-		wg:            sync.WaitGroup{},
-		lock:          sync.RWMutex{},
+		clientManager:   client.NewClientManager(),
+		connections:     make(map[uint8]client.HubQueue),
+		gameState:       NewGameState(),
+		mapController:   &mapController,
+		mapChanging:     utils.NewAtomicBool(false),
+		semaphore:       utils.NewCountingSemaphore(uint32(helpers.IdCountLimit)),
+		wg:              sync.WaitGroup{},
+		lock:            sync.RWMutex{},
 	}
+
+	// MapTimer
+	mTimeOutCallback := func() {
+
+		_ = hc.NewMap("desert.txt")
+	}
+	hc.timeoutMapQueue = NewMapTimer(0, mTimeOutCallback)
+	// TODO: handle Error
+	hc.timeoutMapQueue.Run()
 
 	// implement item timer callbacks (blocked by missing map implementation)
 	// Attention this is not done anymore, but the comment is kept here as
