@@ -1,10 +1,11 @@
 package mapstate
 
 import (
-	"github.zhaw.ch/raycasters/server/log"
 	"math"
 	"math/rand"
 	"sync"
+
+	"github.zhaw.ch/raycasters/server/log"
 
 	"github.zhaw.ch/raycasters/server/gamemap"
 )
@@ -33,16 +34,6 @@ func NewMapController(filePath string) (MapController, error) {
 	}, nil
 }
 
-/*
-func NewMapCustomMapController() (MapController, error) {
-	return MapController{
-		spawingarea: map2d.GetLegalSpawns(),
-		map2d:       map2d,
-		clients:     make(map[uint8]*gamemap.Coordinate),
-		getNextInt:  rand.Intn,
-		lock:        &sync.RWMutex{},
-	}, nil
-}*/
 // clientExists will check if the client already exists.
 // Attention this function locks on its own.
 func (mc *MapController) clientExists(id uint8) bool {

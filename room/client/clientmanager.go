@@ -235,8 +235,11 @@ func (manager *ClientManager) AddClient(meta ClientMeta, queue ClientQueue, time
 // RemoveClient will remove the given client from the manager, this will return an error
 // if the given client does not exist.
 func (manager *ClientManager) RemoveClient(meta ClientMeta) error {
+	logger.Debugf("trying to remove client [%d]", meta.id)
+
 	id, ok := manager.MapId(meta)
 	if !ok {
+		logger.Debugf("client [%d] does not exist", meta.id)
 		return NewErrClientDoesntExist(meta)
 	}
 
@@ -254,31 +257,33 @@ func (manager *ClientManager) RemoveClient(meta ClientMeta) error {
 
 	// run shutdown procedure, while preparing the rest of the system
 	go func() {
+		logger.Debugf("shutting down client [%d]", meta.id)
 		val.Shutdown(cxt)
+		logger.Debugf("shutting down of client [%d] completed", meta.id)
 		close(waiter)
 	}()
 
-	// this is run in an internal function, as to
-	// keep the lock for as short as possible
-	// due to the waiter possibly waiting for about 1s
-	remove := func() {
-		// lock the system and remove stuff,
-		// try to keep the lock for as short as possible
-		manager.lock.Lock()
-		defer manager.lock.Unlock()
-		// remove from mapping
-		delete(manager.mapping, meta.id)
-		delete(manager.clients, id)
-	}
+	// lock the system and remove stuff,
+	// try to keep the lock for as short as possible
+	logger.Debugf("removing client [%d] from mappings", meta.id)
 
-	remove()
+	manager.lock.Lock()
+	// remove from mapping
+	delete(manager.mapping, meta.id)
+	delete(manager.clients, id)
+	manager.lock.Unlock()
+
+	logger.Debugf("waiting until client [%d] finishes execution", meta.id)
 
 	<-waiter
 
 	cancel()
 
 	// remove client from manager
-	defer manager.wg.Done()
+	defer func() {
+		logger.Debugf("client [%d] fully removed", meta.id)
+		manager.wg.Done()
+	}()
 
 	// free the id as the last point
 	// at the end of the process

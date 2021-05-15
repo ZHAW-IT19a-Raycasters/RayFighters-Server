@@ -16,7 +16,6 @@ import (
 	pclient "github.zhaw.ch/raycasters/server/protocol/client"
 	"github.zhaw.ch/raycasters/server/room/client"
 	"github.zhaw.ch/raycasters/server/room/helpers"
-	"github.zhaw.ch/raycasters/server/room/items"
 )
 
 // HubController is the main brain of the hub
@@ -42,7 +41,8 @@ type HubController struct {
 	respawnHandler client.HubRespawnHandler
 	// timeoutItemQueue stores the currently timedout map elements
 	// so that they can be respawned once the timeout runs out.
-	timeoutItemQueue items.ItemTimer
+	// timeoutItemQueue items.ItemTimer
+
 	// Semaphore, counts the totally active
 	// player connections, although that number is already available
 	// via the client map length, is would have to be accessed
@@ -217,10 +217,18 @@ func (hc *HubController) ClientState(meta client.ClientMeta) (client.ConnectionS
 	// check the meta information, so that
 	// there never can be a double increment
 	// per added client.
-	c := client.Offline
 
 	hc.lock.RLock()
 	defer hc.lock.RUnlock()
+	return hc.unsafeClientState(meta)
+}
+
+// unsafeClientState checks if the client has a place on the map or
+// not.
+// Attention this function assumes the caller having the controller
+// lock.
+func (hc *HubController) unsafeClientState(meta client.ClientMeta) (client.ConnectionStatus, bool) {
+	c := client.Offline
 	id, ok := hc.clientManager.MapId(meta)
 	if !ok {
 		return c, ok
@@ -228,6 +236,33 @@ func (hc *HubController) ClientState(meta client.ClientMeta) (client.ConnectionS
 	// okay is not needed here as we know the clinet already exists.
 	c, _ = hc.clientManager.GetClientStatus(id)
 	return c, ok
+}
+
+// IsClientState checks if the client is in the given state or
+// not.
+func (hc *HubController) IsClientState(id uint8, expectedState client.ConnectionStatus) error {
+	hc.lock.RLock()
+	defer hc.lock.RUnlock()
+	return hc.unsafeIsClientState(id, expectedState)
+}
+
+// unsafeIsClientState checks if the client is in the given state or
+// not.
+// Attention this function assumes the caller having the controller
+// lock.
+func (hc *HubController) unsafeIsClientState(id uint8, expectedState client.ConnectionStatus) error {
+	status, ok := hc.clientManager.GetClientStatus(id)
+	if !ok {
+		return ErrClientDoesNotExist{
+			id: id,
+		}
+	} else if status != expectedState {
+		return ErrClientUnexpectedState{
+			state: expectedState,
+			id:    id,
+		}
+	}
+	return nil
 }
 
 // RegisterClient will add the client to the controller
@@ -320,17 +355,26 @@ func (hc *HubController) RegisterClient(meta client.ClientMeta) error {
 // client.
 func (hc *HubController) runClientConnection(hqueue client.HubQueue, id uint8) {
 	var wg sync.WaitGroup
-	defer wg.Wait()
+
+	defer func() {
+		logger.Debug("waiting for workers for client [%d] to finish", id)
+		wg.Wait()
+		logger.Debug("removing client [%d] from hub", id)
+		// We ignore the ok because this function can't be called without the user already existing
+		meta, _ := hc.clientManager.MapMeta(id)
+		// We ignore the error here, as it is impossible per definition
+		_ = hc.removeClient(meta)
+	}()
 
 	for {
 		// if there was an error this means
 		// that we can stop running this here
 		data, err := hqueue.Dequeue()
 		if err != nil {
-			break
+			return
 		} else if len(data) == 0 {
 			logger.Error("Received no Data to Process")
-			break
+			return
 		}
 
 		wg.Add(1)
@@ -339,6 +383,7 @@ func (hc *HubController) runClientConnection(hqueue client.HubQueue, id uint8) {
 			defer wg.Done()
 
 			gotten := hc.handleRead(data, id)
+
 			// this means that the given opcode will not actually
 			// result in a direct return message, this happens
 			// with broadcast commands.
@@ -350,10 +395,7 @@ func (hc *HubController) runClientConnection(hqueue client.HubQueue, id uint8) {
 			hqueue.Enqueue(toSend)
 
 			if toSend[0] == server.UnknownOpcode.Value() {
-				// We ignore the ok because this function can't be called without the user already existing
-				meta, _ := hc.clientManager.MapMeta(id)
-				// We ignore the error here, as it is impossible per definition
-				_ = hc.removeClient(meta)
+				logger.Debugf("client [%d] has sent a shutdown command", id)
 				return
 			}
 		}()
@@ -368,10 +410,18 @@ func (hc *HubController) runClientConnection(hqueue client.HubQueue, id uint8) {
 // Attention decrementing the client may only happen
 // in a case, that there actually was a client removed.
 func (hc *HubController) removeClient(meta client.ClientMeta) error {
-	_, ok := hc.ClientState(meta)
+	hc.lock.Lock()
+	defer hc.lock.Unlock()
+	state, ok := hc.unsafeClientState(meta)
+
 	if !ok {
 		return client.NewErrClientDoesntExist(meta)
+	} else if state == client.Timeout {
+		logger.Debugf("client [%d] is still timed out", meta.GetId())
+		return nil
 	}
+
+	logger.Debugf("removing client [%d] from hub", meta.GetId())
 
 	// error is not needed as per definition the client has to exists
 	// at this point
@@ -383,18 +433,13 @@ func (hc *HubController) removeClient(meta client.ClientMeta) error {
 	q := hc.connections[id]
 	q.Shutdown()
 
-	// only lock here as the remove client function is a blocking call
-	hc.lock.Lock()
 	// remove queue
 	delete(hc.connections, id)
-	hc.lock.Unlock()
 
-	// TODO: remove from map
+	_ = hc.mapController.RemoveClient(id)
+
 	_ = hc.gameState.RemoveClient(id)
 
-	// client exists so lock everything down to remove him
-	// as we do not have any type of limitation using
-	// background here
 	_ = hc.clientManager.RemoveClient(meta)
 
 	hc.broadCast(server.NewPlayerLeft(id), helpers.NewIdSet())

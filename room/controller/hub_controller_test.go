@@ -160,15 +160,16 @@ func TestHandleReadDisconnect(t *testing.T) {
 	const otherId uint8 = 2
 	hub.connections[otherId] = hQueue
 
-	client2Meta, _ := getClientMeta(2)
-
+	client2Meta, mc2 := getClientMeta(2)
+	done, _, _ := setupMock(mc2)
 	hub.RegisterClient(client2Meta)
 
 	_, hQueue = rClient.NewWorkQueue()
 	const userId uint8 = 1
 	hub.connections[userId] = hQueue
 
-	client1Meta, _ := getClientMeta(1)
+	client1Meta, mc1 := getClientMeta(1)
+	_, _, _ = setupMock(mc1)
 
 	hub.RegisterClient(client1Meta)
 
@@ -185,6 +186,7 @@ func TestHandleReadDisconnect(t *testing.T) {
 	if !compareByteArrays(expected, bytes, t) {
 		t.Error("Error in HandleDisconnect")
 	}
+	close(done)
 
 	cQueue.Dequeue()
 	cQueue.Dequeue()

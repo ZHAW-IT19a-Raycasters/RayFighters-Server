@@ -73,6 +73,40 @@ func (err ErrNonBinaryMessage) Is(target error) bool {
 	return ok
 }
 
+type ErrRecvHandler struct {
+	inner error
+}
+
+func (err ErrRecvHandler) Error() string {
+	return fmt.Sprintf("got a receiver error [%s]", err.inner.Error())
+}
+
+func (err ErrRecvHandler) Is(target error) bool {
+	_, ok := target.(ErrRecvHandler)
+	return ok
+}
+
+func (err ErrRecvHandler) Unwrap() error {
+	return err.inner
+}
+
+type ErrRecvReader struct {
+	inner error
+}
+
+func (err ErrRecvReader) Error() string {
+	return fmt.Sprintf("got a receiver error [%s]", err.inner.Error())
+}
+
+func (err ErrRecvReader) Is(target error) bool {
+	_, ok := target.(ErrRecvReader)
+	return ok
+}
+
+func (err ErrRecvReader) Unwrap() error {
+	return err.inner
+}
+
 // Client represents a client in it's full configuration.
 // This struct stores all the information about a single
 // client instance in a hub.
@@ -123,6 +157,7 @@ func (c *Client) GetInternalMeta() clientInternalMeta {
 func (c *Client) registerConn(conn ClientMeta, queue ClientQueue) error {
 	// check if the receiving routine is running
 	if c.isActive.Get() {
+		logger.Debugf("client [%d] is already active", c.meta.id)
 		return ErrClientWorkersAlreadyActive
 	}
 
@@ -137,12 +172,15 @@ func (c *Client) registerConn(conn ClientMeta, queue ClientQueue) error {
 	// make sure that there is no chance of this conn
 	// already being registered
 	if c.status == Registered {
+		logger.Debugf("client [%d] is already registered", c.meta.id)
 		return ErrClientWorkersAlreadyActive
 	}
 
 	c.meta = newClientInternalMeta(c.meta.id, conn)
 	c.queue = queue
 	c.status = Registered
+
+	logger.Debugf("client connection [%d] was successfully armed", c.meta.id)
 
 	// rearm the queue
 	c.timoutQueue.Reset()
@@ -177,23 +215,20 @@ func (c *Client) Run() error {
 	// as possible
 	c.wg.Add(2)
 
-	setupStates := func() {
-		c.lock.Lock()
-		defer c.lock.Unlock()
-		// setup the states
-		c.status = Active
-	}
-	setupStates()
+	c.lock.Lock()
+	// setup the states
+	c.status = Active
+	c.lock.Unlock()
 
 	go func() {
 		err := c.recvData()
-
 		c.wg.Done()
 
-		if err != nil {
-			c.recvConnectionErrHandler(err)
+		if err != nil && c.recvConnectionErrHandler(err) {
+			c.Shutdown(context.Background())
 		}
 	}()
+
 	go func() {
 		c.sendData()
 		c.wg.Done()
@@ -342,7 +377,15 @@ func (c *Client) recvDataHandler(messageType int, message io.Reader) error {
 
 // recvConnectionErrHandler will handle the different error cases
 // possibly received by the server from the front end
-func (c *Client) recvConnectionErrHandler(err error) {
+func (c *Client) recvConnectionErrHandler(err error) bool {
+	if errors.Is(err, ErrRecvHandler{}) {
+		// As this is not an error that needs
+		// special attention simply return here.
+		return false
+	}
+	// get inner
+	err = errors.Unwrap(err)
+
 	if websocket.IsCloseError(err, websocket.CloseAbnormalClosure) {
 		// the case that there was an unexpected close event
 		// such as internet connection problems and similar.
@@ -351,7 +394,7 @@ func (c *Client) recvConnectionErrHandler(err error) {
 		// new connection can be established.
 		logger.Warnf("Client [%d] lost connection, setting to timeout", c.meta.id)
 		c.registerTimeout()
-		return
+		return false
 	}
 
 	if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
@@ -367,7 +410,7 @@ func (c *Client) recvConnectionErrHandler(err error) {
 			"information\n[%s]", c.meta.id, err.Error())
 	}
 
-	c.Shutdown(context.Background())
+	return true
 }
 
 // recvData is the actual function used to run the client read loop
@@ -397,14 +440,17 @@ func (c *Client) recvData() error {
 		// method returns a non-nil error, all subsequent calls to this method return the same
 		// error
 		if err != nil {
-
-			return err
+			return ErrRecvReader{
+				inner: err,
+			}
 		}
 
 		err = c.recvDataHandler(messageType, message)
 
 		if err != nil {
-			return err
+			return ErrRecvHandler{
+				inner: err,
+			}
 		}
 	}
 }
@@ -432,9 +478,14 @@ func (c *Client) shutdownHandler() {
 		return
 	}
 
+	logger.Debugf("shutting down client [%d]", c.meta.id)
+
 	// Error here is not important as the connections already died
 	// before reaching this position.
-	_ = c.meta.conn.Close()
+	err := c.meta.conn.Close()
+	if err != nil {
+		logger.Debugf("error happend here [%s] for client [%d]", err.Error(), c.meta.id)
+	}
 
 	// terminate the queue
 	c.queue.Shutdown()
@@ -458,8 +509,6 @@ func (c *Client) Shutdown(ctx context.Context) {
 
 	logger.Debugf("Shutting down client [%d]", c.meta.eId)
 
-	c.shutdownHandler()
-
 	c.lock.Lock()
 	// set the state of the client to shutting down
 	c.status = ShuttingDown
@@ -470,15 +519,12 @@ func (c *Client) Shutdown(ctx context.Context) {
 
 	// Make a waiter that will (hopefully) shutdown soon.
 	go func() {
-		// close the connection
-		// error is irrelevant as we already send the
-		// disconnect message
-		_ = c.meta.conn.Close()
-
-		c.queue.Shutdown()
-
+		logger.Debugf("running shutdown procedure for client [%d]", c.meta.id)
+		c.shutdownHandler()
 		// wait until the work group reaches zero
 		c.wg.Wait()
+
+		logger.Debugf("waiting for client [%d] worker shutdown completed", c.meta.id)
 
 		// toggle the completed shutdown channel
 		close(runs)
@@ -486,7 +532,7 @@ func (c *Client) Shutdown(ctx context.Context) {
 
 	select {
 	case <-runs:
-		logger.Debugf("Shutdown of client [%d] complete", c.meta.eId)
+		logger.Debugf("Shutdown of client [%d] completed", c.meta.eId)
 	case <-ctx.Done():
 		logger.Debugf("forced shutdown of client [%d], due to timeout", c.meta.eId)
 	}
