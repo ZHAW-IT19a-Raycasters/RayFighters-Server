@@ -478,7 +478,7 @@ func (hc *HubController) Shutdown(cxt context.Context) {
 	hc.broadCast(server.NewDisconnect(), helpers.NewIdSet())
 
 	waiter := make(chan struct{})
-	wg := sync.WaitGroup{}
+	var wg sync.WaitGroup
 
 	// use complex way to avoid code repetition
 	// thanks sonar lint alert

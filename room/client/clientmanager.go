@@ -306,11 +306,9 @@ func (manager *ClientManager) RemoveClient(meta ClientMeta) error {
 // the clients will only partially be unregistered.
 func (manager *ClientManager) Shutdown(cxt context.Context) {
 	// Will tell all the clients to shutdown in the given shutdown time.
-	childCxt, chancelCxt := context.WithTimeout(cxt, ClientShutdownTime)
 
 	// Remove from memory and close any open waiting channels.
 	waiter := make(chan struct{})
-	defer chancelCxt()
 
 	// start up waiter first
 	go func() {
@@ -319,23 +317,15 @@ func (manager *ClientManager) Shutdown(cxt context.Context) {
 		close(waiter)
 	}()
 
-	closeClient := func(val *Client) {
-		val.Shutdown(childCxt)
-		// Decrement the wait group here
-		// as there there is no unregistration.
-		manager.wg.Done()
-	}
-
 	// run shutdown on all clients
-	manager.lock.RLock()
-	for _, value := range manager.clients {
-		// run shutdown in it's own threads
-		// do not remove all the clients
-		// as that would use up too much time
-		// for not used data.
-		go closeClient(value)
+	for id, _ := range manager.clients {
+		meta, ok := manager.mapToExternalMeta(id)
+		if !ok {
+			// if the client already has been removed
+			continue
+		}
+		manager.RemoveClient(meta)
 	}
-	manager.lock.RUnlock()
 
 	select {
 	case <-waiter:
