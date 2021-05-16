@@ -318,7 +318,7 @@ func (manager *ClientManager) Shutdown(cxt context.Context) {
 	}()
 
 	// run shutdown on all clients
-	for id, _ := range manager.clients {
+	for id := range manager.clients {
 		meta, ok := manager.mapToExternalMeta(id)
 		if !ok {
 			// if the client already has been removed

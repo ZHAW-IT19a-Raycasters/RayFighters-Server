@@ -293,13 +293,17 @@ func TestHandleReadShootingError(t *testing.T) {
 
 func TestHandleReadRequestOtherPlayer(t *testing.T) {
 	hub := NewHubController()
-	client2Meta, _ := getClientMeta(2)
+	defer hub.Shutdown(context.Background())
+
+	client2Meta, mock2 := getClientMeta(2)
+	_, _, _ = setupMock(mock2)
 
 	hub.RegisterClient(client2Meta)
 
 	const userId uint8 = 1
 
-	client1Meta, _ := getClientMeta(1)
+	client1Meta, mock1 := getClientMeta(1)
+	_, _, _ = setupMock(mock1)
 
 	hub.RegisterClient(client1Meta)
 
@@ -360,6 +364,7 @@ func TestHandleReadRequestOtherPlayer(t *testing.T) {
 
 func TestHandleReadRequestOtherPlayerError(t *testing.T) {
 	hub := NewHubController()
+	defer hub.Shutdown(context.Background())
 
 	const userId uint8 = 1
 
@@ -367,7 +372,8 @@ func TestHandleReadRequestOtherPlayerError(t *testing.T) {
 		client.RequestOtherPlayersOpcode.Value(),
 		0x01,
 	}
-	actual := hub.handleRead(request, userId)
+	rawActual := hub.handleRead(request, userId)
+	actual := rawActual.Bytes()
 	expected := []byte{
 		server.UnknownOpcode.Value(),
 	}
@@ -377,7 +383,7 @@ func TestHandleReadRequestOtherPlayerError(t *testing.T) {
 		return
 	}
 
-	if !compareByteArrays(expected, actual.Bytes(), t) {
+	if !compareByteArrays(expected, actual, t) {
 		t.Errorf("Happend in Request other Players Error")
 	}
 }
