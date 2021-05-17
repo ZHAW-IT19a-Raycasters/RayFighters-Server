@@ -160,15 +160,24 @@ func (h *Hub) runRegistration() {
 		h.isActive.SetFalse()
 	}()
 
+	register := func(meta client.ClientMeta) error {
+		logger.Debugf("Adding a new player to hub [%d]", h.id)
+		err := h.controller.RegisterClient(meta)
+		if err != nil {
+			meta.Close()
+			logger.Debugf("unable to register client because [%s]", err.Error())
+		}
+		return err
+	}
+
 	for {
 		select {
 		case meta := <-h.input:
-			logger.Debugf("Adding a new player to hub [%d]", h.id)
-			err := h.controller.RegisterClient(meta)
-			if err != nil {
+			if !h.isActive.Get() {
 				meta.Close()
-				logger.Debugf("unable to register client because [%s]", err.Error())
+				return
 			}
+			register(meta)
 		case <-h.shutdown:
 			logger.Infof("Shutting down hub [%d]", h.id)
 			return

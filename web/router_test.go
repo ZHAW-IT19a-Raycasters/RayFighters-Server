@@ -172,12 +172,12 @@ func TestAuthorizedWebsocketEstablishment(t *testing.T) {
 
 	t.Logf("connecting to %s\n", u.String())
 
-	c, res, err := dialer.Dial(u.String(), nil)
+	ws, res, err := dialer.Dial(u.String(), nil)
 
 	if err != nil {
 		t.Logf("Error during handshake [%s]", err.Error())
 	}
-	defer c.Close()
+	defer ws.Close()
 
 	if res.StatusCode != http.StatusSwitchingProtocols {
 		t.Errorf("handler returned wrong status code during handshake: got %v want %v",

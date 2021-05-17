@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"runtime"
@@ -17,6 +18,10 @@ import (
 	"github.zhaw.ch/raycasters/server/room/client"
 	"github.zhaw.ch/raycasters/server/room/helpers"
 )
+
+// ErrHubControllerOffline is the error returned in the
+// case that the controller is offline.
+var ErrHubControllerOffline = errors.New("the hub controller is offline")
 
 // HubController is the main brain of the hub
 // it is soley responsible for all the interactions
@@ -50,6 +55,9 @@ type HubController struct {
 	// while asynchronously adding a new client. So to avoid the given
 	// overhead an atomic counting semaphore implementation is here used.
 	semaphore utils.CountingSemaphore
+	// isActive checks if the current controller is still active
+	// to add clients or not.
+	isActive utils.AtomicBool
 	// wg is the wait group used for counting the ammout
 	// of active hub workers.
 	wg sync.WaitGroup
@@ -84,6 +92,7 @@ func NewHubController() *HubController {
 		gameState:     NewGameState(),
 		mapController: mapController,
 		semaphore:     utils.NewCountingSemaphore(uint32(helpers.IdCountLimit)),
+		isActive:      utils.NewAtomicBool(true),
 		wg:            sync.WaitGroup{},
 		lock:          sync.RWMutex{},
 	}
@@ -94,6 +103,9 @@ func NewHubController() *HubController {
 
 	// client timer callbacks
 	cTimeoutCallback := func(id uint8) {
+		if !hc.isActive.Get() {
+			return
+		}
 		// error is not important for execution
 		// as it only says if there was an
 		// execution or not
@@ -107,6 +119,9 @@ func NewHubController() *HubController {
 
 	// client respawn callbacks
 	cRespawnCallback := func(id uint8) {
+		if !hc.isActive.Get() {
+			return
+		}
 		// error is not important for execution
 		// as it only says if there was an
 		// execution or not
@@ -124,6 +139,9 @@ func NewHubController() *HubController {
 }
 
 func (hc *HubController) respawnPlayer(id uint8) error {
+	if !hc.isActive.Get() {
+		return ErrHubControllerOffline
+	}
 	logger.Debugf("trying to respawn player [%d]", id)
 	// check if the player is stil active
 	// only respawn if the client is still
@@ -267,6 +285,10 @@ func (hc *HubController) unsafeIsClientState(id uint8, expectedState client.Conn
 
 // RegisterClient will add the client to the controller
 func (hc *HubController) RegisterClient(meta client.ClientMeta) error {
+	if !hc.isActive.Get() {
+		return ErrHubControllerOffline
+	}
+
 	// TODO: register in the game state (if it is a new connection)
 	logger.Debugf("registering client in hub [%s]", meta.GetId().String())
 
@@ -455,7 +477,6 @@ func (hc *HubController) removeClient(meta client.ClientMeta) error {
 // BroadCast will as the name implies broadcast a given
 // byte interface to a given client.
 func (hc *HubController) broadCast(msg protocol.Bytefy, except helpers.IdSet) {
-
 	hc.lock.RLock()
 	defer hc.lock.RUnlock()
 	hc.unsafeBroadCast(msg, except)
@@ -474,6 +495,11 @@ func (hc *HubController) unsafeBroadCast(msg protocol.Bytefy, except helpers.IdS
 
 // Shutdown will Shutdown the controller
 func (hc *HubController) Shutdown(cxt context.Context) {
+	// system is already shutdown
+	if !hc.isActive.SetFalse() {
+		return
+	}
+
 	// send shutdown message to all the clients
 	hc.broadCast(server.NewDisconnect(), helpers.NewIdSet())
 
