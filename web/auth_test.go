@@ -94,7 +94,7 @@ func TestAuthRequestWithValidJson(t *testing.T) {
 
 		router := mux.NewRouter()
 
-		router.HandleFunc("/auth", auth.ServeAuthWithKey())
+		router.HandleFunc("/auth", auth.AuthConnection())
 		router.ServeHTTP(rr, req)
 		res := rr.Result()
 		if res.StatusCode != http.StatusOK {
@@ -138,7 +138,7 @@ func TestAuthTokenResponseVaild(t *testing.T) {
 	router := mux.NewRouter()
 	auth, _ := newAuthManager("")
 
-	router.HandleFunc("/auth", auth.ServeAuthWithKey())
+	router.HandleFunc("/auth", auth.AuthConnection())
 	router.ServeHTTP(rr, req)
 	res := rr.Result()
 	if res.StatusCode != http.StatusOK {

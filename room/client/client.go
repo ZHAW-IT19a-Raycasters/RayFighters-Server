@@ -73,6 +73,40 @@ func (err ErrNonBinaryMessage) Is(target error) bool {
 	return ok
 }
 
+type ErrRecvHandler struct {
+	inner error
+}
+
+func (err ErrRecvHandler) Error() string {
+	return fmt.Sprintf("got a receiver error [%s]", err.inner.Error())
+}
+
+func (err ErrRecvHandler) Is(target error) bool {
+	_, ok := target.(ErrRecvHandler)
+	return ok
+}
+
+func (err ErrRecvHandler) Unwrap() error {
+	return err.inner
+}
+
+type ErrRecvReader struct {
+	inner error
+}
+
+func (err ErrRecvReader) Error() string {
+	return fmt.Sprintf("got a receiver error [%s]", err.inner.Error())
+}
+
+func (err ErrRecvReader) Is(target error) bool {
+	_, ok := target.(ErrRecvReader)
+	return ok
+}
+
+func (err ErrRecvReader) Unwrap() error {
+	return err.inner
+}
+
 // Client represents a client in it's full configuration.
 // This struct stores all the information about a single
 // client instance in a hub.
@@ -106,6 +140,8 @@ func NewClient(id uint8, meta ClientMeta, queue ClientQueue, tq ClientTimer) *Cl
 
 // GetStatus will return the current connection status of the client
 func (c *Client) GetStatus() ConnectionStatus {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
 	return c.status
 }
 
@@ -121,6 +157,7 @@ func (c *Client) GetInternalMeta() clientInternalMeta {
 func (c *Client) registerConn(conn ClientMeta, queue ClientQueue) error {
 	// check if the receiving routine is running
 	if c.isActive.Get() {
+		logger.Debugf("client [%d] is already active", c.meta.id)
 		return ErrClientWorkersAlreadyActive
 	}
 
@@ -135,12 +172,15 @@ func (c *Client) registerConn(conn ClientMeta, queue ClientQueue) error {
 	// make sure that there is no chance of this conn
 	// already being registered
 	if c.status == Registered {
+		logger.Debugf("client [%d] is already registered", c.meta.id)
 		return ErrClientWorkersAlreadyActive
 	}
 
 	c.meta = newClientInternalMeta(c.meta.id, conn)
 	c.queue = queue
 	c.status = Registered
+
+	logger.Debugf("client connection [%d] was successfully armed", c.meta.id)
 
 	// rearm the queue
 	c.timoutQueue.Reset()
@@ -162,7 +202,9 @@ func (c *Client) Run() error {
 
 	// make sure that there is no chance of this conn
 	// already being registered
-	if !c.checkRegistered() {
+	_, isRegistered := c.CheckState(Registered)
+
+	if !isRegistered {
 		return ErrClientWorkersAlreadyActive
 	}
 
@@ -173,18 +215,20 @@ func (c *Client) Run() error {
 	// as possible
 	c.wg.Add(2)
 
-	setupStates := func() {
-		c.lock.Lock()
-		defer c.lock.Unlock()
-		// setup the states
-		c.status = Active
-	}
-	setupStates()
+	c.lock.Lock()
+	// setup the states
+	c.status = Active
+	c.lock.Unlock()
 
 	go func() {
-		c.recvData()
+		err := c.recvData()
 		c.wg.Done()
+
+		if err != nil && c.recvConnectionErrHandler(err) {
+			c.Shutdown(context.Background())
+		}
 	}()
+
 	go func() {
 		c.sendData()
 		c.wg.Done()
@@ -193,32 +237,21 @@ func (c *Client) Run() error {
 	return nil
 }
 
-// checkOffline will check based on the
-// current client state, if the client
-// already as been set to offline.
-func (c *Client) checkRegistered() bool {
+// CheckState will check if the current client state is equvalent
+// to the expected value.
+func (c *Client) CheckState(exp ConnectionStatus) (ConnectionStatus, bool) {
 	// this write lock is needed in the later parts
 	// of the processes
 	c.lock.RLock()
 	defer c.lock.RUnlock()
-	// don't bother with running the function more then
-	// once
-	// unlock again here
-	return c.status == Registered
+	return c.unsafeCheckState(exp)
 }
 
-// checkOffline will check based on the
-// current client state, if the client
-// already as been set to offline.
-func (c *Client) checkOffline() bool {
-	// this write lock is needed in the later parts
-	// of the processes
-	c.lock.RLock()
-	defer c.lock.RUnlock()
-	// don't bother with running the function more then
-	// once
-	// unlock again here
-	return c.status == Offline
+// unsafeCheckState is the lock less equivalent of the
+// unsafe check state.
+// Attention this function assumes a client lock from the caller.
+func (c *Client) unsafeCheckState(exp ConnectionStatus) (ConnectionStatus, bool) {
+	return c.status, c.status == exp
 }
 
 // sendData is the actual function used to run the client send loop
@@ -344,14 +377,17 @@ func (c *Client) recvDataHandler(messageType int, message io.Reader) error {
 
 // recvConnectionErrHandler will handle the different error cases
 // possibly received by the server from the front end
-func (c *Client) recvConnectionErrHandler(err error) {
-	if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
-		// the case that either
-		// - the connection was correctly closed by the client side web socket
-		// - the connection was incorrectly closed by a closed browser instance
-		//   or the browser having navigated away from the page withe the connection.
-		logger.Infof("Connection to client [%d] was shutdown by client", c.meta.id)
-	} else if websocket.IsCloseError(err, websocket.CloseAbnormalClosure) {
+func (c *Client) recvConnectionErrHandler(err error) bool {
+	if errors.Is(err, ErrRecvHandler{}) {
+		// As this is not an error that needs
+		// special attention simply return here.
+		return false
+	}
+
+	// get inner
+	err = errors.Unwrap(err)
+
+	if websocket.IsCloseError(err, websocket.CloseAbnormalClosure) {
 		// the case that there was an unexpected close event
 		// such as internet connection problems and similar.
 		// Given that case the client has to be set into its
@@ -359,19 +395,30 @@ func (c *Client) recvConnectionErrHandler(err error) {
 		// new connection can be established.
 		logger.Warnf("Client [%d] lost connection, setting to timeout", c.meta.id)
 		c.registerTimeout()
+		return false
+	}
+
+	if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
+		// the case that either
+		// - the connection was correctly closed by the client side web socket
+		// - the connection was incorrectly closed by a closed browser instance
+		//   or the browser having navigated away from the page withe the connection.
+		logger.Infof("Connection to client [%d] was shutdown by client", c.meta.id)
 	} else {
 		// every other unexpected case
 		logger.Warnf("unexpected web socket closure error received for client [%d] "+
 			"- see https://rfc-editor.org/rfc/rfc6455.html#section-11.7 for more "+
 			"information\n[%s]", c.meta.id, err.Error())
 	}
+
+	return true
 }
 
 // recvData is the actual function used to run the client read loop
 // it will also handle all the incoming opcode commands.
 // Attention this function is a blocking call, so be careful, while
 // reading form it.
-func (c *Client) recvData() {
+func (c *Client) recvData() error {
 	defer c.shutdownHandler()
 
 	for {
@@ -385,7 +432,7 @@ func (c *Client) recvData() {
 		if !c.isActive.Get() {
 			// simply shutdown
 			logger.Debugf("shutting down the receiver of the client [%d]", c.meta.GetId())
-			return
+			return nil
 		}
 
 		// as per definition
@@ -394,14 +441,17 @@ func (c *Client) recvData() {
 		// method returns a non-nil error, all subsequent calls to this method return the same
 		// error
 		if err != nil {
-			c.recvConnectionErrHandler(err)
-			return
+			return ErrRecvReader{
+				inner: err,
+			}
 		}
 
 		err = c.recvDataHandler(messageType, message)
 
 		if err != nil {
-			return
+			return ErrRecvHandler{
+				inner: err,
+			}
 		}
 	}
 }
@@ -429,19 +479,26 @@ func (c *Client) shutdownHandler() {
 		return
 	}
 
-	// Error here is not important as the connections already died
-	// before reaching this position.
-	_ = c.meta.conn.Close()
+	logger.Debugf("shutting down client [%d]", c.meta.id)
 
 	// terminate the queue
 	c.queue.Shutdown()
+
+	// Error here is not important as the connections already died
+	// before reaching this position.
+	err := c.meta.conn.Close()
+	if err != nil {
+		logger.Debugf("error happend here [%s] for client [%d]", err.Error(), c.meta.id)
+	}
 }
 
 // Shutdown will shutdown the client and the queue.
 // Attention this is a blocking call until the
 // context expires.
 func (c *Client) Shutdown(ctx context.Context) {
-	if c.checkOffline() {
+	_, isOffline := c.CheckState(Offline)
+
+	if isOffline {
 		return
 	}
 
@@ -453,8 +510,6 @@ func (c *Client) Shutdown(ctx context.Context) {
 
 	logger.Debugf("Shutting down client [%d]", c.meta.eId)
 
-	c.shutdownHandler()
-
 	c.lock.Lock()
 	// set the state of the client to shutting down
 	c.status = ShuttingDown
@@ -465,15 +520,12 @@ func (c *Client) Shutdown(ctx context.Context) {
 
 	// Make a waiter that will (hopefully) shutdown soon.
 	go func() {
-		// close the connection
-		// error is irrelevant as we already send the
-		// disconnect message
-		_ = c.meta.conn.Close()
-
-		c.queue.Shutdown()
-
+		logger.Debugf("running shutdown procedure for client [%d]", c.meta.id)
+		c.shutdownHandler()
 		// wait until the work group reaches zero
 		c.wg.Wait()
+
+		logger.Debugf("waiting for client [%d] worker shutdown completed", c.meta.id)
 
 		// toggle the completed shutdown channel
 		close(runs)
@@ -481,7 +533,7 @@ func (c *Client) Shutdown(ctx context.Context) {
 
 	select {
 	case <-runs:
-		logger.Debugf("Shutdown of client [%d] complete", c.meta.eId)
+		logger.Debugf("Shutdown of client [%d] completed", c.meta.eId)
 	case <-ctx.Done():
 		logger.Debugf("forced shutdown of client [%d], due to timeout", c.meta.eId)
 	}
