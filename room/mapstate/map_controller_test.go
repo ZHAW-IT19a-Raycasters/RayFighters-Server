@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -301,6 +302,24 @@ func TestLoadFaultyMapController(t *testing.T) {
 	}
 }
 
+type MockIRand struct {
+	lock     *sync.RWMutex
+	fIntn    func(n int) int
+	fFloat64 func() float64
+}
+
+func (m MockIRand) Intn(n int) int {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+	return m.fIntn(n)
+}
+
+func (m MockIRand) Float64() float64 {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+	return m.fFloat64()
+}
+
 func TestSpawningPointAddClient(t *testing.T) {
 	file, err := setupTmpFile(t)
 	if err != nil {
@@ -313,12 +332,15 @@ func TestSpawningPointAddClient(t *testing.T) {
 		return
 	}
 	mapController, err := NewMapController(file)
+
 	if err != nil {
 		t.Error("NewMapController returned error in TestMoveClient")
 		return
 	}
 
-	mapController.getNextInt = func(n int) int { return 4 }
+	mockedRand := MockIRand{}
+	mockedRand.fIntn = func(n int) int { return 4 }
+	mapController.random = mockedRand
 
 	_, err = mapController.AddClient(1)
 

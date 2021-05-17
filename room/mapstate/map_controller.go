@@ -12,11 +12,26 @@ import (
 
 var logger = log.Log()
 
+type iRand interface {
+	Intn(n int) int
+	Float64() float64
+}
+
+type sRand struct{}
+
+func (r sRand) Intn(n int) int {
+	return rand.Intn(n)
+}
+
+func (r sRand) Float64() float64 {
+	return rand.Float64()
+}
+
 type MapController struct {
 	clients     map[uint8]*gamemap.Coordinate
 	spawingarea []gamemap.Coordinate
 	map2d       gamemap.Map2d
-	getNextInt  func(int) int
+	random      iRand
 	lock        *sync.RWMutex
 }
 
@@ -29,7 +44,7 @@ func NewMapController(filePath string) (MapController, error) {
 		spawingarea: map2d.GetLegalSpawns(),
 		map2d:       map2d,
 		clients:     make(map[uint8]*gamemap.Coordinate),
-		getNextInt:  rand.Intn,
+		random:      sRand{},
 		lock:        &sync.RWMutex{},
 	}, nil
 }
@@ -63,8 +78,21 @@ func (mc *MapController) AddClient(id uint8) (gamemap.Coordinate, error) {
 // about the players existance or else, so be carefull
 // when using it.
 func (mc *MapController) unsafeRandomSpawn(id uint8) gamemap.Coordinate {
-	nextRand := mc.getNextInt(len(mc.spawingarea))
+	nextRand := mc.random.Intn(len(mc.spawingarea))
 	spawn := mc.spawingarea[nextRand]
+
+	randSpawn := func() float64 {
+		for count := 0; count < 50; count += 1 {
+			offset := mc.random.Float64()
+			if !(offset == 0 || offset == 1) {
+				return offset
+			}
+		}
+		return 0.1
+	}
+
+	spawn.SetX(spawn.X() + randSpawn())
+	spawn.SetY(spawn.X() + mc.random.Float64())
 	coord := gamemap.NewCoordinate(spawn.X(), spawn.Y(), 0)
 	pCoord := &coord
 
