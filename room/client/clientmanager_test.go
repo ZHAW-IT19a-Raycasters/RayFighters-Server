@@ -147,6 +147,16 @@ func TestClientManagerAddClientTwice(t *testing.T) {
 
 	// check that client is shutdown
 	<-done
+	waiter := make(chan struct{})
+
+	go func() {
+		for val.isActive.Get() {
+		}
+		close(waiter)
+	}()
+
+	<-waiter
+
 	if val.isActive.Get() {
 		t.Error("client is still active")
 		return

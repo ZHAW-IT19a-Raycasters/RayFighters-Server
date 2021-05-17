@@ -11,7 +11,7 @@ const (
 // of the logger that is responsible for
 // multiplexing the given debug information.
 type internalLogger struct {
-	lock     sync.Mutex
+	lock     sync.RWMutex
 	isSetup  bool
 	handlers []LogHandler
 }
@@ -21,7 +21,7 @@ type internalLogger struct {
 func newInternalLogger() internalLogger {
 	return internalLogger{
 		handlers: nil,
-		lock:     sync.Mutex{},
+		lock:     sync.RWMutex{},
 		isSetup:  false,
 	}
 }
@@ -55,6 +55,8 @@ func (lg *internalLogger) reset() {
 
 // log will log a message of the given type.
 func (lg *internalLogger) log(level Level, v ...interface{}) {
+	lg.lock.RLock()
+	defer lg.lock.RUnlock()
 	// this is valid as if the handler array is nil
 	// it is translated to be of lenght zero, so
 	// this loop will do nothing
@@ -65,6 +67,8 @@ func (lg *internalLogger) log(level Level, v ...interface{}) {
 
 // logf will first format and then log a given message.
 func (lg *internalLogger) logf(level Level, format string, v ...interface{}) {
+	lg.lock.RLock()
+	defer lg.lock.RUnlock()
 	// this is valid as if the handler array is nil
 	// it is translated to be of lenght zero, so
 	// this loop will do nothing
