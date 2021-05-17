@@ -1,5 +1,7 @@
 package gamemap
 
+import "path/filepath"
+
 type MapMeta struct {
 	id				uint8
 	name, filePath 	string
@@ -18,5 +20,5 @@ func (mm MapMeta) GetFilePath() string {
 }
 
 func (mm MapMeta) LoadFile() (Map2d, error) {
-	return LoadMap2d(mm.GetFilePath())
+	return LoadMap2d(filepath.Join(mm.GetFilePath(), mm.GetName()))
 }

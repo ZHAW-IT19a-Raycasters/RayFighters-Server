@@ -41,11 +41,11 @@ func (it mapTimeData) GetTime() time.Time {
 
 // mapTimer is the data handler
 type MapTimer struct {
-	callback  func()
+	callback  func(elem interface{})
 	baseTimer utils.BaseTimer
 }
 
-func NewMapTimer(mapBuffer int, callback func()) MapTimer {
+func NewMapTimer(mapBuffer int, callback func(elem interface{})) MapTimer {
 	it := MapTimer{
 		callback: callback,
 	}
@@ -55,7 +55,7 @@ func NewMapTimer(mapBuffer int, callback func()) MapTimer {
 		// from the given context of the
 		// mapTimer the element will always
 		// be a gamemap.MapCoordinate
-		it.callback()
+		it.callback(elem)
 	}
 
 	it.baseTimer = utils.NewBaseTimer(mapBuffer, MapTimeout, iCallback)

@@ -120,7 +120,7 @@ func NewHubController() *HubController {
 	}
 
 	// MapTimer
-	mTimeOutCallback := func() {
+	mTimeOutCallback := func(elem interface{}) {
 
 		_ = hc.NewMap("desert.txt")
 	}
