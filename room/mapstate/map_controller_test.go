@@ -3,6 +3,7 @@ package mapstate
 import (
 	"errors"
 	"io/ioutil"
+	"math/rand"
 	"os"
 	"strings"
 	"sync"
@@ -308,13 +309,21 @@ type MockIRand struct {
 	fFloat64 func() float64
 }
 
-func (m MockIRand) Intn(n int) int {
+func NewMockIRand() MockIRand {
+	return MockIRand{
+		lock:     &sync.RWMutex{},
+		fIntn:    func(n int) int { return rand.Intn(n) },
+		fFloat64: func() float64 { return rand.Float64() },
+	}
+}
+
+func (m *MockIRand) Intn(n int) int {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 	return m.fIntn(n)
 }
 
-func (m MockIRand) Float64() float64 {
+func (m *MockIRand) Float64() float64 {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 	return m.fFloat64()
@@ -338,9 +347,9 @@ func TestSpawningPointAddClient(t *testing.T) {
 		return
 	}
 
-	mockedRand := MockIRand{}
+	mockedRand := NewMockIRand()
 	mockedRand.fIntn = func(n int) int { return 4 }
-	mapController.random = mockedRand
+	mapController.random = &mockedRand
 
 	_, err = mapController.AddClient(1)
 
@@ -355,7 +364,9 @@ func TestSpawningPointAddClient(t *testing.T) {
 		return
 	}
 
-	if coordinate.X() != mapController.spawingarea[4].X() && coordinate.Y() != mapController.spawingarea[4].Y() {
+	exp := mapController.spawingarea[4]
+
+	if coordinate.X() != exp.X()+0.5 && coordinate.Y() != exp.Y()+0.5 {
 		t.Error("Coordinates aren't the same")
 	}
 }
