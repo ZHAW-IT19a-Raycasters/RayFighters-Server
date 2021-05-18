@@ -59,34 +59,37 @@ func (map2d *Map2d) Compare(other *Map2d) bool {
 	return equals2d(map2d.map2d, other.map2d)
 }
 
+// GetLegalSpawns will generate an array of legaly usable spawns
 func (map2d *Map2d) GetLegalSpawns() []Coordinate {
 	counter := 0
-	for _, x := range map2d.map2d {
-		for _, y := range x {
-			if y != Wall {
+
+	// check how many elements have to be allocated
+	for y := map2d.dim - 1; y > -1; y -= 1 {
+		for x := map2d.dim - 1; x > -1; x -= 1 {
+			if map2d.MapElementAt(y, x) != Wall {
 				counter += 1
 			}
 		}
 	}
 
-	res := make([]Coordinate, 0, counter)
-	for i, x := range map2d.map2d {
-		for j, y := range x {
-			if y != Wall {
-				res = append(res, NewCoordinate(float64(i), float64(j), 0))
+	// allocate memory
+	legalSpawns := make([]Coordinate, 0, counter)
+
+	// fill up
+	for y := map2d.dim - 1; y > -1; y -= 1 {
+		for x := map2d.dim - 1; x > -1; x -= 1 {
+			if map2d.MapElementAt(y, x) != Wall {
+				legalSpawns = append(legalSpawns, NewCoordinate(float64(x), float64(y), 0))
 			}
 		}
 	}
-	return res
-}
-
-func (map2d *Map2d) IsMapBoundary(x int, y int) bool {
-	return x == (map2d.dim-1) || y == (map2d.dim-1)
+	return legalSpawns
 }
 
 // IsPenetrable true if a bullet can pass through it
 func (map2d *Map2d) IsPenetrable(x int, y int) bool {
-	return map2d.MapElementAt(x, y) != Wall
+	elem := map2d.MapElementAt(x, y)
+	return elem != Wall
 }
 
 // NewFlatMap2d creates squared 2D-map without walls

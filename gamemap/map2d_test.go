@@ -165,8 +165,110 @@ func TestMap2d_SetMapElement(t *testing.T) {
 				dim:   tt.fields.dim,
 				map2d: tt.fields.map2d,
 			}
-			if map2d.SetMapElement(tt.args.x, tt.args.y, tt.args.mapElement); !reflect.DeepEqual(map2d, tt.want) {
+			map2d.SetMapElement(tt.args.x, tt.args.y, tt.args.mapElement)
+
+			if !reflect.DeepEqual(map2d, tt.want) {
 				t.Errorf("NewFlatMap2d() = %v, want %v", map2d, tt.want)
+			}
+		})
+	}
+}
+
+func TestMap2d(t *testing.T) {
+
+	data := [][]MapElement{
+		{Floor, Floor, Floor, Floor},
+		{Wall, Floor, Wall, Floor},
+		{Floor, Floor, Floor, Floor},
+		{Floor, Floor, Floor, Floor},
+	}
+
+	mp := newMap2d(len(data), data)
+
+	if mp.IsPenetrable(0, 1) {
+		t.Error("should not be penetrable")
+		return
+	}
+	if !mp.IsPenetrable(0, 0) {
+		t.Error("should be penetrable")
+		return
+	}
+}
+
+func TestMap2dGetLegalSpawn(t *testing.T) {
+	type test struct {
+		data [][]MapElement
+		exp  []Coordinate
+		name string
+	}
+
+	tests := []test{
+		{
+			name: "AllFloor",
+			data: [][]MapElement{
+				{Floor, Floor, Floor, Floor},
+				{Floor, Floor, Floor, Floor},
+				{Floor, Floor, Floor, Floor},
+				{Floor, Floor, Floor, Floor},
+			},
+			exp: []Coordinate{
+				NewCoordinate(3, 3, 0),
+				NewCoordinate(2, 3, 0),
+				NewCoordinate(1, 3, 0),
+				NewCoordinate(0, 3, 0),
+				NewCoordinate(3, 2, 0),
+				NewCoordinate(2, 2, 0),
+				NewCoordinate(1, 2, 0),
+				NewCoordinate(0, 2, 0),
+				NewCoordinate(3, 1, 0),
+				NewCoordinate(2, 1, 0),
+				NewCoordinate(1, 1, 0),
+				NewCoordinate(0, 1, 0),
+				NewCoordinate(3, 0, 0),
+				NewCoordinate(2, 0, 0),
+				NewCoordinate(1, 0, 0),
+				NewCoordinate(0, 0, 0),
+			},
+		},
+		{
+			name: "WallWithMedkit",
+			data: [][]MapElement{
+				{Floor, Floor, Floor, Floor},
+				{Wall, Wall, Medkit, Wall},
+				{Floor, Floor, Floor, Floor},
+				{Floor, Floor, Floor, Floor},
+			},
+			exp: []Coordinate{
+				NewCoordinate(3, 3, 0),
+				NewCoordinate(2, 3, 0),
+				// NewCoordinate(1, 3, 0), => Wall
+				NewCoordinate(0, 3, 0),
+				NewCoordinate(3, 2, 0),
+				NewCoordinate(2, 2, 0),
+				NewCoordinate(1, 2, 0), // => MedKit
+				NewCoordinate(0, 2, 0),
+				NewCoordinate(3, 1, 0),
+				NewCoordinate(2, 1, 0),
+				// NewCoordinate(1, 1, 0), => Wall
+				NewCoordinate(0, 1, 0),
+				NewCoordinate(3, 0, 0),
+				NewCoordinate(2, 0, 0),
+				// NewCoordinate(1, 0, 0), => Wall
+				NewCoordinate(0, 0, 0),
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			map2d := newMap2d(len(tt.data), tt.data)
+			elems := map2d.GetLegalSpawns()
+			for i, elem := range elems {
+				if !reflect.DeepEqual(elem, tt.exp[i]) {
+					e := tt.exp[i]
+					t.Errorf("incorrect element used on index [%d]\nexp: [x: [%f] y: [%f]]\ngot: [x: [%f] y: [%f]] ", i, elem.X(), elem.Y(), e.X(), e.Y())
+					return
+				}
 			}
 		})
 	}
