@@ -2,6 +2,7 @@ package room
 
 import (
 	"errors"
+	"github.zhaw.ch/raycasters/server/gamemap"
 	"os"
 )
 
@@ -22,6 +23,6 @@ func (mc MapConfig) CheckConfiguration() error {
 	if fileInfo.IsDir() {
 		return ErrMapConfigurationInvalid
 	}
-	_, err = readJSON(mc.JsonPath)
+	_, err = gamemap.readJSON(mc.JsonPath)
 	return err
 }

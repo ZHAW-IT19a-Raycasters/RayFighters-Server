@@ -1,24 +1,23 @@
-package room
+package gamemap
 
 import (
 	"encoding/json"
-	"github.zhaw.ch/raycasters/server/gamemap"
 	"io/ioutil"
 )
 
 // TODO: COMMENTS!!! --> Dali
 
 type mapList struct {
-	maps []gamemap.MapMeta
+	maps []MapMeta
 }
 
 type MapIteratorManager struct {
 	// filePath is the path to the JSON file
 	filePath string
-	maps chan gamemap.MapMeta
+	maps chan MapMeta
 }
 
-func newMapIterator(channel chan gamemap.MapMeta) MapIterator {
+func newMapIterator(channel chan MapMeta) MapIterator {
 	return MapIterator{
 		maps: channel,
 	}
@@ -29,7 +28,7 @@ func (mim *MapIteratorManager) GetIterator() MapIterator{
 }
 
 type MapIterator struct {
-	maps chan gamemap.MapMeta
+	maps chan MapMeta
 }
 
 func NewMapIteratorManager(filePath string) (MapIteratorManager, error) {
@@ -39,7 +38,7 @@ func NewMapIteratorManager(filePath string) (MapIteratorManager, error) {
 		return MapIteratorManager{}, err
 	}
 
-	mapChannel := make(chan gamemap.MapMeta, len(ml.maps))
+	mapChannel := make(chan MapMeta, len(ml.maps))
 	for _, element := range ml.maps {
 		mapChannel <- element
 	}
@@ -50,7 +49,7 @@ func NewMapIteratorManager(filePath string) (MapIteratorManager, error) {
 	}, nil
 }
 
-func (mi *MapIterator) GetMap() gamemap.MapMeta {
+func (mi *MapIterator) GetMap() MapMeta {
 	m := <-mi.maps
 	mi.maps <- m
 	return m
@@ -58,7 +57,7 @@ func (mi *MapIterator) GetMap() gamemap.MapMeta {
 
 func parseJSON(jsonContent []byte) (mapList, error) {
 	ml := mapList{
-		maps: make([]gamemap.MapMeta, 0),
+		maps: make([]MapMeta, 0),
 	}
 	err := json.Unmarshal(jsonContent, &ml.maps)
 	return ml, err

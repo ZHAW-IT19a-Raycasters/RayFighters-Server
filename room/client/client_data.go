@@ -135,6 +135,10 @@ func (cm ClientMeta) GetName() string {
 	return cm.name
 }
 
+func (cm *ClientMeta) Close() {
+	cm.conn.Close()
+}
+
 // clientInternalMeta is the internal representation of a client meta
 // it also contains the internal id of the client.
 type clientInternalMeta struct {

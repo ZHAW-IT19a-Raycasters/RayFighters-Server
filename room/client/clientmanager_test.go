@@ -5,11 +5,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"strings"
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/gorilla/websocket"
 	"github.zhaw.ch/raycasters/server/log"
 )
 
@@ -63,7 +65,9 @@ func TestClientManagerAddClientSingle(t *testing.T) {
 		return
 	}
 
-	clientMeta, _ := getClientMeta(0)
+	clientMeta, meta := getClientMeta(0)
+	_, _, _ = setupMock(meta)
+
 	clientQueue, _ := NewWorkQueue()
 
 	_, getClientTimer := helpTimeout()
@@ -116,7 +120,8 @@ func TestClientManagerAddClientTwice(t *testing.T) {
 	cm := NewClientManager()
 	defer cm.Shutdown(context.Background())
 
-	clientMeta, _ := getClientMeta(0)
+	clientMeta, pmock := getClientMeta(0)
+	done, funcReader, _ := setupMock(pmock)
 
 	clientQueue, _ := NewWorkQueue()
 
@@ -132,11 +137,44 @@ func TestClientManagerAddClientTwice(t *testing.T) {
 	// force the client to be in a timeout state
 	id, _ := cm.MapId(clientMeta)
 	val := cm.clients[id]
-	val.Shutdown(context.Background())
+
+	// shutdown the system
+	funcReader <- func() (int, io.Reader, error) {
+		return 0, nil, &websocket.CloseError{
+			Code: websocket.CloseAbnormalClosure,
+		}
+	}
+
+	// check that client is shutdown
+	<-done
+	waiter := make(chan struct{})
+
+	go func() {
+		for val.isActive.Get() {
+		}
+		close(waiter)
+	}()
+
+	<-waiter
+
+	if val.isActive.Get() {
+		t.Error("client is still active")
+		return
+	} else if val.GetStatus() == Active {
+		t.Error("client is still active")
+		return
+	} else if val.GetStatus() != Timeout {
+		t.Error("client should be timed out")
+		return
+	}
 
 	// adding a connection, while client conn is still active
 	mock := NewMockedConnection()
-	clientMeta.conn = &mock
+	pmock = &mock
+	_, _, _ = setupMock(pmock)
+	pmock.Close()
+
+	clientMeta.conn = pmock
 
 	clientQueue, _ = NewWorkQueue()
 

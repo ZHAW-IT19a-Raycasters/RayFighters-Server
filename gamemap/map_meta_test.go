@@ -43,19 +43,23 @@ func TestGetFilePath(t *testing.T) {
 }
 
 func TestLoadFile(t *testing.T) {
-	mm := MapMeta{
-		id: 1,
-		name: "tempfile",
-		filePath: "",
-	}
 	file, err := ioutil.TempFile(".", "tempfile")
 	if err != nil {
 		t.Error(err.Error())
 		return
 	}
+
+	mm := MapMeta{
+		id: 1,
+		name: file.Name(),
+		filePath: "",
+	}
 	// "defer" stacks
-	defer os.Remove(file.Name())
-	defer file.Close()
+	defer func() {
+		os.Remove(file.Name())
+		file.Close()
+	}()
+
 	expectedMap2d := newMap2d(2, [][]MapElement{{Floor, Floor}, {Floor, Floor}})
 	file.WriteString(intoMapString(2, []string{"00", "00"}))
 	actualMap2d, err := mm.LoadFile()

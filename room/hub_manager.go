@@ -1,6 +1,7 @@
 package room
 
 import (
+	"github.zhaw.ch/raycasters/server/gamemap"
 	"github.zhaw.ch/raycasters/server/room/controller"
 	"sync"
 )
@@ -8,14 +9,14 @@ import (
 // HubManager is a manager of all Hubs.
 // Is manages all running Hubs
 type HubManager struct {
-	hubs 	map[int]*controller.Hub
-	channel MapIteratorManager
+	hubs    map[int]*controller.Hub
+	channel gamemap.MapIteratorManager
 	lock    *sync.RWMutex
 }
 
 // NewHubManager will create a new manager
 func NewHubManager(filePath string) (HubManager, error) {
-	mim, err := NewMapIteratorManager(filePath)
+	mim, err := gamemap.NewMapIteratorManager(filePath)
 	if err != nil {
 		return HubManager{}, err
 	}

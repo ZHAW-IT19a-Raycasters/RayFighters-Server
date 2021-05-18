@@ -1,21 +1,39 @@
 package mapstate
 
 import (
-	"github.zhaw.ch/raycasters/server/log"
 	"math"
 	"math/rand"
 	"sync"
+
+	"github.zhaw.ch/raycasters/server/log"
 
 	"github.zhaw.ch/raycasters/server/gamemap"
 )
 
 var logger = log.Log()
 
+const spawnOffset = 0.5
+
+type iRand interface {
+	Intn(n int) int
+	Float64() float64
+}
+
+type sRand struct{}
+
+func (r sRand) Intn(n int) int {
+	return rand.Intn(n)
+}
+
+func (r sRand) Float64() float64 {
+	return rand.Float64()
+}
+
 type MapController struct {
 	clients     map[uint8]*gamemap.Coordinate
 	spawingarea []gamemap.Coordinate
 	map2d       gamemap.Map2d
-	getNextInt  func(int) int
+	random      iRand
 	lock        *sync.RWMutex
 }
 
@@ -28,21 +46,10 @@ func NewMapController(filePath string) (MapController, error) {
 		spawingarea: map2d.GetLegalSpawns(),
 		map2d:       map2d,
 		clients:     make(map[uint8]*gamemap.Coordinate),
-		getNextInt:  rand.Intn,
+		random:      sRand{},
 		lock:        &sync.RWMutex{},
 	}, nil
 }
-
-/*
-func NewMapCustomMapController() (MapController, error) {
-	return MapController{
-		spawingarea: map2d.GetLegalSpawns(),
-		map2d:       map2d,
-		clients:     make(map[uint8]*gamemap.Coordinate),
-		getNextInt:  rand.Intn,
-		lock:        &sync.RWMutex{},
-	}, nil
-}*/
 
 // ChangeMap reloads map2d and spawningarea when the map is changing
 func (mc *MapController) ChangeMap(filePath string) (map[uint8]*gamemap.Coordinate, error) {
@@ -91,8 +98,15 @@ func (mc *MapController) AddClient(id uint8) (gamemap.Coordinate, error) {
 // about the players existance or else, so be carefull
 // when using it.
 func (mc *MapController) unsafeRandomSpawn(id uint8) gamemap.Coordinate {
-	nextRand := mc.getNextInt(len(mc.spawingarea))
+	nextRand := mc.random.Intn(len(mc.spawingarea))
 	spawn := mc.spawingarea[nextRand]
+
+	logger.Debugf("x: [%f] y: [%f]", spawn.X(), spawn.Y())
+
+	spawn.SetX(spawn.X() + spawnOffset)
+	spawn.SetY(spawn.Y() + spawnOffset)
+
+	logger.Debugf("post x: [%f] y: [%f]", spawn.X(), spawn.Y())
 	coord := gamemap.NewCoordinate(spawn.X(), spawn.Y(), 0)
 	pCoord := &coord
 
@@ -189,10 +203,6 @@ func (mc *MapController) GetMapCoordinates(userId uint8) (x int, y int, ok bool)
 		return 0, 0, ok
 	}
 	return c.GetMapCoordinate().X(), c.GetMapCoordinate().Y(), ok
-}
-
-func (mc *MapController) IsMapBound(x int, y int) bool {
-	return mc.map2d.IsMapBoundary(x, y)
 }
 
 // IsPenetrable true if a bullet can pass through it

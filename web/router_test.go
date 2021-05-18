@@ -91,7 +91,7 @@ func setupTestServer(t *testing.T) ([]*controller.Hub, *httptest.Server, error) 
 
 	auth, _ := newAuthManager("")
 
-	router.HandleFunc("/auth", auth.ServeAuthWithKey())
+	router.HandleFunc("/auth", auth.AuthConnection())
 	router.HandleFunc("/ws/{roomID:[0-9]+}", func(rw http.ResponseWriter, r *http.Request) {
 		serveWs(hubs, rw, r)
 	})
@@ -172,12 +172,12 @@ func TestAuthorizedWebsocketEstablishment(t *testing.T) {
 
 	t.Logf("connecting to %s\n", u.String())
 
-	c, res, err := dialer.Dial(u.String(), nil)
+	ws, res, err := dialer.Dial(u.String(), nil)
 
 	if err != nil {
 		t.Logf("Error during handshake [%s]", err.Error())
 	}
-	defer c.Close()
+	defer ws.Close()
 
 	if res.StatusCode != http.StatusSwitchingProtocols {
 		t.Errorf("handler returned wrong status code during handshake: got %v want %v",
@@ -233,6 +233,10 @@ func TestWsFirstOpcodes(t *testing.T) {
 	t.Logf("connecting to %s\n", url.String())
 
 	ws, resp, err := dialer.Dial(urlPath, nil)
+	// close the websocket
+	defer func() {
+		_ = ws.Close()
+	}()
 
 	if resp.StatusCode != http.StatusSwitchingProtocols {
 		t.Errorf("incorrect status was used exp : [%d] got: [%d]", http.StatusAccepted, resp.StatusCode)
@@ -299,6 +303,9 @@ func TestWsMovement(t *testing.T) {
 	t.Logf("connecting to %s\n", url.String())
 
 	ws, resp, err := dialer.Dial(urlPath, nil)
+	defer func() {
+		_ = ws.Close()
+	}()
 
 	if resp.StatusCode != http.StatusSwitchingProtocols {
 		t.Errorf("incorrect status was used exp : [%d] got: [%d]", http.StatusAccepted, resp.StatusCode)

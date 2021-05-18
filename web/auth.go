@@ -23,10 +23,26 @@ const (
 	JwtUUID       string = "uuid"
 )
 
-// errParseCookie is the error that happens on a parse error
-type errParseCookie struct {
+// ErrParseCookie is the error that happens on a parse error
+type ErrParseCookie struct {
 	logMsg, httpMsg string
 	status          int
+}
+
+// Error satisfies the error interface
+func (err ErrParseCookie) Error() string {
+	return fmt.Sprintf("[%d] - [%s]", err.status, err.logMsg)
+}
+
+// ErrParseCookie is the error that happens on a parse error
+type ErrNoCookie struct {
+	logMsg, httpMsg string
+	status          int
+}
+
+// Error satisfies the error interface
+func (err ErrNoCookie) Error() string {
+	return fmt.Sprintf("[%d] - [%s]", err.status, err.logMsg)
 }
 
 // ErrAuthManagerFailour is the error that is returned once
@@ -68,7 +84,7 @@ type authenticationManager struct {
 func newAuthManager(privateKeyPath string) (authenticationManager, error) {
 	// special case where a new rsa key has to be generated
 	if privateKeyPath == "" {
-		logger.Debug("Generating a temporary RSA PRIVATE KEY")
+		logger.Warn("Generating a temporary RSA PRIVATE KEY")
 		key, err := utils.GenerateRSA()
 		if err != nil {
 			return authenticationManager{},
@@ -105,16 +121,23 @@ func newAuthManager(privateKeyPath string) (authenticationManager, error) {
 	}, nil
 }
 
-// ServeAuthWithKey creates a closure with the given key and
+// AuthConnection creates a closure with the given key and
 // returns a route handler that
 // creates a JWT, signs it with the provided key
 // and adds it to the Response Header via Set-Cookie
-func (auth *authenticationManager) ServeAuthWithKey() (HandleFunc func(w http.ResponseWriter, r *http.Request)) {
+func (auth *authenticationManager) AuthConnection() (HandleFunc func(w http.ResponseWriter, r *http.Request)) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// check if there already is a valid JWT token
+		err := auth.checkIfCookieValid(r)
+		// not getting an error here means that the
+		// user already is authenticated.
+		if err == nil {
+			return
+		}
 
 		var creds Credentials
-		err := parseToCredentialsFromJSON(&creds, r.Body)
+		err = parseToCredentialsFromJSON(&creds, r.Body)
+
 		if err != nil {
 			// If the structure of the body is wrong, return an HTTP error
 			http.Error(w, err.Error(), http.StatusBadRequest)
@@ -132,10 +155,28 @@ func (auth *authenticationManager) ServeAuthWithKey() (HandleFunc func(w http.Re
 
 		// Finally, we request to set the client cookie to the JWT we just generated
 		http.SetCookie(w, cookie)
-
 	}
 }
 
+// checkIfCookieValid will check if there is a valid cookie
+// if not this will return an error
+func (amw *authenticationManager) checkIfCookieValid(r *http.Request) error {
+	logger.Debug("Checking for a cookie")
+	cookie, err := amw.findCookie(r)
+	if err != nil {
+		return err
+	}
+
+	logger.Debug("cookie found")
+	_, err = amw.parseCookie(cookie)
+	if err != nil {
+		logger.Debug("valid cookie found")
+	}
+
+	return err
+}
+
+// createCookie will create a standard issue JWT cookie.
 func (auth *authenticationManager) createCookie(creds *Credentials) (*http.Cookie, error) {
 	// create new client uuid
 	uuidStr := uuid.NewString()
@@ -162,26 +203,31 @@ func (auth *authenticationManager) createCookie(creds *Credentials) (*http.Cooki
 	}, nil
 }
 
-// parseCookie will parse the cookie if possible to
-// check for its validity.
-func (amw *authenticationManager) parseCookie(r *http.Request) (jwt.Token, *errParseCookie) {
-	logger.Debug(r.Cookies())
+// findCookie will look into the request header and
+// search for the JWT cookie.
+func (amw *authenticationManager) findCookie(r *http.Request) (*http.Cookie, error) {
 	// get cookie from request
 	jwtCookie, err := r.Cookie(JwtCookieName)
 	if err != nil {
-		return nil, &errParseCookie{
+		return nil, ErrNoCookie{
 			logMsg:  fmt.Sprintf("no JWT found in request Cookies %s", err.Error()),
 			httpMsg: "no JWT found in Cookies",
 			status:  http.StatusUnauthorized,
 		}
 	}
+	return jwtCookie, nil
+}
+
+// parseCookie will parse the cookie if possible to
+// check for its validity.
+func (amw *authenticationManager) parseCookie(jwtCookie *http.Cookie) (jwt.Token, error) {
 
 	logger.Debug(*jwtCookie)
 
 	token, err := jwt.ParseString(jwtCookie.Value, jwt.WithVerify(jwa.RS512, amw.privateKey.PublicKey))
 
 	if err != nil {
-		return nil, &errParseCookie{
+		return nil, &ErrParseCookie{
 			logMsg:  fmt.Sprintf("unauthenticated request %s", err.Error()),
 			httpMsg: "unauthenticated request",
 			status:  http.StatusUnauthorized,
@@ -193,9 +239,21 @@ func (amw *authenticationManager) parseCookie(r *http.Request) (jwt.Token, *errP
 // Middleware checks if user is authenticated via valid token
 func (amw *authenticationManager) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		token, errHandler := amw.parseCookie(r)
+		cookie, err := amw.findCookie(r)
 
-		if errHandler != nil {
+		if err != nil {
+			// we know we are talking about a specific error
+			errHandler := err.(ErrNoCookie)
+			logger.Info(errHandler.httpMsg)
+			http.Error(w, errHandler.httpMsg, errHandler.status)
+			return
+		}
+
+		token, err := amw.parseCookie(cookie)
+
+		if err != nil {
+			// we know we are talking about a specific error
+			errHandler := err.(ErrParseCookie)
 			logger.Info(errHandler.httpMsg)
 			http.Error(w, errHandler.httpMsg, errHandler.status)
 			return
@@ -217,10 +275,11 @@ func validUsername(str string) (string, error) {
 	if !utf8.ValidString(str) {
 		return "", fmt.Errorf("invalid utf-8 runes in username %s", str)
 	}
-
-	if utf8.RuneCountInString(str) > maxUsernameLength {
+	strLen := utf8.RuneCountInString(str)
+	if strLen == 0 || strLen > maxUsernameLength {
 		return "", fmt.Errorf("username contains too many runes %d, %s", utf8.RuneCountInString(str), str)
 	}
+
 	escaped := html.EscapeString(str)
 	return escaped, nil
 }

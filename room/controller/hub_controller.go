@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.zhaw.ch/raycasters/server/gamemap"
 	"path/filepath"
 	"runtime"
 	"sync"
@@ -18,6 +19,10 @@ import (
 	"github.zhaw.ch/raycasters/server/room/client"
 	"github.zhaw.ch/raycasters/server/room/helpers"
 )
+
+// ErrHubControllerOffline is the error returned in the
+// case that the controller is offline.
+var ErrHubControllerOffline = errors.New("the hub controller is offline")
 
 // HubController is the main brain of the hub
 // it is solely responsible for all the interactions
@@ -49,6 +54,9 @@ type HubController struct {
 	// mapChanging will be set True when the Map is being reloaded
 	// so we know when to reset everything to restart the game
 	mapChanging utils.AtomicBool
+	// mapIterator.
+	// TODO: write comments
+	mapIterator gamemap.MapIterator
 	// Semaphore, counts the totally active
 	// player connections, although that number is already available
 	// via the client map length, is would have to be accessed
@@ -56,6 +64,9 @@ type HubController struct {
 	// while asynchronously adding a new client. So to avoid the given
 	// overhead an atomic counting semaphore implementation is here used.
 	semaphore utils.CountingSemaphore
+	// isActive checks if the current controller is still active
+	// to add clients or not.
+	isActive utils.AtomicBool
 	// wg is the wait group used for counting the amount
 	// of active hub workers.
 	wg sync.WaitGroup
@@ -114,6 +125,7 @@ func NewHubController() *HubController {
 		gameState:       NewGameState(),
 		mapController:   &mapController,
 		mapChanging:     utils.NewAtomicBool(false),
+		isActive:      	 utils.NewAtomicBool(true),
 		semaphore:       utils.NewCountingSemaphore(uint32(helpers.IdCountLimit)),
 		wg:              sync.WaitGroup{},
 		lock:            sync.RWMutex{},
@@ -134,6 +146,9 @@ func NewHubController() *HubController {
 
 	// client timer callbacks
 	cTimeoutCallback := func(id uint8) {
+		if !hc.isActive.Get() {
+			return
+		}
 		// error is not important for execution
 		// as it only says if there was an
 		// execution or not
@@ -147,6 +162,9 @@ func NewHubController() *HubController {
 
 	// client respawn callbacks
 	cRespawnCallback := func(id uint8) {
+		if !hc.isActive.Get() {
+			return
+		}
 		// error is not important for execution
 		// as it only says if there was an
 		// execution or not
@@ -164,6 +182,9 @@ func NewHubController() *HubController {
 }
 
 func (hc *HubController) respawnPlayer(id uint8) error {
+	if !hc.isActive.Get() {
+		return ErrHubControllerOffline
+	}
 	logger.Debugf("trying to respawn player [%d]", id)
 	// check if the player is still active
 	// only respawn if the client is still
@@ -255,20 +276,66 @@ func (hc *HubController) IsFull() bool {
 	return hc.semaphore.Full()
 }
 
-// ClientExists checks if the client has a place on the map or
+// ClientState checks if the client has a place on the map or
 // not.
-func (hc *HubController) ClientExists(meta client.ClientMeta) bool {
+func (hc *HubController) ClientState(meta client.ClientMeta) (client.ConnectionStatus, bool) {
 	// check the meta information, so that
 	// there never can be a double increment
 	// per added client.
+
 	hc.lock.RLock()
 	defer hc.lock.RUnlock()
-	_, ok := hc.clientManager.MapId(meta)
-	return ok
+	return hc.unsafeClientState(meta)
+}
+
+// unsafeClientState checks if the client has a place on the map or
+// not.
+// Attention this function assumes the caller having the controller
+// lock.
+func (hc *HubController) unsafeClientState(meta client.ClientMeta) (client.ConnectionStatus, bool) {
+	c := client.Offline
+	id, ok := hc.clientManager.MapId(meta)
+	if !ok {
+		return c, ok
+	}
+	// okay is not needed here as we know the clinet already exists.
+	c, _ = hc.clientManager.GetClientStatus(id)
+	return c, ok
+}
+
+// IsClientState checks if the client is in the given state or
+// not.
+func (hc *HubController) IsClientState(id uint8, expectedState client.ConnectionStatus) error {
+	hc.lock.RLock()
+	defer hc.lock.RUnlock()
+	return hc.unsafeIsClientState(id, expectedState)
+}
+
+// unsafeIsClientState checks if the client is in the given state or
+// not.
+// Attention this function assumes the caller having the controller
+// lock.
+func (hc *HubController) unsafeIsClientState(id uint8, expectedState client.ConnectionStatus) error {
+	status, ok := hc.clientManager.GetClientStatus(id)
+	if !ok {
+		return ErrClientDoesNotExist{
+			id: id,
+		}
+	} else if status != expectedState {
+		return ErrClientUnexpectedState{
+			state: expectedState,
+			id:    id,
+		}
+	}
+	return nil
 }
 
 // RegisterClient will add the client to the controller
 func (hc *HubController) RegisterClient(meta client.ClientMeta) error {
+	if !hc.isActive.Get() {
+		return ErrHubControllerOffline
+	}
+
 	// TODO: register in the game state (if it is a new connection)
 	logger.Debugf("registering client in hub [%s]", meta.GetId().String())
 
@@ -357,17 +424,26 @@ func (hc *HubController) RegisterClient(meta client.ClientMeta) error {
 // client.
 func (hc *HubController) runClientConnection(hqueue client.HubQueue, id uint8) {
 	var wg sync.WaitGroup
-	defer wg.Wait()
+
+	defer func() {
+		logger.Debug("waiting for workers for client [%d] to finish", id)
+		wg.Wait()
+		logger.Debug("removing client [%d] from hub", id)
+		// We ignore the ok because this function can't be called without the user already existing
+		meta, _ := hc.clientManager.MapMeta(id)
+		// We ignore the error here, as it is impossible per definition
+		_ = hc.removeClient(meta)
+	}()
 
 	for {
 		// if there was an error this means
 		// that we can stop running this here
 		data, err := hqueue.Dequeue()
 		if err != nil {
-			break
+			return
 		} else if len(data) == 0 {
 			logger.Error("Received no Data to Process")
-			break
+			return
 		}
 
 		wg.Add(1)
@@ -376,6 +452,7 @@ func (hc *HubController) runClientConnection(hqueue client.HubQueue, id uint8) {
 			defer wg.Done()
 
 			gotten := hc.handleRead(data, id)
+
 			// this means that the given opcode will not actually
 			// result in a direct return message, this happens
 			// with broadcast commands.
@@ -387,10 +464,7 @@ func (hc *HubController) runClientConnection(hqueue client.HubQueue, id uint8) {
 			hqueue.Enqueue(toSend)
 
 			if toSend[0] == server.UnknownOpcode.Value() {
-				// We ignore the ok because this function can't be called without the user already existing
-				meta, _ := hc.clientManager.MapMeta(id)
-				// We ignore the error here, as it is impossible per definition
-				_ = hc.removeClient(meta)
+				logger.Debugf("client [%d] has sent a shutdown command", id)
 				return
 			}
 		}()
@@ -405,9 +479,18 @@ func (hc *HubController) runClientConnection(hqueue client.HubQueue, id uint8) {
 // Attention decrementing the client may only happen
 // in a case, that there actually was a client removed.
 func (hc *HubController) removeClient(meta client.ClientMeta) error {
-	if !hc.ClientExists(meta) {
+	hc.lock.Lock()
+	defer hc.lock.Unlock()
+	state, ok := hc.unsafeClientState(meta)
+
+	if !ok {
 		return client.NewErrClientDoesntExist(meta)
+	} else if state == client.Timeout {
+		logger.Debugf("client [%d] is still timed out", meta.GetId())
+		return nil
 	}
+
+	logger.Debugf("removing client [%s] from hub", meta.GetId())
 
 	// error is not needed as per definition the client has to exists
 	// at this point
@@ -419,38 +502,36 @@ func (hc *HubController) removeClient(meta client.ClientMeta) error {
 	q := hc.connections[id]
 	q.Shutdown()
 
-	// only lock here as the remove client function is a blocking call
-	hc.lock.Lock()
 	// remove queue
 	delete(hc.connections, id)
-	hc.lock.Unlock()
 
-	// TODO: remove from map
+	_ = hc.mapController.RemoveClient(id)
+
 	_ = hc.gameState.RemoveClient(id)
 
-	// client exists so lock everything down to remove him
-	// as we do not have any type of limitation using
-	// background here
 	_ = hc.clientManager.RemoveClient(meta)
 
-	hc.broadCast(server.NewPlayerLeft(id), helpers.NewIdSet())
+	hc.unsafeBroadCast(server.NewPlayerLeft(id), helpers.NewIdSet())
 
 	// decrement the counter
 	// error here is impossible due to the checks above
 	_ = hc.Release()
 
 	return nil
+	// defer
 }
 
 // BroadCast will as the name implies broadcast a given
 // byte interface to a given client.
 func (hc *HubController) broadCast(msg protocol.Bytefy, except helpers.IdSet) {
-	// get the bytes first
-	data := msg.Bytes()
-
 	hc.lock.RLock()
 	defer hc.lock.RUnlock()
+	hc.unsafeBroadCast(msg, except)
+}
 
+func (hc *HubController) unsafeBroadCast(msg protocol.Bytefy, except helpers.IdSet) {
+	// get the bytes first
+	data := msg.Bytes()
 	for id, clientQueue := range hc.connections {
 		if except.Has(id) {
 			continue
@@ -461,11 +542,16 @@ func (hc *HubController) broadCast(msg protocol.Bytefy, except helpers.IdSet) {
 
 // Shutdown will Shutdown the controller
 func (hc *HubController) Shutdown(cxt context.Context) {
+	// system is already shutdown
+	if !hc.isActive.SetFalse() {
+		return
+	}
+
 	// send shutdown message to all the clients
 	hc.broadCast(server.NewDisconnect(), helpers.NewIdSet())
 
 	waiter := make(chan struct{})
-	wg := sync.WaitGroup{}
+	var wg sync.WaitGroup
 
 	// use complex way to avoid code repetition
 	// thanks sonar lint alert
