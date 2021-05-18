@@ -84,12 +84,12 @@ func (mc *MapController) unsafeRandomSpawn(id uint8) gamemap.Coordinate {
 	spawn := mc.spawingarea[nextRand]
 
 	logger.Debugf("x: [%f] y: [%f]", spawn.X(), spawn.Y())
-	// spawn.SetX(spawn.X() + spawnOffset)
-	// spawn.SetY(spawn.Y() + spawnOffset)
+
+	spawn.SetX(spawn.X() + spawnOffset)
+	spawn.SetY(spawn.Y() + spawnOffset)
 
 	logger.Debugf("post x: [%f] y: [%f]", spawn.X(), spawn.Y())
-	// coord := gamemap.NewCoordinate(spawn.X(), spawn.Y(), 0)
-	coord := gamemap.NewCoordinate(spawn.X()+0.5, spawn.Y()+0.5, 0)
+	coord := gamemap.NewCoordinate(spawn.X(), spawn.Y(), 0)
 	pCoord := &coord
 
 	mc.lock.Lock()
