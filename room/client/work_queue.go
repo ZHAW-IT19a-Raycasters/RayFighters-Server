@@ -67,7 +67,6 @@ func (pq *packageQueue) Enqueue(data protocol.Package) error {
 		return ErrQueueIsDraining
 	}
 
-	logger.Debug("enqueing")
 	pq.outQueue <- data
 
 	return nil
@@ -81,7 +80,6 @@ func (pq *packageQueue) Dequeue() (protocol.Package, error) {
 	if pq.isDraining.Get() {
 		return nil, ErrQueueIsDraining
 	}
-	logger.Debug("dequeing")
 	// check if the queue is still running and then
 	select {
 	case <-pq.running:
@@ -102,8 +100,6 @@ func (pq *packageQueue) DequeueDrain() ([]protocol.Package, error) {
 	}
 	// set the system back to running
 	defer pq.isActive.Set(false)
-
-	logger.Debug("draining queue")
 
 	// pre-allocate to the max queue size possible
 	data := make([]protocol.Package, 0, QueueSize)

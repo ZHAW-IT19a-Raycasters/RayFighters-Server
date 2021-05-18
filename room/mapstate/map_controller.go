@@ -12,6 +12,8 @@ import (
 
 var logger = log.Log()
 
+const spawnOffset = 0.5
+
 type iRand interface {
 	Intn(n int) int
 	Float64() float64
@@ -81,19 +83,13 @@ func (mc *MapController) unsafeRandomSpawn(id uint8) gamemap.Coordinate {
 	nextRand := mc.random.Intn(len(mc.spawingarea))
 	spawn := mc.spawingarea[nextRand]
 
-	randSpawn := func() float64 {
-		for count := 0; count < 50; count += 1 {
-			offset := mc.random.Float64()
-			if !(offset == 0 || offset == 1) {
-				return offset
-			}
-		}
-		return 0.1
-	}
+	logger.Debugf("x: [%f] y: [%f]", spawn.X(), spawn.Y())
+	// spawn.SetX(spawn.X() + spawnOffset)
+	// spawn.SetY(spawn.Y() + spawnOffset)
 
-	spawn.SetX(spawn.X() + randSpawn())
-	spawn.SetY(spawn.X() + mc.random.Float64())
-	coord := gamemap.NewCoordinate(spawn.X(), spawn.Y(), 0)
+	logger.Debugf("post x: [%f] y: [%f]", spawn.X(), spawn.Y())
+	// coord := gamemap.NewCoordinate(spawn.X(), spawn.Y(), 0)
+	coord := gamemap.NewCoordinate(spawn.X()+0.5, spawn.Y()+0.5, 0)
 	pCoord := &coord
 
 	mc.lock.Lock()
