@@ -661,7 +661,7 @@ func (hc *HubController) handleShooting(t []byte, shooterId uint8) protocol.Byte
 	// someone is dead :(
 	if hit {
 		victim, ok := hc.gameState.GetClient(victimId)
-		if !ok || victim.IsDead.Get() {
+		if !ok || !victim.IsDead.SetTrue() {
 			return nil
 		}
 		death := server.NewPlayerDeath(shooterId, victimId)
@@ -671,6 +671,7 @@ func (hc *HubController) handleShooting(t []byte, shooterId uint8) protocol.Byte
 
 		hc.gameState.IncDeaths(victimId)
 		hc.gameState.IncKill(shooterId)
+
 		// register the dead player for respawn
 		hc.respawnHandler.RegisterRespawn(victimId)
 	}
