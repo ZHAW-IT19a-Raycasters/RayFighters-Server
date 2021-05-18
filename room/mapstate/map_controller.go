@@ -74,14 +74,21 @@ func (mc *MapController) ChangeMap(filePath string) (map[uint8]*gamemap.Coordina
 func (mc *MapController) clientExists(id uint8) bool {
 	mc.lock.RLock()
 	defer mc.lock.RUnlock()
+	return mc.unsafeClientExists(id)
+}
+
+// clientExists will check if the client already exists.
+// Attention this function locks on its own.
+func (mc *MapController) unsafeClientExists(id uint8) bool {
 	_, ok := mc.clients[id]
 	return ok
 }
 
 // AddClient will add a new client to the game map
 func (mc *MapController) AddClient(id uint8) (gamemap.Coordinate, error) {
-
-	ok := mc.clientExists(id)
+	mc.lock.Lock()
+	defer mc.lock.Unlock()
+	ok := mc.unsafeClientExists(id)
 	if ok {
 		return gamemap.Coordinate{}, ErrClientExists{
 			id: id,
