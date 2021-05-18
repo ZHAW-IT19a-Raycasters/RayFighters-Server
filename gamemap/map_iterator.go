@@ -71,3 +71,8 @@ func readJSON(jsonContent string) (mapList, error) {
 
 	return parseJSON(content)
 }
+
+func IsValid(jsonPath string) error {
+	_, err := NewMapIteratorManager(jsonPath)
+	return err
+}

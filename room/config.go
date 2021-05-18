@@ -23,6 +23,5 @@ func (mc MapConfig) CheckConfiguration() error {
 	if fileInfo.IsDir() {
 		return ErrMapConfigurationInvalid
 	}
-	_, err = gamemap.readJSON(mc.JsonPath)
-	return err
+	return gamemap.IsValid(mc.JsonPath)
 }
