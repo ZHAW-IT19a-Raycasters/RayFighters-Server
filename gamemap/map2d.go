@@ -79,7 +79,6 @@ func (map2d *Map2d) GetLegalSpawns() []Coordinate {
 	for y := map2d.dim - 1; y > -1; y -= 1 {
 		for x := map2d.dim - 1; x > -1; x -= 1 {
 			if map2d.MapElementAt(y, x) != Wall {
-				//
 				legalSpawns = append(legalSpawns, NewCoordinate(float64(x), float64(y), 0))
 			}
 		}
@@ -87,13 +86,10 @@ func (map2d *Map2d) GetLegalSpawns() []Coordinate {
 	return legalSpawns
 }
 
-func (map2d *Map2d) IsMapBoundary(x int, y int) bool {
-	return x == (map2d.dim-1) || y == (map2d.dim-1)
-}
-
 // IsPenetrable true if a bullet can pass through it
 func (map2d *Map2d) IsPenetrable(x int, y int) bool {
-	return map2d.MapElementAt(x, y) != Wall
+	elem := map2d.MapElementAt(x, y)
+	return elem != Wall
 }
 
 // NewFlatMap2d creates squared 2D-map without walls

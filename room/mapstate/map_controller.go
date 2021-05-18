@@ -190,10 +190,6 @@ func (mc *MapController) GetMapCoordinates(userId uint8) (x int, y int, ok bool)
 	return c.GetMapCoordinate().X(), c.GetMapCoordinate().Y(), ok
 }
 
-func (mc *MapController) IsMapBound(x int, y int) bool {
-	return mc.map2d.IsMapBoundary(x, y)
-}
-
 // IsPenetrable true if a bullet can pass through it
 func (mc *MapController) IsPenetrable(x int, y int) bool {
 	return mc.map2d.IsPenetrable(x, y)
