@@ -1,6 +1,7 @@
 package client
 
 import (
+	"github.zhaw.ch/raycasters/server/utils"
 	"sync/atomic"
 
 	"github.com/google/uuid"
@@ -70,7 +71,7 @@ func (p Position) GetY() float64 {
 type ClientGame struct {
 	kills    uint32
 	deaths   uint32
-	position Position
+	IsDead	 utils.AtomicBool
 }
 
 // NewClientGame creates the default client object.
@@ -78,7 +79,7 @@ func NewClientGame() ClientGame {
 	return ClientGame{
 		kills:    0,
 		deaths:   0,
-		position: NewPosition(),
+		IsDead:	  utils.NewAtomicBool(false),
 	}
 }
 
@@ -104,15 +105,6 @@ func (cg *ClientGame) IncKills() {
 // death counter by one
 func (cg *ClientGame) IncDeaths() {
 	atomic.AddUint32(&cg.deaths, 1)
-}
-
-func (cg *ClientGame) GetPosition() Position {
-	return cg.position
-}
-
-func (cg *ClientGame) MovePlayer(x float64, y float64) {
-	cg.position.x += x
-	cg.position.y += y
 }
 
 // ClientMeta contains the shared meta information of a
