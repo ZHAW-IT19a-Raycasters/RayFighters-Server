@@ -160,6 +160,10 @@ func (hc *HubController) respawnPlayer(id uint8) error {
 	// teleport the player back into the game
 	tp := server.NewTeleportPlayer(id, coord.X(), coord.Y())
 
+	// revive player
+	victim, _ := hc.gameState.GetClient(id)
+	victim.IsDead.SetFalse()
+
 	logger.Debugf("player [%d] teleported to x: [%f] y: [%f]", id, tp.CoorX(), tp.CoorY())
 
 	hc.broadCast(tp, helpers.NewIdSet())
@@ -656,10 +660,17 @@ func (hc *HubController) handleShooting(t []byte, shooterId uint8) protocol.Byte
 
 	// someone is dead :(
 	if hit {
+		victim, ok := hc.gameState.GetClient(victimId)
+		if !ok || victim.IsDead.Get() {
+			return nil
+		}
 		death := server.NewPlayerDeath(shooterId, victimId)
+
 		// broadcast the death to all players
 		hc.broadCast(death, helpers.NewIdSet())
 
+		hc.gameState.IncDeaths(victimId)
+		hc.gameState.IncKill(shooterId)
 		// register the dead player for respawn
 		hc.respawnHandler.RegisterRespawn(victimId)
 	}
