@@ -4,10 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.zhaw.ch/raycasters/server/room"
-	"github.zhaw.ch/raycasters/server/room/controller"
 	"net/http"
 	"time"
+
+	"github.zhaw.ch/raycasters/server/room"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
@@ -31,9 +31,10 @@ var logger = log.Log()
 
 // Server holds all endpoints for a server
 type Server struct {
-	endpoint *http.Server
-	auth     authenticationManager
-	conf     *webconfig.WebConfig
+	endpoint   *http.Server
+	auth       authenticationManager
+	conf       *webconfig.WebConfig
+	hubManager *room.HubManager
 }
 
 // ErrRoomIdUnavailable can be thrown when a room is requested that cannot currently be accessed.
@@ -43,12 +44,19 @@ var ErrRoomIdUnavailable = errors.New("no Room available for the given ID")
 // and attaches the appropriate routehandler functions
 func NewServer(conf *webconfig.WebConfig, mapConfig *room.MapConfig) (*Server, error) {
 	// instantiate hubs
-	var hubs [hubsCount]*controller.Hub
-	var i int = 0
-	for ; i < hubsCount; i++ {
-		hubs[i] = controller.NewHub(i)
-		go hubs[i].Run()
+	hm, err := room.NewHubManager(mapConfig.JsonPath)
+	if err != nil {
+		return nil, err
 	}
+	// add all hubs
+	for i := 0; i < hubsCount; i += 1 {
+		err = hm.AddHub(i)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	phm := &hm
 
 	auth, err := newAuthManager(conf.JWTConfig.RsaPrivateKey)
 
@@ -77,7 +85,8 @@ func NewServer(conf *webconfig.WebConfig, mapConfig *room.MapConfig) (*Server, e
 	api.HandleFunc(wsPath, func(w http.ResponseWriter, r *http.Request) {
 		// TODO: get a hub reference from handler function via HubManager
 		// handle with a wrapper lambda for now
-		serveWs(hubs[:], w, r)
+
+		serveWs(phm, w, r)
 	})
 
 	// handle CORS-requests
@@ -99,9 +108,10 @@ func NewServer(conf *webconfig.WebConfig, mapConfig *room.MapConfig) (*Server, e
 	}
 
 	return &Server{
-		endpoint: httpServer,
-		auth:     auth,
-		conf:     conf,
+		endpoint:   httpServer,
+		auth:       auth,
+		conf:       conf,
+		hubManager: phm,
 	}, nil
 }
 
@@ -114,6 +124,12 @@ func (p *Server) Start() error {
 
 // ServerStop will initialize a graceful shutdown of the server.
 func (p *Server) ServerStop(ctx context.Context) error {
+
+	err := p.hubManager.Shutdown(ctx)
+	if err != nil {
+		return err
+	}
+
 	return p.endpoint.Shutdown(ctx)
 }
 
@@ -127,7 +143,7 @@ func serveRoot(writer http.ResponseWriter, request *http.Request) {
 // serveWs upgrades HTTP request to WebSocket connection
 // parses desired roomID from the request URL
 // and registers the client to the hub
-func serveWs(hubs []*controller.Hub, w http.ResponseWriter, r *http.Request) {
+func serveWs(hm *room.HubManager, w http.ResponseWriter, r *http.Request) {
 
 	logger.Debug("http connection received")
 	roomID, err := helpers.ParseRoomID(r)
@@ -138,7 +154,8 @@ func serveWs(hubs []*controller.Hub, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if roomID < 0 || roomID >= len(hubs) {
+	hub, err := hm.GetHub(roomID)
+	if err != nil {
 		logger.Debugf("Room [%d] not available", roomID)
 		http.Error(w, ErrRoomIdUnavailable.Error(), http.StatusBadRequest)
 		return
@@ -152,7 +169,7 @@ func serveWs(hubs []*controller.Hub, w http.ResponseWriter, r *http.Request) {
 	// this check is in theory not threadsafe as there is a lot time happing
 	// until the connection build up is done, but this can handle some
 	// wrong connection creations, especially under heavy load.
-	if hubs[roomID].Full() {
+	if hub.Full() {
 		logger.Debugf("Room [%d] not available", roomID)
 		http.Error(w, "Room full", http.StatusBadRequest)
 		return
@@ -161,7 +178,7 @@ func serveWs(hubs []*controller.Hub, w http.ResponseWriter, r *http.Request) {
 	logger.Debug("correct token received upgrading the connection")
 
 	cm := client.NewClientMeta(user.uid, user.name, nil)
-	state, _ := hubs[roomID].ClientState(cm)
+	state, _ := hub.ClientState(cm)
 	if state == client.Active {
 		s := fmt.Sprintf("client [% X] already is connected to the system", cm.GetId())
 		logger.Debug(s)
@@ -193,7 +210,7 @@ func serveWs(hubs []*controller.Hub, w http.ResponseWriter, r *http.Request) {
 	cm = client.NewClientMeta(user.uid, user.name, conn)
 	logger.Debugf("Created client meta for ID [% X]", cm.GetId())
 
-	err = hubs[roomID].RegisterClient(cm)
+	err = hub.RegisterClient(cm)
 
 	if err != nil {
 		logger.Debug("Hub already filled up")

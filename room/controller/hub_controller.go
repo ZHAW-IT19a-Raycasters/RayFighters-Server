@@ -3,8 +3,6 @@ package controller
 import (
 	"context"
 	"errors"
-	"fmt"
-	"github.zhaw.ch/raycasters/server/gamemap"
 	"path/filepath"
 	"runtime"
 	"sync"
@@ -45,18 +43,21 @@ type HubController struct {
 	// the currently killed players so that they
 	// can be reborn once the timeout runs out.
 	respawnHandler client.HubRespawnHandler
+
+	// TODO: remove legacy code
 	// timeoutItemQueue stores the currently timeout map elements
 	// so that they can be respawned once the timeout runs out.
 	/** timeoutItemQueue items.ItemTimer**/
 	// timeoutItemQueue stores the currently timeout map elements
 	// so that they can be respawned once the timeout runs out.
-	timeoutMapQueue MapTimer
+	// timeoutMapQueue MapTimer
+
 	// mapChanging will be set True when the Map is being reloaded
 	// so we know when to reset everything to restart the game
 	mapChanging utils.AtomicBool
-	// mapIterator.
-	// TODO: write comments
-	mapIterator gamemap.MapIterator
+	// currentMap is the struct holding all the information
+	// about the current map
+	currentMap mapTimeMeta
 	// Semaphore, counts the totally active
 	// player connections, although that number is already available
 	// via the client map length, is would have to be accessed
@@ -84,61 +85,29 @@ func getMap(filePath string) string {
 	return filepath.Join(p, "maps", filePath)
 }
 
-func (hc *HubController) NewMap(newMapPath string) error {
-	if !hc.mapChanging.SetTrue() {
-		return errors.New("Atomic Fail True")
-	}
-	hc.lock.Lock()
-	defer hc.lock.Unlock()
-	if hc.mapController != nil {
-		// TODO: shutdown Timer and other used stuff
-	}
-	clients, err := hc.mapController.ChangeMap(newMapPath)
-	emptySet := helpers.NewIdSet()
-	for id, lClient := range clients {
-		// teleport the player back into the game
-		tp := server.NewTeleportPlayer(id, lClient.X(), lClient.Y())
-		hc.broadCast(tp, emptySet)
-	}
-
-	if err != nil {
-		return err
-	}
-	hc.mapChanging.SetFalse()
-	return nil
-}
-
 // NewHubController will create a new controller
 func NewHubController() *HubController {
+	// TODO: handle the legacy code
 	// TODO: handle error
 	// TODO: fix issue with file paths...
 	// TODO: remove panics :(
-	path := getMap("desert.txt")
-	mapController, err := mapstate.NewMapController(path)
-	if err != nil {
-		panic(fmt.Sprintf("error happend while opening the map controller [%s]", err.Error()))
-	}
+	// path := getMap("desert.txt")
+	// mapController, err := mapstate.NewMapController(path)
+	// if err != nil {
+	// 	panic(fmt.Sprintf("error happend while opening the map controller [%s]", err.Error()))
+	// }
 
 	hc := HubController{
-		clientManager:   client.NewClientManager(),
-		connections:     make(map[uint8]client.HubQueue),
-		gameState:       NewGameState(),
-		mapController:   &mapController,
-		mapChanging:     utils.NewAtomicBool(false),
-		isActive:      	 utils.NewAtomicBool(true),
-		semaphore:       utils.NewCountingSemaphore(uint32(helpers.IdCountLimit)),
-		wg:              sync.WaitGroup{},
-		lock:            sync.RWMutex{},
+		clientManager: client.NewClientManager(),
+		connections:   make(map[uint8]client.HubQueue),
+		gameState:     NewGameState(),
+		mapController: nil,
+		mapChanging:   utils.NewAtomicBool(false),
+		isActive:      utils.NewAtomicBool(true),
+		semaphore:     utils.NewCountingSemaphore(uint32(helpers.IdCountLimit)),
+		wg:            sync.WaitGroup{},
+		lock:          sync.RWMutex{},
 	}
-
-	// MapTimer
-	mTimeOutCallback := func(elem interface{}) {
-
-		_ = hc.NewMap("desert.txt")
-	}
-	hc.timeoutMapQueue = NewMapTimer(0, mTimeOutCallback)
-	// TODO: handle Error
-	hc.timeoutMapQueue.Run()
 
 	// implement item timer callbacks (blocked by missing map implementation)
 	// Attention this is not done anymore, but the comment is kept here as
@@ -179,6 +148,41 @@ func NewHubController() *HubController {
 	hc.respawnHandler.Run()
 
 	return &hc
+}
+
+func (hc *HubController) NewMap(mapMeta mapTimeMeta) error {
+	if !hc.mapChanging.SetTrue() {
+		// TODO: extract error
+		return errors.New("atomic Fail True")
+	}
+	hc.lock.Lock()
+	defer hc.lock.Unlock()
+	hc.currentMap = mapMeta
+	mapPath := mapMeta.meta.GetFilePath()
+	if hc.mapController == nil {
+		// the case where the map is currenly
+		// not completly setup
+		ms, err := mapstate.NewMapController(mapPath)
+		if err != nil {
+			return err
+		}
+		hc.mapController = &ms
+		return nil
+	}
+
+	clients, err := hc.mapController.ChangeMap(hc.currentMap.meta.GetFilePath())
+	emptySet := helpers.NewIdSet()
+	for id, lClient := range clients {
+		// teleport the player back into the game
+		tp := server.NewTeleportPlayer(id, lClient.X(), lClient.Y())
+		hc.broadCast(tp, emptySet)
+	}
+
+	if err != nil {
+		return err
+	}
+	hc.mapChanging.SetFalse()
+	return nil
 }
 
 func (hc *HubController) respawnPlayer(id uint8) error {

@@ -1,10 +1,6 @@
 package controller
 
-import (
-	"context"
-	"testing"
-)
-
+/*
 func TestHub(t *testing.T) {
 	const hubId = 1
 	hub := NewHub(hubId)
@@ -42,3 +38,4 @@ func TestHub(t *testing.T) {
 		t.Error("hub should not be active here")
 	}
 }
+*/

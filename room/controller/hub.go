@@ -5,7 +5,9 @@ import (
 	"errors"
 	"math"
 	"sync"
+	"time"
 
+	"github.zhaw.ch/raycasters/server/gamemap"
 	"github.zhaw.ch/raycasters/server/room/client"
 	"github.zhaw.ch/raycasters/server/utils"
 )
@@ -19,6 +21,8 @@ type void struct{}
 // by a single hub. This limitation comes from the
 // decision to only support a player id of size uint8.
 const HubClientLimit = math.MaxUint8
+
+const hubTimeLimiter = 5 * time.Minute
 
 // workerCount is the ammount of workers the
 // hub it self has at all times.
@@ -53,6 +57,9 @@ type Hub struct {
 	// via the `RegisterClient` function associated
 	// with this type.
 	input chan client.ClientMeta
+	// mapIterator is responsible for the iteration of all
+	// the maps accros all the hubs.
+	mapIterator *gamemap.MapIterator
 	// The channel that signals the main loop to shutdown.
 	shutdown chan void
 	// If the current hub is running or not.
@@ -65,14 +72,15 @@ type Hub struct {
 // NewHub will initiate a new hub struct.
 // The hubId needs to be unique over all
 // the data structures.
-func NewHub(hubId int) *Hub {
+func NewHub(hubId int, mapIter *gamemap.MapIterator) *Hub {
 	h := &Hub{
-		input:      make(chan client.ClientMeta),
-		controller: NewHubController(),
-		shutdown:   make(chan void),
-		id:         hubId,
-		isActive:   utils.NewAtomicBool(false),
-		wg:         &sync.WaitGroup{},
+		input:       make(chan client.ClientMeta),
+		controller:  NewHubController(),
+		mapIterator: mapIter,
+		shutdown:    make(chan void),
+		id:          hubId,
+		isActive:    utils.NewAtomicBool(false),
+		wg:          &sync.WaitGroup{},
 	}
 	return h
 }
@@ -145,12 +153,12 @@ func (h *Hub) Run() error {
 	// add two runners
 	h.wg.Add(workerCount)
 
-	go h.runRegistration()
+	go h.runHub()
 
 	return nil
 }
 
-func (h *Hub) runRegistration() {
+func (h *Hub) runHub() {
 	// set alive bool
 	// reset the state of is active, on shutdown or
 	// crash
@@ -169,15 +177,42 @@ func (h *Hub) runRegistration() {
 		return err
 	}
 
+	newMap := func() error {
+		// get map
+		nextMap := h.mapIterator.GetMap()
+		return h.controller.NewMap(newMapMeta(nextMap))
+
+	}
+
+	// setup the map
+	err := newMap()
+	if err != nil {
+		logger.Errorf("An error [%s] happend while creating the mapping instance in hub [%d]", err.Error(), h.id)
+		return
+	}
+
+	timer := time.NewTicker(hubTimeLimiter)
+	defer timer.Stop()
+
 	for {
 		select {
+		case <-timer.C:
+			// time to change the map
+			err := newMap()
+			if err != nil {
+				// shutting down the hub
+				logger.Errorf("An error [%s] happend while switching the map in hub [%d]", err.Error(), h.id)
+				return
+			}
 		case meta := <-h.input:
+			// a new player has been added
 			if !h.isActive.Get() {
 				meta.Close()
 				return
 			}
 			register(meta)
 		case <-h.shutdown:
+			// shutting down the hub
 			logger.Infof("Shutting down hub [%d]", h.id)
 			return
 		}

@@ -14,21 +14,17 @@ type mapList struct {
 type MapIteratorManager struct {
 	// filePath is the path to the JSON file
 	filePath string
-	maps chan MapMeta
+	maps     chan MapMeta
 }
 
-func newMapIterator(channel chan MapMeta) MapIterator {
-	return MapIterator{
+func newMapIterator(channel chan MapMeta) *MapIterator {
+	return &MapIterator{
 		maps: channel,
 	}
 }
 
-func (mim *MapIteratorManager) GetIterator() MapIterator{
+func (mim *MapIteratorManager) GetIterator() *MapIterator {
 	return newMapIterator(mim.maps)
-}
-
-type MapIterator struct {
-	maps chan MapMeta
 }
 
 func NewMapIteratorManager(filePath string) (MapIteratorManager, error) {
@@ -45,8 +41,12 @@ func NewMapIteratorManager(filePath string) (MapIteratorManager, error) {
 
 	return MapIteratorManager{
 		filePath: filePath,
-		maps: mapChannel,
+		maps:     mapChannel,
 	}, nil
+}
+
+type MapIterator struct {
+	maps chan MapMeta
 }
 
 func (mi *MapIterator) GetMap() MapMeta {
