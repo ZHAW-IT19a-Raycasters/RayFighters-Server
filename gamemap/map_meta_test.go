@@ -8,8 +8,8 @@ import (
 
 func TestGetID(t *testing.T) {
 	mm := MapMeta{
-		id: 1,
-		name: "desert.txt",
+		id:       1,
+		name:     "desert.txt",
 		filePath: "/maps/desert/",
 	}
 
@@ -20,8 +20,8 @@ func TestGetID(t *testing.T) {
 
 func TestGetName(t *testing.T) {
 	mm := MapMeta{
-		id: 1,
-		name: "desert.txt",
+		id:       1,
+		name:     "desert.txt",
 		filePath: "/maps/desert/",
 	}
 
@@ -32,8 +32,8 @@ func TestGetName(t *testing.T) {
 
 func TestGetFilePath(t *testing.T) {
 	mm := MapMeta{
-		id: 1,
-		name: "desert.txt",
+		id:       1,
+		name:     "desert.txt",
 		filePath: "/maps/desert/",
 	}
 
@@ -50,8 +50,8 @@ func TestLoadFile(t *testing.T) {
 	}
 
 	mm := MapMeta{
-		id: 1,
-		name: file.Name(),
+		id:       1,
+		name:     file.Name(),
 		filePath: "",
 	}
 	// "defer" stacks

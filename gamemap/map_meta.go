@@ -2,9 +2,26 @@ package gamemap
 
 import "path/filepath"
 
+type mapList struct {
+	maps []mapMetaJSON
+}
+
+type mapMetaJSON struct {
+	Id             uint8
+	Name, FilePath string
+}
+
+func (m *mapMetaJSON) mapMeta() MapMeta {
+	return MapMeta{
+		id:       m.Id,
+		name:     m.Name,
+		filePath: m.FilePath,
+	}
+}
+
 type MapMeta struct {
-	id				uint8
-	name, filePath 	string
+	id             uint8
+	name, filePath string
 }
 
 func (mm MapMeta) GetId() uint8 {

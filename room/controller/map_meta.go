@@ -7,11 +7,11 @@ import (
 )
 
 type mapTimeMeta struct {
-	meta  gamemap.MapMeta
+	meta  *gamemap.MapMeta
 	since time.Time
 }
 
-func newMapMeta(meta gamemap.MapMeta) mapTimeMeta {
+func newMapMeta(meta *gamemap.MapMeta) mapTimeMeta {
 	return mapTimeMeta{
 		meta:  meta,
 		since: time.Now(),

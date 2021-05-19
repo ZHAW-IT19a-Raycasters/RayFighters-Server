@@ -338,6 +338,7 @@ func (hc *HubController) RegisterClient(meta client.ClientMeta) error {
 	// prepare messages without the new player information
 	sendAllPLayerKd := hc.gameState.GetPlayersKD()
 	sendAllPlayerInfo := server.NewSendAllPlayerInfo(hc.clientManager.GetPlayers())
+	mapInfo := server.NewMapChange(hc.currentMap.meta.GetId(), hc.currentMap.since.UnixNano())
 
 	// directly add the client to the manager and
 	// let it figure out, what to do here
@@ -368,6 +369,7 @@ func (hc *HubController) RegisterClient(meta client.ClientMeta) error {
 		youAreCalled,
 		sendAllPLayerKd,
 		sendAllPlayerInfo,
+		mapInfo,
 	}
 
 	for _, message := range messages {

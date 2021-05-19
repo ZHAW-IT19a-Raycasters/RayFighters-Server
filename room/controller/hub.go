@@ -180,14 +180,16 @@ func (h *Hub) runHub() {
 	newMap := func() error {
 		// get map
 		nextMap := h.mapIterator.GetMap()
-		return h.controller.NewMap(newMapMeta(nextMap))
-
+		err := h.controller.NewMap(newMapMeta(nextMap))
+		if err != nil {
+			logger.Errorf("An error [%s] happend while switching/creating the mapping instance in hub [%d] for map [%s] in [%s]", err.Error(), h.id, nextMap.GetName(), nextMap.GetFilePath())
+		}
+		return err
 	}
 
 	// setup the map
 	err := newMap()
 	if err != nil {
-		logger.Errorf("An error [%s] happend while creating the mapping instance in hub [%d]", err.Error(), h.id)
 		return
 	}
 
@@ -201,7 +203,6 @@ func (h *Hub) runHub() {
 			err := newMap()
 			if err != nil {
 				// shutting down the hub
-				logger.Errorf("An error [%s] happend while switching the map in hub [%d]", err.Error(), h.id)
 				return
 			}
 		case meta := <-h.input:
