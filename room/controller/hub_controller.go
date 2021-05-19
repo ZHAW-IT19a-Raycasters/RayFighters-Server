@@ -3,8 +3,6 @@ package controller
 import (
 	"context"
 	"errors"
-	"path/filepath"
-	"runtime"
 	"sync"
 
 	"github.zhaw.ch/raycasters/server/room/mapstate"
@@ -74,15 +72,6 @@ type HubController struct {
 	// lock is used to limit the access to the connections.
 	// as well as to the client manager.
 	lock sync.RWMutex
-}
-
-func getMap(filePath string) string {
-	_, filename, _, _ := runtime.Caller(0)
-	p := filepath.Dir(filename)
-	p = filepath.Dir(p)
-	p = filepath.Dir(p)
-
-	return filepath.Join(p, "maps", filePath)
 }
 
 // NewHubController will create a new controller
