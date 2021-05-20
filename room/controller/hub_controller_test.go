@@ -9,14 +9,15 @@ import (
 	"github.zhaw.ch/raycasters/server/protocol/client"
 	"github.zhaw.ch/raycasters/server/protocol/server"
 	rClient "github.zhaw.ch/raycasters/server/room/client"
+	"github.zhaw.ch/raycasters/server/room/testhelpers"
 )
 
-func getClientMeta(i int) (rClient.ClientMeta, *MockedConnection) {
+func getClientMeta(i int) (rClient.ClientMeta, *testhelpers.MockedConnection) {
 	// as uuids should be unique, it makes no difference,
 	// if a new one is called here.
 	uuid := uuid.New()
 	name := fmt.Sprintf("id: %d", i)
-	mock := NewMockedConnection()
+	mock := testhelpers.NewMockedConnection()
 	pmock := &mock
 	return rClient.NewClientMeta(uuid, name, pmock), pmock
 }

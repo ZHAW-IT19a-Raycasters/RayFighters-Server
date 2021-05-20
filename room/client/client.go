@@ -280,6 +280,7 @@ func (c *Client) unsafeCheckState(exp ConnectionStatus) (ConnectionStatus, bool)
 // condition this function will only ever be called a single time
 // per run.
 func (c *Client) sendData() {
+	defer c.shutdownHandler()
 	// No checks for activation are needed
 	// due to that this function will only
 	// be called from the run function
