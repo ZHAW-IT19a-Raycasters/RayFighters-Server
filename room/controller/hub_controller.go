@@ -20,6 +20,10 @@ import (
 // case that the controller is offline.
 var ErrHubControllerOffline = errors.New("the hub controller is offline")
 
+// ErrHubControllerChangingMap is the error returned in the
+// case that there is a map change currently going on.
+var ErrHubControllerChangingMap = errors.New("the hub conrtroller is currently changing the map")
+
 // HubController is the main brain of the hub
 // it is solely responsible for all the interactions
 // done by the user.
@@ -141,11 +145,13 @@ func NewHubController() *HubController {
 
 func (hc *HubController) NewMap(mapMeta mapTimeMeta) error {
 	if !hc.mapChanging.SetTrue() {
-		// TODO: extract error
-		return errors.New("atomic Fail True")
+		return ErrHubControllerChangingMap
 	}
+	defer hc.mapChanging.SetFalse()
+
 	hc.lock.Lock()
 	defer hc.lock.Unlock()
+
 	hc.currentMap = mapMeta
 	mapPath := mapMeta.meta.GetFilePath()
 	if hc.mapController == nil {
@@ -159,18 +165,26 @@ func (hc *HubController) NewMap(mapMeta mapTimeMeta) error {
 		return nil
 	}
 
-	clients, err := hc.mapController.ChangeMap(hc.currentMap.meta.GetFilePath())
+	logger.Debugf("Moving to map [%d]", mapMeta.meta.GetId())
+
+	mc := server.NewMapChange(mapMeta.meta.GetId(), mapMeta.since.UnixNano())
+
 	emptySet := helpers.NewIdSet()
-	for id, lClient := range clients {
-		// teleport the player back into the game
-		tp := server.NewTeleportPlayer(id, lClient.X(), lClient.Y())
-		hc.broadCast(tp, emptySet)
-	}
+
+	hc.unsafeBroadCast(mc, emptySet)
+
+	clients, err := hc.mapController.ChangeMap(hc.currentMap.meta.GetFilePath())
 
 	if err != nil {
 		return err
 	}
-	hc.mapChanging.SetFalse()
+	for id, lClient := range clients {
+		logger.Debugf("teleporting player [%d] into the map [%d]", id, mapMeta.meta.GetId())
+		// teleport the player back into the game
+		tp := server.NewTeleportPlayer(id, lClient.X(), lClient.Y())
+		hc.unsafeBroadCast(tp, emptySet)
+	}
+
 	return nil
 }
 

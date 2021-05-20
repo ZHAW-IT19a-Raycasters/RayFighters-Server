@@ -180,6 +180,7 @@ func (h *Hub) runHub() {
 	newMap := func() error {
 		// get map
 		nextMap := h.mapIterator.GetMap()
+		logger.Debugf("changing the map to [%d] in hub [%d]", nextMap.GetId(), h.id)
 		err := h.controller.NewMap(newMapMeta(nextMap))
 		if err != nil {
 			logger.Errorf("An error [%s] happend while switching/creating the mapping instance in hub [%d] for map [%s] in [%s]", err.Error(), h.id, nextMap.GetName(), nextMap.GetFilePath())

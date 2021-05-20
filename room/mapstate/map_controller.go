@@ -55,6 +55,8 @@ func NewMapController(filePath string) (MapController, error) {
 func (mc *MapController) ChangeMap(filePath string) (map[uint8]*gamemap.Coordinate, error) {
 	mc.lock.Lock()
 	defer mc.lock.Unlock()
+	logger.Debugf("changing to map [%s]", filePath)
+
 	map2d, err := gamemap.LoadMap2d(filePath)
 	if err != nil {
 		return nil, err

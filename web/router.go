@@ -170,7 +170,7 @@ func serveWs(hm *room.HubManager, w http.ResponseWriter, r *http.Request) {
 	roomID, err := helpers.ParseRoomID(r)
 
 	if err != nil {
-		logger.Error(err)
+		logger.Errorf("")
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
