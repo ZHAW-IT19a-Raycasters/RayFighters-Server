@@ -22,25 +22,25 @@ import (
 	"github.zhaw.ch/raycasters/server/room"
 	"github.zhaw.ch/raycasters/server/room/testhelpers"
 	"github.zhaw.ch/raycasters/server/utils"
+	"github.zhaw.ch/raycasters/server/web/helpers"
 	"golang.org/x/net/publicsuffix"
 )
 
-// TODO : fix all these tests
 func hubHelper(t *testing.T) (*room.HubManager, error) {
 	pathJson, _ := testhelpers.SetupIndexJson(t)
 
-	hm, err := room.NewHubManager(pathJson)
+	hm, err := setupHubManager(&room.MapConfig{
+		JsonPath: pathJson,
+	})
+
 	if err != nil {
 		return nil, err
 	}
+
 	t.Cleanup(func() {
 		hm.Shutdown(context.TODO())
 	})
-
-	for i := 0; i < hubsCount; i += 1 {
-		hm.AddHub(i)
-	}
-	return &hm, nil
+	return hm, nil
 }
 
 func setupDialer(url *url.URL, t *testing.T) *websocket.Dialer {
@@ -83,25 +83,28 @@ func setupDialer(url *url.URL, t *testing.T) *websocket.Dialer {
 }
 
 func setupTestServer(t *testing.T) (*room.HubManager, *httptest.Server, error) {
-	hubs, err := hubHelper(t)
+	hubManager, err := hubHelper(t)
 
-	if hubs == nil {
+	if err != nil {
 		return nil, nil, err
 	}
-	// Need to create a router that we can pass the request through so that the vars will be added to the context
-	router := mux.NewRouter()
 
-	auth, _ := newAuthManager("")
+	auth, err := newAuthManager("")
 
-	router.HandleFunc("/auth", auth.AuthConnection())
-	router.HandleFunc("/ws/{roomID:[0-9]+}", func(rw http.ResponseWriter, r *http.Request) {
-		serveWs(hubs, rw, r)
-	})
+	if err != nil {
+		return nil, nil, err
+	}
+
+	router, err := setupRouter(hubManager, &auth)
+
+	if err != nil {
+		return nil, nil, err
+	}
 
 	// setup the server
 	server := httptest.NewServer(router)
 	t.Cleanup(server.Close)
-	return hubs, server, nil
+	return hubManager, server, nil
 }
 
 func TestAPIRoot(t *testing.T) {
@@ -159,6 +162,7 @@ func TestWSBadRoomID(t *testing.T) {
 func TestAuthorizedWebsocketEstablishment(t *testing.T) {
 	_, server, err := setupTestServer(t)
 	if err != nil {
+		t.Errorf("there was an error creating the test server [%s]", err.Error())
 		return
 	}
 	u, err := url.Parse(server.URL)
@@ -339,4 +343,14 @@ func TestWsMovement(t *testing.T) {
 	}
 
 	ws.WriteMessage(websocket.BinaryMessage, data[:])
+}
+
+func TestServeWSNegativNumber(t *testing.T) {
+	req, _ := http.NewRequest("GET", "/ws", nil)
+	w := httptest.NewRecorder()
+	req = mux.SetURLVars(req, map[string]string{helpers.RoomIdParameter: "d"})
+	serveWs(nil, w, req)
+	if w.Code != http.StatusBadRequest {
+		t.Error("Wrong request type used")
+	}
 }

@@ -27,12 +27,13 @@ const (
 	serverTimeout       time.Duration = 15 * time.Second
 )
 
+// logger is the logging instance used here.
 var logger = log.Log()
 
 // Server holds all endpoints for a server
 type Server struct {
-	endpoint   *http.Server
 	auth       authenticationManager
+	endpoint   *http.Server
 	conf       *webconfig.WebConfig
 	hubManager *room.HubManager
 }
@@ -40,11 +41,9 @@ type Server struct {
 // ErrRoomIdUnavailable can be thrown when a room is requested that cannot currently be accessed.
 var ErrRoomIdUnavailable = errors.New("no Room available for the given ID")
 
-// NewServer registers routes for all exposed endpoints
-// and attaches the appropriate routehandler functions
-func NewServer(conf *webconfig.WebConfig, mapConfig *room.MapConfig) (*Server, error) {
+func setupHubManager(mapConf *room.MapConfig) (*room.HubManager, error) {
 	// instantiate hubs
-	hm, err := room.NewHubManager(mapConfig.JsonPath)
+	hm, err := room.NewHubManager(mapConf.JsonPath)
 	if err != nil {
 		return nil, err
 	}
@@ -56,16 +55,12 @@ func NewServer(conf *webconfig.WebConfig, mapConfig *room.MapConfig) (*Server, e
 		}
 	}
 
-	phm := &hm
+	return &hm, nil
+}
 
-	auth, err := newAuthManager(conf.JWTConfig.RsaPrivateKey)
-
-	if err != nil {
-		return nil, err
-	}
-
-	// init global jwt decoding
-	jwt.RegisterCustomField("uuid", uuid.UUID{})
+// setupRouter will take care of creating all the needed routes
+// in which the requestes can thnen be handled accordingly.
+func setupRouter(hm *room.HubManager, auth *authenticationManager) (*mux.Router, error) {
 
 	router := mux.NewRouter()
 
@@ -83,11 +78,37 @@ func NewServer(conf *webconfig.WebConfig, mapConfig *room.MapConfig) (*Server, e
 	wsPath := fmt.Sprintf("/ws/{%s:[0-9]+}", helpers.RoomIdParameter)
 
 	api.HandleFunc(wsPath, func(w http.ResponseWriter, r *http.Request) {
-		// TODO: get a hub reference from handler function via HubManager
-		// handle with a wrapper lambda for now
-
-		serveWs(phm, w, r)
+		//  get a hub reference from handler function via HubManager
+		serveWs(hm, w, r)
 	})
+
+	return router, nil
+}
+
+// NewServer registers routes for all exposed endpoints
+// and attaches the appropriate routehandler functions
+func NewServer(conf *webconfig.WebConfig, mapConfig *room.MapConfig) (*Server, error) {
+
+	hm, err := setupHubManager(mapConfig)
+
+	if err != nil {
+		return nil, err
+	}
+
+	auth, err := newAuthManager(conf.JWTConfig.RsaPrivateKey)
+
+	if err != nil {
+		return nil, err
+	}
+
+	// init global jwt decoding
+	jwt.RegisterCustomField("uuid", uuid.UUID{})
+
+	router, err := setupRouter(hm, &auth)
+
+	if err != nil {
+		return nil, err
+	}
 
 	// handle CORS-requests
 	// see https://de.wikipedia.org/wiki/Cross-Origin_Resource_Sharing
@@ -111,7 +132,7 @@ func NewServer(conf *webconfig.WebConfig, mapConfig *room.MapConfig) (*Server, e
 		endpoint:   httpServer,
 		auth:       auth,
 		conf:       conf,
-		hubManager: phm,
+		hubManager: hm,
 	}, nil
 }
 
