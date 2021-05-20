@@ -435,9 +435,9 @@ func (hc *HubController) runClientConnection(hqueue client.HubQueue, id uint8) {
 	var wg sync.WaitGroup
 
 	defer func() {
-		logger.Debug("waiting for workers for client [%d] to finish", id)
+		logger.Debugf("waiting for workers for client [%d] to finish", id)
 		wg.Wait()
-		logger.Debug("removing client [%d] from hub", id)
+		logger.Debugf("removing client [%d] from hub", id)
 		// We ignore the ok because this function can't be called without the user already existing
 		meta, _ := hc.clientManager.MapMeta(id)
 		// We ignore the error here, as it is impossible per definition
@@ -730,7 +730,7 @@ func (hc *HubController) handleShooting(t []byte, shooterId uint8) protocol.Byte
 	// someone is dead :(
 	if hit {
 		victim, ok := hc.gameState.GetClient(victimId)
-		if !ok || victim.IsDead.Get() {
+		if !ok || !victim.IsDead.SetTrue() {
 			return nil
 		}
 		death := server.NewPlayerDeath(shooterId, victimId)
@@ -742,6 +742,7 @@ func (hc *HubController) handleShooting(t []byte, shooterId uint8) protocol.Byte
 
 		hc.gameState.IncDeaths(victimId)
 		hc.gameState.IncKill(shooterId)
+
 		// register the dead player for respawn
 		hc.respawnHandler.RegisterRespawn(victimId)
 	}

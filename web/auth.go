@@ -128,15 +128,20 @@ func newAuthManager(privateKeyPath string) (authenticationManager, error) {
 func (auth *authenticationManager) AuthConnection() (HandleFunc func(w http.ResponseWriter, r *http.Request)) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// check if there already is a valid JWT token
-		err := auth.checkIfCookieValid(r)
+		// the function will return an error here if
+		// there is no valid cookie
+		isValidCookie := auth.checkIfCookieValid(r) == nil
+
 		// not getting an error here means that the
 		// user already is authenticated.
-		if err == nil {
-			return
-		}
+		// if isValidCookie {
+		// 	// check case that there is a
+		// 	// need to change the name
+		// 	return
+		// }
 
 		var creds Credentials
-		err = parseToCredentialsFromJSON(&creds, r.Body)
+		err := parseToCredentialsFromJSON(&creds, r.Body)
 
 		if err != nil {
 			// If the structure of the body is wrong, return an HTTP error
@@ -145,7 +150,25 @@ func (auth *authenticationManager) AuthConnection() (HandleFunc func(w http.Resp
 			return
 		}
 
-		cookie, err := auth.createCookie(&creds)
+		uuidVal := ""
+
+		if isValidCookie {
+			// we already checked if the token is valid
+			oldCreds, err := parseUserInformation(w, r)
+			if err != nil {
+
+			} else if oldCreds.name == creds.Username {
+				// token is still valid
+				return
+			} else {
+				uuidVal = oldCreds.uid.String()
+			}
+		}
+
+		// check state that name is the same
+		// if cookie is valid
+
+		cookie, err := auth.createCookie(&creds, uuidVal)
 		if err != nil {
 			// also wraps a json marshalling error
 			logger.Warnf("failed to sign token: %s", err)
@@ -177,9 +200,11 @@ func (amw *authenticationManager) checkIfCookieValid(r *http.Request) error {
 }
 
 // createCookie will create a standard issue JWT cookie.
-func (auth *authenticationManager) createCookie(creds *Credentials) (*http.Cookie, error) {
+func (auth *authenticationManager) createCookie(creds *Credentials, uuidStr string) (*http.Cookie, error) {
 	// create new client uuid
-	uuidStr := uuid.NewString()
+	if uuidStr == "" {
+		uuidStr = uuid.NewString()
+	}
 
 	// create JWT
 	t := jwt.New()
