@@ -1,22 +1,46 @@
 package web
 
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"io"
+	"log"
+	"net/http"
+	"net/http/cookiejar"
+	"net/http/httptest"
+	"net/url"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/gorilla/mux"
+	"github.com/gorilla/websocket"
+	"github.zhaw.ch/raycasters/server/gamemap"
+	"github.zhaw.ch/raycasters/server/protocol/client"
+	oServer "github.zhaw.ch/raycasters/server/protocol/server"
+	"github.zhaw.ch/raycasters/server/room"
+	"github.zhaw.ch/raycasters/server/room/testhelpers"
+	"github.zhaw.ch/raycasters/server/utils"
+	"golang.org/x/net/publicsuffix"
+)
+
 // TODO : fix all these tests
-/*
 func hubHelper(t *testing.T) (*room.HubManager, error) {
-	hm := room.NewHubManager()
-	for i := 0; i < hubsCount; i += 1 {
-		hub := controller.NewHub(i)
-		err := hub.Run()
-		if err != nil {
-			t.Errorf("unable to start up a hub [%s]", err.Error())
-			return nil, err
-		}
-		t.Cleanup(func() {
-			hub.Shutdown(context.TODO())
-		})
-		hubs = append(hubs, hub)
+	pathJson, _ := testhelpers.SetupIndexJson(t)
+
+	hm, err := room.NewHubManager(pathJson)
+	if err != nil {
+		return nil, err
 	}
-	return hubs, nil
+	t.Cleanup(func() {
+		hm.Shutdown(context.TODO())
+	})
+
+	for i := 0; i < hubsCount; i += 1 {
+		hm.AddHub(i)
+	}
+	return &hm, nil
 }
 
 func setupDialer(url *url.URL, t *testing.T) *websocket.Dialer {
@@ -58,7 +82,7 @@ func setupDialer(url *url.URL, t *testing.T) *websocket.Dialer {
 	}
 }
 
-func setupTestServer(t *testing.T) ([]*controller.Hub, *httptest.Server, error) {
+func setupTestServer(t *testing.T) (*room.HubManager, *httptest.Server, error) {
 	hubs, err := hubHelper(t)
 
 	if hubs == nil {
@@ -246,6 +270,7 @@ func TestWsFirstOpcodes(t *testing.T) {
 		oServer.YouAreCalledOpcode.Value():      {},
 		oServer.SendAllPlayerInfoOpcode.Value(): {},
 		oServer.SendAllPlayerKDOpcode.Value():   {},
+		oServer.MapChangeOpcode.Value():         {},
 		oServer.TeleportPlayerOpcode.Value():    {},
 	}
 
@@ -315,4 +340,3 @@ func TestWsMovement(t *testing.T) {
 
 	ws.WriteMessage(websocket.BinaryMessage, data[:])
 }
-*/

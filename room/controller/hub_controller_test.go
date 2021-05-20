@@ -90,8 +90,8 @@ func TestHandleReadWhoamiError(t *testing.T) {
 }
 
 func TestHandleReadMovement(t *testing.T) {
-	mapIterManager := setupMapIterator(t)
-	mapIter := mapIterManager.GetIterator()
+	mIm := testhelpers.SetupMapIterator(t)
+	mapIter := mIm.GetIterator()
 
 	hub := NewHubController()
 	defer hub.Shutdown(context.Background())
@@ -166,7 +166,7 @@ func TestHandleReadMovementError(t *testing.T) {
 }
 
 func TestHandleReadDisconnect(t *testing.T) {
-	mIm := setupMapIterator(t)
+	mIm := testhelpers.SetupMapIterator(t)
 	mI := mIm.GetIterator()
 	hub := NewHubController()
 	defer hub.Shutdown(context.Background())
@@ -224,7 +224,7 @@ func TestHandleReadDisconnect(t *testing.T) {
 
 func TestHandleReadDisconnectError(t *testing.T) {
 
-	mIm := setupMapIterator(t)
+	mIm := testhelpers.SetupMapIterator(t)
 	mI := mIm.GetIterator()
 	hub := NewHubController()
 
@@ -253,7 +253,7 @@ func TestHandleReadDisconnectError(t *testing.T) {
 
 func TestHandleReadShooting(t *testing.T) {
 
-	mIm := setupMapIterator(t)
+	mIm := testhelpers.SetupMapIterator(t)
 	mI := mIm.GetIterator()
 	hub := NewHubController()
 
@@ -298,7 +298,7 @@ func TestHandleReadShooting(t *testing.T) {
 
 func TestHandleReadShootingError(t *testing.T) {
 
-	mIm := setupMapIterator(t)
+	mIm := testhelpers.SetupMapIterator(t)
 	mI := mIm.GetIterator()
 	hub := NewHubController()
 
@@ -328,7 +328,7 @@ func TestHandleReadShootingError(t *testing.T) {
 
 func TestHandleReadRequestOtherPlayer(t *testing.T) {
 
-	mIm := setupMapIterator(t)
+	mIm := testhelpers.SetupMapIterator(t)
 	mI := mIm.GetIterator()
 	hub := NewHubController()
 
@@ -403,7 +403,7 @@ func TestHandleReadRequestOtherPlayer(t *testing.T) {
 
 func TestHandleReadRequestOtherPlayerError(t *testing.T) {
 
-	mIm := setupMapIterator(t)
+	mIm := testhelpers.SetupMapIterator(t)
 	mI := mIm.GetIterator()
 	hub := NewHubController()
 
@@ -433,7 +433,7 @@ func TestHandleReadRequestOtherPlayerError(t *testing.T) {
 }
 
 func TestHandleReadRequestPlayerKD(t *testing.T) {
-	mIm := setupMapIterator(t)
+	mIm := testhelpers.SetupMapIterator(t)
 	mI := mIm.GetIterator()
 	hub := NewHubController()
 
@@ -497,7 +497,7 @@ func TestHandleReadRequestPlayerKD(t *testing.T) {
 }
 
 func TestHandleReadRequestPlayerKDError(t *testing.T) {
-	mIm := setupMapIterator(t)
+	mIm := testhelpers.SetupMapIterator(t)
 	mI := mIm.GetIterator()
 	hub := NewHubController()
 

@@ -14,6 +14,10 @@ type MapIteratorManager struct {
 	maps     chan *MapMeta
 }
 
+func (mim *MapIteratorManager) GetFilePath() string {
+	return mim.filePath
+}
+
 func newMapIterator(channel chan *MapMeta) *MapIterator {
 	return &MapIterator{
 		maps: channel,
