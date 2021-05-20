@@ -80,15 +80,6 @@ type HubController struct {
 
 // NewHubController will create a new controller
 func NewHubController() *HubController {
-	// TODO: handle the legacy code
-	// TODO: handle error
-	// TODO: fix issue with file paths...
-	// TODO: remove panics :(
-	// path := getMap("desert.txt")
-	// mapController, err := mapstate.NewMapController(path)
-	// if err != nil {
-	// 	panic(fmt.Sprintf("error happend while opening the map controller [%s]", err.Error()))
-	// }
 
 	hc := HubController{
 		clientManager: client.NewClientManager(),
@@ -635,7 +626,7 @@ func (hc *HubController) handleRead(data []byte, id uint8) protocol.Bytefy {
 	// check if the hub state is
 	// map changing, if so
 	// ignore the message
-	if !hc.mapChanging.Get() {
+	if hc.mapChanging.Get() {
 		return nil
 	}
 
