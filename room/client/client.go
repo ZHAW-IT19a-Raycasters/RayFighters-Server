@@ -145,6 +145,24 @@ func (c *Client) GetStatus() ConnectionStatus {
 	return c.status
 }
 
+// setStatus will change the current client status
+// and will return the old one.
+func (c *Client) setStatus(status ConnectionStatus) ConnectionStatus {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	return c.unsafeSetStatus(status)
+}
+
+// unsafeSetStatus will change the current client status
+// and will return the old one.
+// Attention this function assume the caller having a
+// writer lock.
+func (c *Client) unsafeSetStatus(status ConnectionStatus) ConnectionStatus {
+	old := c.status
+	c.status = status
+	return old
+}
+
 // GetInternalMeta will return the internal version of the
 // client meta information.
 func (c *Client) GetInternalMeta() clientInternalMeta {
@@ -503,17 +521,12 @@ func (c *Client) Shutdown(ctx context.Context) {
 	}
 
 	defer func() {
-		c.lock.Lock()
-		c.status = Offline
-		c.lock.Unlock()
+		c.setStatus(Offline)
 	}()
 
 	logger.Debugf("Shutting down client [%d]", c.meta.eId)
 
-	c.lock.Lock()
-	// set the state of the client to shutting down
-	c.status = ShuttingDown
-	c.lock.Unlock()
+	c.setStatus(ShuttingDown)
 
 	// make a channel on which, we can wait on.
 	runs := make(chan struct{})

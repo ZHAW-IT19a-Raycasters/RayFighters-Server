@@ -243,7 +243,6 @@ func (manager *ClientManager) RemoveClient(meta ClientMeta) error {
 		return NewErrClientDoesntExist(meta)
 	}
 	manager.lock.Lock()
-
 	val := manager.clients[id]
 
 	// make sure it is shutdown, at most wait for the timeout
@@ -319,22 +318,21 @@ func (manager *ClientManager) Shutdown(cxt context.Context) {
 
 	manager.lock.Lock()
 
-	clients := make([]uint8, 0, len(manager.clients))
+	clients := make([]ClientMeta, 0, len(manager.clients))
 
 	// run shutdown on all clients
 	for id := range manager.clients {
-		clients = append(clients, id)
+		// as we have the lock there is no chance
+		// of a client beeing removed so ignore
+		// the bool value
+		meta, _ := manager.mapToExternalMeta(id)
+		clients = append(clients, meta)
 	}
 
 	manager.lock.Unlock()
 	// run shutdown on all clients
-	for _, id := range clients {
-		meta, ok := manager.mapToExternalMeta(id)
-		if !ok {
-			// if the client already has been removed
-			continue
-		}
-		manager.RemoveClient(meta)
+	for _, meta := range clients {
+		go manager.RemoveClient(meta)
 	}
 
 	select {

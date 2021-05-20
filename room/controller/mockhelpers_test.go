@@ -8,38 +8,45 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+type blockChan chan struct{}
+
+type chanFuncReader chan func() (int, io.Reader, error)
+
+type chanFuncWriter chan func(messageType int) (io.WriteCloser, error)
+
 type MockedConnection struct {
-	lock           sync.RWMutex
-	mr             *MockedReader
-	mwc            *MockedWriteCloser
-	funcNextReader func() (int, io.Reader, error)
-	funcNextWriter func(messageType int) (io.WriteCloser, error)
-	funcCloser     func() error
+	done       blockChan
+	mr         *MockedReader
+	mwc        *MockedWriteCloser
+	funcReader chanFuncReader
+	funcWriter chanFuncWriter
 }
 
 func (m *MockedConnection) NextReader() (int, io.Reader, error) {
-	m.lock.RLock()
-	defer m.lock.RUnlock()
-	return m.funcNextReader()
+	select {
+	case <-m.done:
+		return 0, nil, websocket.ErrCloseSent
+	case d := <-m.funcReader:
+		return d()
+	}
 }
 
 func (m *MockedConnection) NextWriter(messageType int) (io.WriteCloser, error) {
-	m.lock.RLock()
-	defer m.lock.RUnlock()
-	return m.funcNextWriter(messageType)
+	select {
+	case <-m.done:
+		return nil, websocket.ErrCloseSent
+	case d := <-m.funcWriter:
+		return d(messageType)
+	}
 }
 
 func (m *MockedConnection) Close() error {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-	// replace the next func reader and next writer with error returning versions
-	m.funcNextReader = func() (int, io.Reader, error) {
-		return 0, nil, websocket.ErrCloseSent
+	select {
+	case <-m.done:
+	default:
+		close(m.done)
 	}
-	m.funcNextWriter = func(messageType int) (io.WriteCloser, error) {
-		return nil, websocket.ErrCloseSent
-	}
-	return m.funcCloser()
+	return nil
 }
 
 func NewMockedConnection() MockedConnection {
@@ -47,19 +54,12 @@ func NewMockedConnection() MockedConnection {
 	mwc := newMockedWriteCloser()
 	pmr := &mr
 	pmwc := &mwc
+	done := make(blockChan)
+
 	return MockedConnection{
-		lock: sync.RWMutex{},
 		mr:   pmr,
 		mwc:  pmwc,
-		funcNextReader: func() (int, io.Reader, error) {
-			return 0, nil, websocket.ErrCloseSent
-		},
-		funcNextWriter: func(messageType int) (io.WriteCloser, error) {
-			return nil, websocket.ErrCloseSent
-		},
-		funcCloser: func() error {
-			return nil
-		},
+		done: done,
 	}
 }
 
@@ -106,54 +106,4 @@ func newMockedReader() MockedReader {
 	return MockedReader{
 		new(bytes.Buffer),
 	}
-}
-
-type blockChan chan struct{}
-
-type chanFuncReader chan func() (int, io.Reader, error)
-
-type chanFuncWriter chan func(messageType int) (io.WriteCloser, error)
-
-func setupMock(mock *MockedConnection) (blockChan, chanFuncReader, chanFuncWriter) {
-
-	done := make(blockChan)
-
-	// make the connections blocking, so that we can run other
-	// stuff while it waits
-	funcTransferReader := make(chanFuncReader, 10)
-	funcTransferWriter := make(chanFuncWriter, 10)
-
-	mock.mwc.cl = func() error {
-		close(done)
-		return nil
-	}
-
-	mock.funcNextReader = func() (int, io.Reader, error) {
-		select {
-		case <-done:
-			return 0, nil, websocket.ErrCloseSent
-		case d := <-funcTransferReader:
-			return d()
-		}
-	}
-
-	mock.funcNextWriter = func(messageType int) (io.WriteCloser, error) {
-		select {
-		case <-done:
-			return nil, websocket.ErrCloseSent
-		case d := <-funcTransferWriter:
-			return d(messageType)
-		}
-	}
-
-	// override the closer, so that the channels don't get changed by it
-	mock.funcCloser = func() error {
-		select {
-		case <-done:
-		default:
-			close(done)
-		}
-		return nil
-	}
-	return done, funcTransferReader, funcTransferWriter
 }

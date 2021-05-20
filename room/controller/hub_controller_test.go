@@ -175,16 +175,14 @@ func TestHandleReadDisconnect(t *testing.T) {
 	const otherId uint8 = 2
 	hub.connections[otherId] = hQueue
 
-	client2Meta, mc2 := getClientMeta(2)
-	_, _, _ = setupMock(mc2)
+	client2Meta, _ := getClientMeta(2)
 	hub.RegisterClient(client2Meta)
 
 	_, hQueue = rClient.NewWorkQueue()
 	const userId uint8 = 1
 	hub.connections[userId] = hQueue
 
-	client1Meta, mc1 := getClientMeta(1)
-	_, _, _ = setupMock(mc1)
+	client1Meta, _ := getClientMeta(1)
 
 	hub.RegisterClient(client1Meta)
 
@@ -334,17 +332,16 @@ func TestHandleReadRequestOtherPlayer(t *testing.T) {
 	hub := NewHubController()
 
 	defer hub.Shutdown(context.Background())
+
 	hub.NewMap(newMapMeta(mI.GetMap()))
 
-	client2Meta, mock2 := getClientMeta(2)
-	_, _, _ = setupMock(mock2)
+	client2Meta, _ := getClientMeta(2)
 
 	hub.RegisterClient(client2Meta)
 
 	const userId uint8 = 1
 
-	client1Meta, mock1 := getClientMeta(1)
-	_, _, _ = setupMock(mock1)
+	client1Meta, _ := getClientMeta(1)
 
 	hub.RegisterClient(client1Meta)
 
@@ -442,14 +439,12 @@ func TestHandleReadRequestPlayerKD(t *testing.T) {
 	defer hub.Shutdown(context.Background())
 	hub.NewMap(newMapMeta(mI.GetMap()))
 
-	client2Meta, mock2 := getClientMeta(2)
-	_, _, _ = setupMock(mock2)
+	client2Meta, _ := getClientMeta(2)
 
 	hub.RegisterClient(client2Meta)
 
 	userId2, _ := hub.clientManager.MapId(client2Meta)
-	client1Meta, mock1 := getClientMeta(1)
-	_, _, _ = setupMock(mock1)
+	client1Meta, _ := getClientMeta(1)
 
 	hub.RegisterClient(client1Meta)
 
