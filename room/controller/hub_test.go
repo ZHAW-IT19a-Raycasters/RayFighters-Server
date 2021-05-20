@@ -1,13 +1,16 @@
-package room
+package controller
 
 import (
 	"context"
 	"testing"
+
+	"github.zhaw.ch/raycasters/server/room/testhelpers"
 )
 
 func TestHub(t *testing.T) {
+	manager := testhelpers.SetupMapIterator(t)
 	const hubId = 1
-	hub := NewHub(hubId)
+	hub := NewHub(hubId, manager.GetIterator())
 
 	waitUntilActive := make(chan struct{})
 	go func() {

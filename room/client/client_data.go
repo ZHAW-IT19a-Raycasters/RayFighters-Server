@@ -69,9 +69,9 @@ func (p Position) GetY() float64 {
 
 // ClientGame represents the state of the client in the game
 type ClientGame struct {
-	kills    uint32
-	deaths   uint32
-	IsDead	 utils.AtomicBool
+	kills     uint32
+	deaths	  uint32
+	IsDead	  utils.AtomicBool
 }
 
 // NewClientGame creates the default client object.

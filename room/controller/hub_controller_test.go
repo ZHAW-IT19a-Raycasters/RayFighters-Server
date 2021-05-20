@@ -9,14 +9,15 @@ import (
 	"github.zhaw.ch/raycasters/server/protocol/client"
 	"github.zhaw.ch/raycasters/server/protocol/server"
 	rClient "github.zhaw.ch/raycasters/server/room/client"
+	"github.zhaw.ch/raycasters/server/room/testhelpers"
 )
 
-func getClientMeta(i int) (rClient.ClientMeta, *MockedConnection) {
+func getClientMeta(i int) (rClient.ClientMeta, *testhelpers.MockedConnection) {
 	// as uuids should be unique, it makes no difference,
 	// if a new one is called here.
 	uuid := uuid.New()
 	name := fmt.Sprintf("id: %d", i)
-	mock := NewMockedConnection()
+	mock := testhelpers.NewMockedConnection()
 	pmock := &mock
 	return rClient.NewClientMeta(uuid, name, pmock), pmock
 }
@@ -89,7 +90,18 @@ func TestHandleReadWhoamiError(t *testing.T) {
 }
 
 func TestHandleReadMovement(t *testing.T) {
+	mIm := testhelpers.SetupMapIterator(t)
+	mapIter := mIm.GetIterator()
+
 	hub := NewHubController()
+	defer hub.Shutdown(context.Background())
+
+	err := hub.NewMap(newMapMeta(mapIter.GetMap()))
+	if err != nil {
+		t.Errorf("Something happend while setting up the map [%s]", err.Error())
+		return
+	}
+
 	cQueue, hQueue := rClient.NewWorkQueue()
 	const otherId uint8 = 2
 	hub.connections[otherId] = hQueue
@@ -154,22 +166,24 @@ func TestHandleReadMovementError(t *testing.T) {
 }
 
 func TestHandleReadDisconnect(t *testing.T) {
+	mIm := testhelpers.SetupMapIterator(t)
+	mI := mIm.GetIterator()
 	hub := NewHubController()
+	defer hub.Shutdown(context.Background())
+	hub.NewMap(newMapMeta(mI.GetMap()))
 
 	cQueue, hQueue := rClient.NewWorkQueue()
 	const otherId uint8 = 2
 	hub.connections[otherId] = hQueue
 
-	client2Meta, mc2 := getClientMeta(2)
-	_, _, _ = setupMock(mc2)
+	client2Meta, _ := getClientMeta(2)
 	hub.RegisterClient(client2Meta)
 
 	_, hQueue = rClient.NewWorkQueue()
 	const userId uint8 = 1
 	hub.connections[userId] = hQueue
 
-	client1Meta, mc1 := getClientMeta(1)
-	_, _, _ = setupMock(mc1)
+	client1Meta, _ := getClientMeta(1)
 
 	hub.RegisterClient(client1Meta)
 
@@ -209,7 +223,14 @@ func TestHandleReadDisconnect(t *testing.T) {
 }
 
 func TestHandleReadDisconnectError(t *testing.T) {
+
+	mIm := testhelpers.SetupMapIterator(t)
+	mI := mIm.GetIterator()
 	hub := NewHubController()
+
+	defer hub.Shutdown(context.Background())
+	hub.NewMap(newMapMeta(mI.GetMap()))
+
 	meta, _ := getClientMeta(1)
 
 	hub.RegisterClient(meta)
@@ -231,7 +252,14 @@ func TestHandleReadDisconnectError(t *testing.T) {
 }
 
 func TestHandleReadShooting(t *testing.T) {
+
+	mIm := testhelpers.SetupMapIterator(t)
+	mI := mIm.GetIterator()
 	hub := NewHubController()
+
+	defer hub.Shutdown(context.Background())
+	hub.NewMap(newMapMeta(mI.GetMap()))
+
 	cQueue, hQueue := rClient.NewWorkQueue()
 	const otherId uint8 = 2
 	hub.connections[otherId] = hQueue
@@ -269,7 +297,14 @@ func TestHandleReadShooting(t *testing.T) {
 }
 
 func TestHandleReadShootingError(t *testing.T) {
+
+	mIm := testhelpers.SetupMapIterator(t)
+	mI := mIm.GetIterator()
 	hub := NewHubController()
+
+	defer hub.Shutdown(context.Background())
+	hub.NewMap(newMapMeta(mI.GetMap()))
+
 	const userId uint8 = 1
 
 	request := []byte{
@@ -292,18 +327,22 @@ func TestHandleReadShootingError(t *testing.T) {
 }
 
 func TestHandleReadRequestOtherPlayer(t *testing.T) {
+
+	mIm := testhelpers.SetupMapIterator(t)
+	mI := mIm.GetIterator()
 	hub := NewHubController()
+
 	defer hub.Shutdown(context.Background())
 
-	client2Meta, mock2 := getClientMeta(2)
-	_, _, _ = setupMock(mock2)
+	hub.NewMap(newMapMeta(mI.GetMap()))
+
+	client2Meta, _ := getClientMeta(2)
 
 	hub.RegisterClient(client2Meta)
 
 	const userId uint8 = 1
 
-	client1Meta, mock1 := getClientMeta(1)
-	_, _, _ = setupMock(mock1)
+	client1Meta, _ := getClientMeta(1)
 
 	hub.RegisterClient(client1Meta)
 
@@ -363,8 +402,13 @@ func TestHandleReadRequestOtherPlayer(t *testing.T) {
 }
 
 func TestHandleReadRequestOtherPlayerError(t *testing.T) {
+
+	mIm := testhelpers.SetupMapIterator(t)
+	mI := mIm.GetIterator()
 	hub := NewHubController()
+
 	defer hub.Shutdown(context.Background())
+	hub.NewMap(newMapMeta(mI.GetMap()))
 
 	const userId uint8 = 1
 
@@ -389,17 +433,19 @@ func TestHandleReadRequestOtherPlayerError(t *testing.T) {
 }
 
 func TestHandleReadRequestPlayerKD(t *testing.T) {
+	mIm := testhelpers.SetupMapIterator(t)
+	mI := mIm.GetIterator()
 	hub := NewHubController()
-	defer hub.Shutdown(context.TODO())
 
-	client2Meta, mock2 := getClientMeta(2)
-	_, _, _ = setupMock(mock2)
+	defer hub.Shutdown(context.Background())
+	hub.NewMap(newMapMeta(mI.GetMap()))
+
+	client2Meta, _ := getClientMeta(2)
 
 	hub.RegisterClient(client2Meta)
 
 	userId2, _ := hub.clientManager.MapId(client2Meta)
-	client1Meta, mock1 := getClientMeta(1)
-	_, _, _ = setupMock(mock1)
+	client1Meta, _ := getClientMeta(1)
 
 	hub.RegisterClient(client1Meta)
 
@@ -451,7 +497,13 @@ func TestHandleReadRequestPlayerKD(t *testing.T) {
 }
 
 func TestHandleReadRequestPlayerKDError(t *testing.T) {
+	mIm := testhelpers.SetupMapIterator(t)
+	mI := mIm.GetIterator()
 	hub := NewHubController()
+
+	defer hub.Shutdown(context.Background())
+	hub.NewMap(newMapMeta(mI.GetMap()))
+
 	client2Meta, _ := getClientMeta(2)
 
 	hub.RegisterClient(client2Meta)

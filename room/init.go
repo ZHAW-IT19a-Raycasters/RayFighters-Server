@@ -5,4 +5,4 @@ import "github.zhaw.ch/raycasters/server/log"
 
 // logger responsible for all the logging
 // happening
-var logger = log.Log()
+var Logger = log.Log()

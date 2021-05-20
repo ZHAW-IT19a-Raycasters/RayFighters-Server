@@ -2,6 +2,7 @@ package setup
 
 import (
 	"errors"
+	"github.zhaw.ch/raycasters/server/room"
 	"io/ioutil"
 	"os"
 	"strings"
@@ -81,7 +82,12 @@ func writeRSAFile(t *testing.T) string {
 func newConfigurationLegal(t *testing.T) Configuration {
 	rsaFile := writeRSAFile(t)
 	logFile := tmpFileSetup(t)
+	mapFile := tmpFileSetup(t)
+	os.WriteFile(mapFile, []byte("[]"), 666)
 	return Configuration{
+		MapConfig: room.MapConfig{
+			JsonPath: mapFile,
+		},
 		Web: webconfig.WebConfig{
 			Ip:   "127.0.0.1",
 			Port: 44,

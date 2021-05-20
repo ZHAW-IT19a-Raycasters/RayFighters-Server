@@ -51,19 +51,46 @@ func NewMapController(filePath string) (MapController, error) {
 	}, nil
 }
 
+// ChangeMap reloads map2d and spawningarea when the map is changing
+func (mc *MapController) ChangeMap(filePath string) (map[uint8]*gamemap.Coordinate, error) {
+	mc.lock.Lock()
+	defer mc.lock.Unlock()
+	logger.Debugf("changing to map [%s]", filePath)
+
+	map2d, err := gamemap.LoadMap2d(filePath)
+	if err != nil {
+		return nil, err
+	}
+	mc.map2d = map2d
+	mc.spawingarea = map2d.GetLegalSpawns()
+
+	for id := range mc.clients {
+		mc.unsafeRandomSpawn(id)
+	}
+
+	return mc.clients, nil
+}
+
 // clientExists will check if the client already exists.
 // Attention this function locks on its own.
 func (mc *MapController) clientExists(id uint8) bool {
 	mc.lock.RLock()
 	defer mc.lock.RUnlock()
+	return mc.unsafeClientExists(id)
+}
+
+// clientExists will check if the client already exists.
+// Attention this function locks on its own.
+func (mc *MapController) unsafeClientExists(id uint8) bool {
 	_, ok := mc.clients[id]
 	return ok
 }
 
 // AddClient will add a new client to the game map
 func (mc *MapController) AddClient(id uint8) (gamemap.Coordinate, error) {
-
-	ok := mc.clientExists(id)
+	mc.lock.Lock()
+	defer mc.lock.Unlock()
+	ok := mc.unsafeClientExists(id)
 	if ok {
 		return gamemap.Coordinate{}, ErrClientExists{
 			id: id,
@@ -92,9 +119,6 @@ func (mc *MapController) unsafeRandomSpawn(id uint8) gamemap.Coordinate {
 	coord := gamemap.NewCoordinate(spawn.X(), spawn.Y(), 0)
 	pCoord := &coord
 
-	mc.lock.Lock()
-	defer mc.lock.Unlock()
-
 	mc.clients[id] = pCoord
 
 	return coord
@@ -102,9 +126,9 @@ func (mc *MapController) unsafeRandomSpawn(id uint8) gamemap.Coordinate {
 
 // RandomSpawn will move a players location as to respawn it into the game.
 func (mc *MapController) RandomSpawn(id uint8) (gamemap.Coordinate, error) {
-	// no lock is needed here as
-	// there the coordinate has
-	// its own.
+	mc.lock.Lock()
+	defer mc.lock.Unlock()
+
 	_, ok := mc.clients[id]
 	if !ok {
 		return gamemap.Coordinate{}, ErrClientDoesNotExist{
@@ -164,7 +188,7 @@ func (mc *MapController) MoveClient(id uint8, x, y, angle float64) (gamemap.Coor
 
 // GetClient will return a the state of a specific client.
 // And if the client could not be found false will be returned
-func (mc *MapController) getClient(id uint8) (gamemap.Coordinate, bool) {
+func (mc *MapController) GetClient(id uint8) (gamemap.Coordinate, bool) {
 	mc.lock.RLock()
 	defer mc.lock.RUnlock()
 	c, ok := mc.clients[id]
@@ -175,7 +199,7 @@ func (mc *MapController) getClient(id uint8) (gamemap.Coordinate, bool) {
 }
 
 func (mc *MapController) GetPosition(userId uint8) (x float64, y float64, ok bool) {
-	c, ok := mc.getClient(userId)
+	c, ok := mc.GetClient(userId)
 	if !ok {
 		return 0, 0, ok
 	}
@@ -183,7 +207,7 @@ func (mc *MapController) GetPosition(userId uint8) (x float64, y float64, ok boo
 }
 
 func (mc *MapController) GetMapCoordinates(userId uint8) (x int, y int, ok bool) {
-	c, ok := mc.getClient(userId)
+	c, ok := mc.GetClient(userId)
 	if !ok {
 		return 0, 0, ok
 	}

@@ -65,7 +65,7 @@ func main() {
 		return
 	}
 
-	server, err := web.NewServer(&conf.Web)
+	server, err := web.NewServer(&conf.Web, &conf.MapConfig)
 	if err != nil {
 		logger.Errorf("unable to start the server due to [%s]", err.Error())
 		return

@@ -7,13 +7,14 @@ import (
 	"net/http"
 	"time"
 
+	"github.zhaw.ch/raycasters/server/room"
+
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 	"github.com/lestrrat-go/jwx/jwt"
 	"github.com/rs/cors"
 	"github.zhaw.ch/raycasters/server/log"
-	"github.zhaw.ch/raycasters/server/room"
 	"github.zhaw.ch/raycasters/server/room/client"
 	"github.zhaw.ch/raycasters/server/web/helpers"
 
@@ -26,37 +27,40 @@ const (
 	serverTimeout       time.Duration = 15 * time.Second
 )
 
+// logger is the logging instance used here.
 var logger = log.Log()
 
 // Server holds all endpoints for a server
 type Server struct {
-	endpoint *http.Server
-	auth     authenticationManager
-	conf     *webconfig.WebConfig
+	auth       authenticationManager
+	endpoint   *http.Server
+	conf       *webconfig.WebConfig
+	hubManager *room.HubManager
 }
 
 // ErrRoomIdUnavailable can be thrown when a room is requested that cannot currently be accessed.
 var ErrRoomIdUnavailable = errors.New("no Room available for the given ID")
 
-// NewServer registers routes for all exposed endpoints
-// and attaches the appropriate routehandler functions
-func NewServer(conf *webconfig.WebConfig) (*Server, error) {
+func setupHubManager(mapConf *room.MapConfig) (*room.HubManager, error) {
 	// instantiate hubs
-	var hubs [hubsCount]*room.Hub
-	var i int = 0
-	for ; i < hubsCount; i++ {
-		hubs[i] = room.NewHub(i)
-		go hubs[i].Run()
-	}
-
-	auth, err := newAuthManager(conf.JWTConfig.RsaPrivateKey)
-
+	hm, err := room.NewHubManager(mapConf.JsonPath)
 	if err != nil {
 		return nil, err
 	}
+	// add all hubs
+	for i := 0; i < hubsCount; i += 1 {
+		err = hm.AddHub(i)
+		if err != nil {
+			return nil, err
+		}
+	}
 
-	// init global jwt decoding
-	jwt.RegisterCustomField("uuid", uuid.UUID{})
+	return &hm, nil
+}
+
+// setupRouter will take care of creating all the needed routes
+// in which the requestes can thnen be handled accordingly.
+func setupRouter(hm *room.HubManager, auth *authenticationManager) (*mux.Router, error) {
 
 	router := mux.NewRouter()
 
@@ -74,10 +78,37 @@ func NewServer(conf *webconfig.WebConfig) (*Server, error) {
 	wsPath := fmt.Sprintf("/ws/{%s:[0-9]+}", helpers.RoomIdParameter)
 
 	api.HandleFunc(wsPath, func(w http.ResponseWriter, r *http.Request) {
-		// TODO: get a hub reference from handler function via HubManager
-		// handle with a wrapper lambda for now
-		serveWs(hubs[:], w, r)
+		//  get a hub reference from handler function via HubManager
+		serveWs(hm, w, r)
 	})
+
+	return router, nil
+}
+
+// NewServer registers routes for all exposed endpoints
+// and attaches the appropriate routehandler functions
+func NewServer(conf *webconfig.WebConfig, mapConfig *room.MapConfig) (*Server, error) {
+
+	hm, err := setupHubManager(mapConfig)
+
+	if err != nil {
+		return nil, err
+	}
+
+	auth, err := newAuthManager(conf.JWTConfig.RsaPrivateKey)
+
+	if err != nil {
+		return nil, err
+	}
+
+	// init global jwt decoding
+	jwt.RegisterCustomField("uuid", uuid.UUID{})
+
+	router, err := setupRouter(hm, &auth)
+
+	if err != nil {
+		return nil, err
+	}
 
 	// handle CORS-requests
 	// see https://de.wikipedia.org/wiki/Cross-Origin_Resource_Sharing
@@ -98,9 +129,10 @@ func NewServer(conf *webconfig.WebConfig) (*Server, error) {
 	}
 
 	return &Server{
-		endpoint: httpServer,
-		auth:     auth,
-		conf:     conf,
+		endpoint:   httpServer,
+		auth:       auth,
+		conf:       conf,
+		hubManager: hm,
 	}, nil
 }
 
@@ -113,6 +145,12 @@ func (p *Server) Start() error {
 
 // ServerStop will initialize a graceful shutdown of the server.
 func (p *Server) ServerStop(ctx context.Context) error {
+
+	err := p.hubManager.Shutdown(ctx)
+	if err != nil {
+		return err
+	}
+
 	return p.endpoint.Shutdown(ctx)
 }
 
@@ -126,18 +164,19 @@ func serveRoot(writer http.ResponseWriter, request *http.Request) {
 // serveWs upgrades HTTP request to WebSocket connection
 // parses desired roomID from the request URL
 // and registers the client to the hub
-func serveWs(hubs []*room.Hub, w http.ResponseWriter, r *http.Request) {
+func serveWs(hm *room.HubManager, w http.ResponseWriter, r *http.Request) {
 
 	logger.Debug("http connection received")
 	roomID, err := helpers.ParseRoomID(r)
 
 	if err != nil {
-		logger.Error(err)
+		logger.Errorf("")
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	if roomID < 0 || roomID >= len(hubs) {
+	hub, err := hm.GetHub(roomID)
+	if err != nil {
 		logger.Debugf("Room [%d] not available", roomID)
 		http.Error(w, ErrRoomIdUnavailable.Error(), http.StatusBadRequest)
 		return
@@ -151,7 +190,7 @@ func serveWs(hubs []*room.Hub, w http.ResponseWriter, r *http.Request) {
 	// this check is in theory not threadsafe as there is a lot time happing
 	// until the connection build up is done, but this can handle some
 	// wrong connection creations, especially under heavy load.
-	if hubs[roomID].Full() {
+	if hub.Full() {
 		logger.Debugf("Room [%d] not available", roomID)
 		http.Error(w, "Room full", http.StatusBadRequest)
 		return
@@ -160,7 +199,7 @@ func serveWs(hubs []*room.Hub, w http.ResponseWriter, r *http.Request) {
 	logger.Debug("correct token received upgrading the connection")
 
 	cm := client.NewClientMeta(user.uid, user.name, nil)
-	state, _ := hubs[roomID].ClientState(cm)
+	state, _ := hub.ClientState(cm)
 	if state == client.Active {
 		s := fmt.Sprintf("client [% X] already is connected to the system", cm.GetId())
 		logger.Debug(s)
@@ -192,7 +231,7 @@ func serveWs(hubs []*room.Hub, w http.ResponseWriter, r *http.Request) {
 	cm = client.NewClientMeta(user.uid, user.name, conn)
 	logger.Debugf("Created client meta for ID [% X]", cm.GetId())
 
-	err = hubs[roomID].RegisterClient(cm)
+	err = hub.RegisterClient(cm)
 
 	if err != nil {
 		logger.Debug("Hub already filled up")
