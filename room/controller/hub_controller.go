@@ -595,49 +595,46 @@ func (hc *HubController) handleRead(data []byte, id uint8) protocol.Bytefy {
 	if len(data) == 0 {
 		return hc.handleUnknown(id)
 	}
-	if !hc.mapChanging.Get() {
-		switch pclient.Detect(data[0]) {
-		case pclient.DisconnectOpcode:
-			// Received a Disconnect request from client
-			return hc.handleDisconnect(data, id)
-		case pclient.WhoAmIOpcode:
-			// Received a WhoAmI request from client
-			return hc.handleWhoAmI(data, id)
-		case pclient.MovementOpcode:
-			// Received a Movement request from client
-			return hc.handleMovement(data, id)
-		case pclient.ShootingOpcode:
-			// Received a Shooting request from client
-			return hc.handleShooting(data, id)
-		case pclient.RequestOtherPlayersOpcode:
-			// Received a RequestOtherPlayers request from client
-			return hc.handleRequestOtherPlayer(data)
-		case pclient.RequestPlayerKDOpcode:
-			// Received a RequestOtherPlayers request from client
-			return hc.handleRequestPlayerKD(data)
-		default:
-			// Received Unknown Code from client
-			return hc.handleUnknown(id)
-		}
-	} else {
-		switch pclient.Detect(data[0]) {
-		case pclient.DisconnectOpcode:
-			// Received a Disconnect request from client
-			return hc.handleDisconnect(data, id)
-		case pclient.WhoAmIOpcode:
-			// Received a WhoAmI request from client
-			return hc.handleWhoAmI(data, id)
-		case pclient.RequestOtherPlayersOpcode:
-			// Received a RequestOtherPlayers request from client
-			return hc.handleRequestOtherPlayer(data)
-		case pclient.RequestPlayerKDOpcode:
-			// Received a RequestOtherPlayers request from client
-			return hc.handleRequestPlayerKD(data)
-		default:
-			// Received Unknown Code from client
-			return hc.handleUnknown(id)
-		}
+
+	// opcodes that always will be processed no matter the state
+	// execution
+	opcode := pclient.Detect(data[0])
+
+	switch opcode {
+	case pclient.DisconnectOpcode:
+		// Received a Disconnect request from client
+		return hc.handleDisconnect(data, id)
+	case pclient.WhoAmIOpcode:
+		// Received a WhoAmI request from client
+		return hc.handleWhoAmI(data, id)
+	case pclient.RequestOtherPlayersOpcode:
+		// Received a RequestOtherPlayers request from client
+		return hc.handleRequestOtherPlayer(data)
+	case pclient.RequestPlayerKDOpcode:
+		// Received a RequestOtherPlayers request from client
+		return hc.handleRequestPlayerKD(data)
+	case pclient.UnknownOpcode:
+		// Received Unknown Code from client
+		return hc.handleUnknown(id)
 	}
+
+	// check if the hub state is
+	// map changing, if so
+	// ignore the message
+	if !hc.mapChanging.Get() {
+		return nil
+	}
+
+	switch opcode {
+	case pclient.MovementOpcode:
+		// Received a Movement request from client
+		return hc.handleMovement(data, id)
+	case pclient.ShootingOpcode:
+		// Received a Shooting request from client
+		return hc.handleShooting(data, id)
+	}
+	// this is an impossible case, but safe is safe
+	return nil
 }
 
 func (hc *HubController) handleUnknown(id uint8) protocol.Bytefy {

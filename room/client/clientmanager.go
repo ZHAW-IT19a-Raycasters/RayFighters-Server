@@ -92,7 +92,7 @@ func (manager *ClientManager) Size() int {
 func (manager *ClientManager) MapId(meta ClientMeta) (uint8, bool) {
 	manager.lock.RLock()
 	defer manager.lock.RUnlock()
-	return manager.mapToInternalId(meta)
+	return manager.unsafeMapToId(meta)
 }
 
 // MapMeta will map the client internal id with the correct meta
@@ -118,11 +118,11 @@ func (manager *ClientManager) mapToExternalMeta(id uint8) (ClientMeta, bool) {
 	return client.meta.GetMeta(), ok
 }
 
-// mapToInternalId is the lock free version to the MapId function,
+// unsafeMapToId is the lock free version to the MapId function,
 // it is intended to be used, with external locking in place as
 // it itself does not lock, but assumes the caller already
 // has one.
-func (manager *ClientManager) mapToInternalId(meta ClientMeta) (uint8, bool) {
+func (manager *ClientManager) unsafeMapToId(meta ClientMeta) (uint8, bool) {
 	id, ok := manager.mapping[meta.id]
 	return id, ok
 }
@@ -187,7 +187,7 @@ func (manager *ClientManager) AddClient(meta ClientMeta, queue ClientQueue, time
 	defer manager.lock.Unlock()
 
 	// check if client ID already exists.
-	if id, ok := manager.mapToInternalId(meta); ok {
+	if id, ok := manager.unsafeMapToId(meta); ok {
 		// the person already existed in the Hub
 		// add him back
 		if client, ok := manager.clients[id]; ok {
@@ -317,8 +317,18 @@ func (manager *ClientManager) Shutdown(cxt context.Context) {
 		close(waiter)
 	}()
 
+	manager.lock.Lock()
+
+	clients := make([]uint8, 0, len(manager.clients))
+
 	// run shutdown on all clients
 	for id := range manager.clients {
+		clients = append(clients, id)
+	}
+
+	manager.lock.Unlock()
+	// run shutdown on all clients
+	for _, id := range clients {
 		meta, ok := manager.mapToExternalMeta(id)
 		if !ok {
 			// if the client already has been removed
