@@ -38,15 +38,15 @@ func parseMap(file io.Reader) ([][]MapElement, error) {
 		return nil, err
 	}
 	// Read the map dimesion and make sure it is positive
-	mapDimesion, err := readMapDimension(scanner)
+	mapDimension, err := readMapDimension(scanner)
 	if err != nil {
 		logger.Errorf(err.Error())
 		return nil, err
 	}
 
 	// Convert map in the file into in gamemap structure
-	locationMap := make([][]MapElement, mapDimesion)
-	for rowIndex := 0; rowIndex < mapDimesion; rowIndex += 1 {
+	locationMap := make([][]MapElement, mapDimension)
+	for rowIndex := 0; rowIndex < mapDimension; rowIndex += 1 {
 		if !scanner.Scan() {
 			logger.Error(ErrMapDimCol)
 			return nil, ErrMapDimCol

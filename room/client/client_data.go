@@ -1,6 +1,7 @@
 package client
 
 import (
+	"github.zhaw.ch/raycasters/server/utils"
 	"sync/atomic"
 
 	"github.com/google/uuid"
@@ -68,9 +69,9 @@ func (p Position) GetY() float64 {
 
 // ClientGame represents the state of the client in the game
 type ClientGame struct {
-	kills     uint32
-	deaths	  uint32
-	position  Position
+	kills    uint32
+	deaths   uint32
+	IsDead	 utils.AtomicBool
 }
 
 // NewClientGame creates the default client object.
@@ -78,7 +79,7 @@ func NewClientGame() ClientGame {
 	return ClientGame{
 		kills:    0,
 		deaths:   0,
-		position: NewPosition(),
+		IsDead:	  utils.NewAtomicBool(false),
 	}
 }
 
@@ -104,15 +105,6 @@ func (cg *ClientGame) IncKills() {
 // death counter by one
 func (cg *ClientGame) IncDeaths() {
 	atomic.AddUint32(&cg.deaths, 1)
-}
-
-func (cg *ClientGame) GetPosition() Position {
-	return cg.position
-}
-
-func (cg *ClientGame) MovePlayer(x float64, y float64) {
-	cg.position.x += x
-	cg.position.y += y
 }
 
 // ClientMeta contains the shared meta information of a
@@ -141,6 +133,10 @@ func (cm ClientMeta) GetId() uuid.UUID {
 // GetName will return the client name
 func (cm ClientMeta) GetName() string {
 	return cm.name
+}
+
+func (cm *ClientMeta) Close() {
+	cm.conn.Close()
 }
 
 // clientInternalMeta is the internal representation of a client meta

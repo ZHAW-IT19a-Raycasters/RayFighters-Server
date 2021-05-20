@@ -14,21 +14,38 @@ import (
 )
 
 // logFile is the file, where to the logs shall be logged to
-const logFile string = "logs.txt"
+// const logFile string = "logs.txt"
 
 // the system logger
 var logger = log.Log()
 
-func setupLogger() error {
+// setupLogger will configure the logger
+func setupLogger(conf setup.LoggerConfig) error {
 	b := log.NewBuilder()
 
 	// register file handler
-	fh := log.NewFileHandler(log.Info, logFile)
-	b.RegisterHandler(fh)
+
+	// this error is impossible to get as incorrect
+	// configuration should be stoped before
+	// the programm arrives here
+	lv, _ := log.LevelDetect(conf.File.Level)
+
+	fh := log.NewFileHandler(lv, conf.File.FilePath)
+	err := b.RegisterHandler(fh)
+
+	// there might have been an error while
+	// opening the file
+	if err != nil {
+		return err
+	}
 
 	// register console handler
-	ch := log.NewConsoleHandler(log.Debug)
-	b.RegisterHandler(ch)
+	lv, _ = log.LevelDetect(conf.Console.Level)
+	ch := log.NewConsoleHandler(lv)
+
+	// new console handler will never return an error
+	// on registraction.
+	_ = b.RegisterHandler(ch)
 
 	return b.Build()
 }
@@ -41,13 +58,18 @@ func main() {
 		return
 	}
 
-	err := setupLogger()
+	err := setupLogger(conf.Logger)
 
 	if err != nil {
+		fmt.Println(err.Error())
 		return
 	}
 
-	server := web.NewServer(&conf.Web)
+	server, err := web.NewServer(&conf.Web)
+	if err != nil {
+		logger.Errorf("unable to start the server due to [%s]", err.Error())
+		return
+	}
 
 	done := make(chan struct{})
 	ctx := context.Background()

@@ -94,6 +94,13 @@ func (h *Hub) Full() bool {
 	return h.controller.IsFull()
 }
 
+// ClientState checks for the current client state.
+// Attention this allows a meta object, where the
+// connection is nil.
+func (h *Hub) ClientState(meta client.ClientMeta) (client.ConnectionStatus, bool) {
+	return h.controller.ClientState(meta)
+}
+
 // RegisterClient will use the meta information given
 // by the parameter to check if the player
 func (h *Hub) RegisterClient(meta client.ClientMeta) error {
@@ -101,13 +108,16 @@ func (h *Hub) RegisterClient(meta client.ClientMeta) error {
 	// if the client does not have an entry in the
 	// manager, then the player count has to be
 	// incremented.
-	if !h.controller.ClientExists(meta) {
+	_, ok := h.ClientState(meta)
+	if !ok {
 		// increment the counter
 		// if the counter already is maxed out
 		// this will return an error
 		err := h.controller.Acquire()
 
 		if err != nil {
+			// close the connection
+			logger.Debug("hub already full")
 			return ErrHubIsFull
 		}
 
@@ -136,7 +146,6 @@ func (h *Hub) Run() error {
 	// add two runners
 	h.wg.Add(workerCount)
 
-	// go h.runTimer()
 	go h.runRegistration()
 
 	return nil
@@ -151,11 +160,24 @@ func (h *Hub) runRegistration() {
 		h.isActive.SetFalse()
 	}()
 
+	register := func(meta client.ClientMeta) error {
+		logger.Debugf("Adding a new player to hub [%d]", h.id)
+		err := h.controller.RegisterClient(meta)
+		if err != nil {
+			meta.Close()
+			logger.Debugf("unable to register client because [%s]", err.Error())
+		}
+		return err
+	}
+
 	for {
 		select {
 		case meta := <-h.input:
-			logger.Debugf("Adding a new player to hub [%d]", h.id)
-			h.controller.RegisterClient(meta)
+			if !h.isActive.Get() {
+				meta.Close()
+				return
+			}
+			register(meta)
 		case <-h.shutdown:
 			logger.Infof("Shutting down hub [%d]", h.id)
 			return

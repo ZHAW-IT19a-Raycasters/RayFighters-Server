@@ -48,6 +48,7 @@ type packageQueue struct {
 // newPackageQueue will create a new package queue with which to
 // communicate.
 func newPackageQueue(in, out chan protocol.Package, running chan struct{}, active, drain *utils.AtomicBool) packageQueue {
+	logger.Debugf("using queue [%p]", running)
 	return packageQueue{
 		running:    running,
 		isActive:   active,
@@ -59,7 +60,7 @@ func newPackageQueue(in, out chan protocol.Package, running chan struct{}, activ
 
 // Enqueue will put the package onto the out queue, so that the
 // counter part can use, for work.
-func (pq packageQueue) Enqueue(data protocol.Package) error {
+func (pq *packageQueue) Enqueue(data protocol.Package) error {
 	if !pq.isActive.Get() {
 		return ErrQueueClosed
 	} else if pq.isDraining.Get() {
@@ -75,7 +76,7 @@ func (pq packageQueue) Enqueue(data protocol.Package) error {
 // the paired until will be received.
 // Attention use this function inside of a select, or
 // else this function will block all your executions.
-func (pq packageQueue) Dequeue() (protocol.Package, error) {
+func (pq *packageQueue) Dequeue() (protocol.Package, error) {
 	if pq.isDraining.Get() {
 		return nil, ErrQueueIsDraining
 	}
@@ -92,7 +93,7 @@ func (pq packageQueue) Dequeue() (protocol.Package, error) {
 // return them.
 // Attention this is an exclusive access call, so that
 // no other caller can use the queue while this is draining
-func (pq packageQueue) DequeueDrain() ([]protocol.Package, error) {
+func (pq *packageQueue) DequeueDrain() ([]protocol.Package, error) {
 	// get exclusive access to the queue
 	if !pq.isDraining.SetTrue() {
 		return nil, ErrQueueIsDraining
@@ -116,10 +117,11 @@ func (pq packageQueue) DequeueDrain() ([]protocol.Package, error) {
 
 // Shutdown will shutdown the transmissions.
 // Once they shutdown there is no way to restart them.
-func (pq packageQueue) Shutdown() {
+func (pq *packageQueue) Shutdown() {
 	if !pq.isActive.SetFalse() {
 		return
 	}
+	logger.Debugf("shutting down queue [%p]", pq.running)
 	close(pq.running)
 }
 

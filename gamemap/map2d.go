@@ -12,8 +12,8 @@ type Map2d struct {
 
 // Error codes returned by failures in gamemap.
 var (
-	ErrMap2dIndx  = errors.New("map2d: index out of bound")
-	ErrMap2dNotSq = errors.New("map2d: invalid map dimension")
+	ErrorIndexOutOfBound = errors.New("map2d: index out of bound")
+	ErrorMapIsNotSquared = errors.New("map2d: invalid map dimension")
 )
 
 // LoadMap2d loads map from given path and wraps it into ingame abstraction.
@@ -24,12 +24,12 @@ func LoadMap2d(filePath string) (Map2d, error) {
 		return Map2d{}, err
 	}
 	if !isSquared(map2dSlice) {
-		return Map2d{}, ErrMap2dNotSq
+		return Map2d{}, ErrorMapIsNotSquared
 	}
 	return newMap2d(len(map2dSlice), map2dSlice), nil
 }
 
-// newMap2d is inpackage convinience function for creatin Map2d using passed parameters.
+// newMap2d is package convenience function for creating Map2d using passed parameters.
 func newMap2d(mDim int, lMap [][]MapElement) Map2d {
 	return Map2d{dim: mDim, map2d: lMap}
 }
@@ -40,7 +40,9 @@ func (map2d *Map2d) MapElementAt(x int, y int) MapElement {
 	if x >= d || y >= d || x < 0 || y < 0 {
 		return Floor
 	}
-	return map2d.map2d[x][y]
+	// as per definition seen in
+	// https://github.zhaw.ch/raycasters/docs/wiki/Map
+	return map2d.map2d[y][x]
 }
 
 // GetMapDimension returns map dimension
@@ -57,23 +59,52 @@ func (map2d *Map2d) Compare(other *Map2d) bool {
 	return equals2d(map2d.map2d, other.map2d)
 }
 
+// GetLegalSpawns will generate an array of legaly usable spawns
 func (map2d *Map2d) GetLegalSpawns() []Coordinate {
 	counter := 0
-	for _, x := range map2d.map2d  {
-		for _, y := range x {
-			if y != Wall {
-				counter+=1
+
+	// check how many elements have to be allocated
+	for y := map2d.dim - 1; y > -1; y -= 1 {
+		for x := map2d.dim - 1; x > -1; x -= 1 {
+			if map2d.MapElementAt(y, x) != Wall {
+				counter += 1
 			}
 		}
 	}
 
-	res := make([]Coordinate, 0, counter)
-	for i, x := range map2d.map2d  {
-		for j, y := range x {
-			if y != Wall {
-				res = append(res, NewCoordinate(float64(i), float64(j), 0))
+	// allocate memory
+	legalSpawns := make([]Coordinate, 0, counter)
+
+	// fill up
+	for y := map2d.dim - 1; y > -1; y -= 1 {
+		for x := map2d.dim - 1; x > -1; x -= 1 {
+			if map2d.MapElementAt(y, x) != Wall {
+				legalSpawns = append(legalSpawns, NewCoordinate(float64(x), float64(y), 0))
 			}
 		}
 	}
-	return res
+	return legalSpawns
+}
+
+// IsPenetrable true if a bullet can pass through it
+func (map2d *Map2d) IsPenetrable(x int, y int) bool {
+	elem := map2d.MapElementAt(x, y)
+	return elem != Wall
+}
+
+// NewFlatMap2d creates squared 2D-map without walls
+func NewFlatMap2d(mapDimension int) Map2d {
+	map2d := make([][]MapElement, mapDimension)
+	for i := range map2d {
+		map2d[i] = make([]MapElement, mapDimension)
+		for j := range map2d[i] {
+			map2d[i][j] = Floor
+		}
+	}
+	return newMap2d(mapDimension, map2d)
+}
+
+// SetMapElement will put given MapElement at given Location
+func (map2d *Map2d) SetMapElement(x, y int, mapElement MapElement) {
+	map2d.map2d[y][x] = mapElement
 }

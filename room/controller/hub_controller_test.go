@@ -160,15 +160,16 @@ func TestHandleReadDisconnect(t *testing.T) {
 	const otherId uint8 = 2
 	hub.connections[otherId] = hQueue
 
-	client2Meta, _ := getClientMeta(2)
-
+	client2Meta, mc2 := getClientMeta(2)
+	_, _, _ = setupMock(mc2)
 	hub.RegisterClient(client2Meta)
 
 	_, hQueue = rClient.NewWorkQueue()
 	const userId uint8 = 1
 	hub.connections[userId] = hQueue
 
-	client1Meta, _ := getClientMeta(1)
+	client1Meta, mc1 := getClientMeta(1)
+	_, _, _ = setupMock(mc1)
 
 	hub.RegisterClient(client1Meta)
 
@@ -292,13 +293,17 @@ func TestHandleReadShootingError(t *testing.T) {
 
 func TestHandleReadRequestOtherPlayer(t *testing.T) {
 	hub := NewHubController()
-	client2Meta, _ := getClientMeta(2)
+	defer hub.Shutdown(context.Background())
+
+	client2Meta, mock2 := getClientMeta(2)
+	_, _, _ = setupMock(mock2)
 
 	hub.RegisterClient(client2Meta)
 
 	const userId uint8 = 1
 
-	client1Meta, _ := getClientMeta(1)
+	client1Meta, mock1 := getClientMeta(1)
+	_, _, _ = setupMock(mock1)
 
 	hub.RegisterClient(client1Meta)
 
@@ -359,6 +364,7 @@ func TestHandleReadRequestOtherPlayer(t *testing.T) {
 
 func TestHandleReadRequestOtherPlayerError(t *testing.T) {
 	hub := NewHubController()
+	defer hub.Shutdown(context.Background())
 
 	const userId uint8 = 1
 
@@ -366,7 +372,8 @@ func TestHandleReadRequestOtherPlayerError(t *testing.T) {
 		client.RequestOtherPlayersOpcode.Value(),
 		0x01,
 	}
-	actual := hub.handleRead(request, userId)
+	rawActual := hub.handleRead(request, userId)
+	actual := rawActual.Bytes()
 	expected := []byte{
 		server.UnknownOpcode.Value(),
 	}
@@ -376,7 +383,7 @@ func TestHandleReadRequestOtherPlayerError(t *testing.T) {
 		return
 	}
 
-	if !compareByteArrays(expected, actual.Bytes(), t) {
+	if !compareByteArrays(expected, actual, t) {
 		t.Errorf("Happend in Request other Players Error")
 	}
 }
@@ -385,13 +392,15 @@ func TestHandleReadRequestPlayerKD(t *testing.T) {
 	hub := NewHubController()
 	defer hub.Shutdown(context.TODO())
 
-	client2Meta, _ := getClientMeta(2)
+	client2Meta, mock2 := getClientMeta(2)
+	_, _, _ = setupMock(mock2)
 
 	hub.RegisterClient(client2Meta)
 
 	userId2, _ := hub.clientManager.MapId(client2Meta)
+	client1Meta, mock1 := getClientMeta(1)
+	_, _, _ = setupMock(mock1)
 
-	client1Meta, _ := getClientMeta(1)
 	hub.RegisterClient(client1Meta)
 
 	userId1, _ := hub.clientManager.MapId(client1Meta)
@@ -417,6 +426,7 @@ func TestHandleReadRequestPlayerKD(t *testing.T) {
 		t.Error("there should be a returned value on Send All PlayersKD request")
 		return
 	}
+
 	actualBytes := actual.Bytes()
 	var expected1 [12]byte
 	var expected2 [12]byte

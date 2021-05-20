@@ -11,7 +11,7 @@ import (
 // ClientTimeout says the maximal time a client
 // may not have an active connection to the
 // system, before beeing removed from it.
-const ClientTimeout = 5 * time.Second // is a var so that it can be used for testing.
+const ClientTimeout = 5 * time.Second
 
 // getTime is the function that will return the
 // current time.
@@ -23,7 +23,7 @@ var getTime = time.Now
 // a timeout would be repeatedly timeout.
 var ErrAlreadyTimeout = errors.New("this client is already timed out")
 
-// TimerData is the struct holding all the
+// timerData is the struct holding all the
 // information needed to handle all the
 // timeouts
 type timerData struct {
@@ -31,24 +31,24 @@ type timerData struct {
 	from time.Time
 }
 
+// newTimoutData will return a new TimerData instance.
+func newTimoutData(id uint8) timerData {
+	return timerData{
+		id:   id,
+		from: getTime(),
+	}
+}
+
 // GetId will return the id, of the
 // timed out client.
-func (td *timerData) GetItem() interface{} {
+func (td timerData) GetItem() interface{} {
 	return td.id
 }
 
 // GetTime will return the moment
 // this timeout has been registered.
-func (td *timerData) GetTime() time.Time {
+func (td timerData) GetTime() time.Time {
 	return td.from
-}
-
-// newTimeData will return a new TimerData instance.
-func newTimeData(id uint8) timerData {
-	return timerData{
-		id:   id,
-		from: getTime(),
-	}
 }
 
 // ClientTimer is the timer queue used by the
@@ -67,7 +67,7 @@ func (ct *ClientTimer) RegisterTimeout() error {
 		return ErrAlreadyTimeout
 	}
 
-	ct.sender(newTimeData(ct.id))
+	ct.sender(newTimoutData(ct.id))
 
 	return nil
 }
@@ -88,16 +88,16 @@ func newClientTimer(id uint8, sender func(timerData)) ClientTimer {
 	}
 }
 
-// HubTimer is the parent handler for any timeouts
+// HubTimeoutHandler is the parent handler for any timeouts
 // registered by clients.
-type HubTimer struct {
+type HubTimeoutHandler struct {
 	callback  func(id uint8)
 	baseTimer utils.BaseTimer
 }
 
 // NewHubTimer will create a new hub timer instance.
-func NewHubTimer(bufferSize int, callback func(id uint8)) HubTimer {
-	ht := HubTimer{
+func NewHubTimer(bufferSize int, callback func(id uint8)) HubTimeoutHandler {
+	ht := HubTimeoutHandler{
 		callback: callback,
 	}
 
@@ -105,7 +105,7 @@ func NewHubTimer(bufferSize int, callback func(id uint8)) HubTimer {
 		// as this function can only be called
 		// from the given context of the
 		// ItemTimer the element will always
-		// be a gamemap.MapCoordinate
+		// be a uint8
 		id, _ := elem.(uint8)
 		ht.callback(id)
 	}
@@ -116,20 +116,20 @@ func NewHubTimer(bufferSize int, callback func(id uint8)) HubTimer {
 }
 
 // Run will run the timer instance
-func (ht *HubTimer) Run() error {
+func (ht *HubTimeoutHandler) Run() error {
 	return ht.baseTimer.Run()
 }
 
 // Shutdown will shutdown the timer
-func (ht *HubTimer) Shutdown(cxt context.Context) error {
+func (ht *HubTimeoutHandler) Shutdown(cxt context.Context) error {
 	return ht.baseTimer.Shutdown(cxt)
 }
 
 // NewClientTimer will create a new client timer
 // connected to this hub timer.
-func (ht *HubTimer) NewClientTimer(id uint8) ClientTimer {
+func (ht *HubTimeoutHandler) NewClientTimer(id uint8) ClientTimer {
 	sender := func(td timerData) {
-		ht.baseTimer.Enqueue(&td)
+		ht.baseTimer.Enqueue(td)
 	}
 	return newClientTimer(id, sender)
 }
