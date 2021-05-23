@@ -52,21 +52,6 @@ type Position struct {
 	y float64
 }
 
-func NewPosition() Position {
-	return Position{
-		x: 0,
-		y: 0,
-	}
-}
-
-func (p Position) GetX() float64 {
-	return p.x
-}
-
-func (p Position) GetY() float64 {
-	return p.y
-}
-
 // ClientGame represents the state of the client in the game
 type ClientGame struct {
 	kills     uint32
