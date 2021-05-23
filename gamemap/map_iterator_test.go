@@ -3,6 +3,7 @@ package gamemap
 import (
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -57,13 +58,13 @@ func TestGetMap(t *testing.T) {
 	expected1 := MapMeta{
 		id: 0,
 		name: "Super gritty city backyard",
-		filePath: os.TempDir() + "maps/city_yard.txt",
+		filePath: filepath.Join(os.TempDir() + "maps/city_yard.txt"),
 	}
 
 	expected2 := MapMeta{
 		id: 1,
 		name: "Desert",
-		filePath: os.TempDir() + "maps/desert.txt",
+		filePath: filepath.Join(os.TempDir() + "maps/desert.txt"),
 	}
 
 	if compareMapMeta(&expected1, mi.GetMap(), t) {
