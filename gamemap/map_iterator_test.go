@@ -25,7 +25,6 @@ func compareMapMeta(expected, actual *MapMeta, t *testing.T) bool {
 	}
 	return false
 }
-// TODO: ask Adrian
 
 func TestGetMap(t *testing.T) {
 	file, err := ioutil.TempFile(os.TempDir(), "tempfile")
@@ -113,13 +112,13 @@ func TestNewMapIteratorManager(t *testing.T) {
 	expected1 := MapMeta{
 		id: 0,
 		name: "Super gritty city backyard",
-		filePath: os.TempDir() + "maps/city_yard.txt",
+		filePath: filepath.Join(os.TempDir() + "maps/city_yard.txt"),
 	}
 
 	expected2 := MapMeta{
 		id: 1,
 		name: "Desert",
-		filePath: os.TempDir() + "maps/desert.txt",
+		filePath: filepath.Join(os.TempDir() + "maps/desert.txt"),
 	}
 
 	if compareMapMeta(&expected1, <- mim.maps, t) {
@@ -167,7 +166,6 @@ func TestWrongJson(t *testing.T) {
 }
 
 func TestReadJSON(t *testing.T) {
-	// TODO: ask Adrian
 	json := "[" +
 		"{" +
 		"\"id\": 0," +
