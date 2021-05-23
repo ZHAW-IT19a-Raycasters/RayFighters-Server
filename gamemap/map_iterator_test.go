@@ -57,13 +57,13 @@ func TestGetMap(t *testing.T) {
 	expected1 := MapMeta{
 		id: 0,
 		name: "Super gritty city backyard",
-		filePath: filepath.Join(os.TempDir() + "maps/city_yard.txt"),
+		filePath: filepath.Join(os.TempDir() + "/maps/city_yard.txt"),
 	}
 
 	expected2 := MapMeta{
 		id: 1,
 		name: "Desert",
-		filePath: filepath.Join(os.TempDir() + "maps/desert.txt"),
+		filePath: filepath.Join(os.TempDir() + "/maps/desert.txt"),
 	}
 
 	if compareMapMeta(&expected1, mi.GetMap(), t) {
@@ -112,13 +112,13 @@ func TestNewMapIteratorManager(t *testing.T) {
 	expected1 := MapMeta{
 		id: 0,
 		name: "Super gritty city backyard",
-		filePath: filepath.Join(os.TempDir() + "maps/city_yard.txt"),
+		filePath: filepath.Join(os.TempDir() + "/maps/city_yard.txt"),
 	}
 
 	expected2 := MapMeta{
 		id: 1,
 		name: "Desert",
-		filePath: filepath.Join(os.TempDir() + "maps/desert.txt"),
+		filePath: filepath.Join(os.TempDir() + "/maps/desert.txt"),
 	}
 
 	if compareMapMeta(&expected1, <- mim.maps, t) {
