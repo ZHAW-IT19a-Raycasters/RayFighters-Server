@@ -55,14 +55,14 @@ func TestGetMap(t *testing.T) {
 	mi := mim.GetIterator()
 
 	expected1 := MapMeta{
-		id: 0,
-		name: "Super gritty city backyard",
+		id:       0,
+		name:     "Super gritty city backyard",
 		filePath: filepath.Join(os.TempDir() + "/maps/city_yard.txt"),
 	}
 
 	expected2 := MapMeta{
-		id: 1,
-		name: "Desert",
+		id:       1,
+		name:     "Desert",
 		filePath: filepath.Join(os.TempDir() + "/maps/desert.txt"),
 	}
 
@@ -76,7 +76,6 @@ func TestGetMap(t *testing.T) {
 		return
 	}
 }
-
 
 func TestNewMapIteratorManager(t *testing.T) {
 	file, err := ioutil.TempFile(os.TempDir(), "tempfile")
@@ -92,14 +91,14 @@ func TestNewMapIteratorManager(t *testing.T) {
 
 	file.WriteString("[" +
 		"{" +
-			"\"id\": 0," +
-			"\"name\": \"Super gritty city backyard\"," +
-			"\"filePath\": \"maps/city_yard.txt\"" +
+		"\"id\": 0," +
+		"\"name\": \"Super gritty city backyard\"," +
+		"\"filePath\": \"maps/city_yard.txt\"" +
 		"}," +
 		"{" +
-			"\"id\": 1," +
-			"\"name\": \"Desert\"," +
-			"\"filePath\": \"maps/desert.txt\"" +
+		"\"id\": 1," +
+		"\"name\": \"Desert\"," +
+		"\"filePath\": \"maps/desert.txt\"" +
 		"}]")
 
 	mim, err := NewMapIteratorManager(file.Name())
@@ -109,30 +108,60 @@ func TestNewMapIteratorManager(t *testing.T) {
 		return
 	}
 
+	if mim.GetFilePath() != file.Name() {
+		t.Error("FilePath was set wrong in NewMapIterator")
+	}
+
 	expected1 := MapMeta{
-		id: 0,
-		name: "Super gritty city backyard",
+		id:       0,
+		name:     "Super gritty city backyard",
 		filePath: filepath.Join(os.TempDir() + "/maps/city_yard.txt"),
 	}
 
 	expected2 := MapMeta{
-		id: 1,
-		name: "Desert",
+		id:       1,
+		name:     "Desert",
 		filePath: filepath.Join(os.TempDir() + "/maps/desert.txt"),
 	}
 
-	if compareMapMeta(&expected1, <- mim.maps, t) {
+	// get both expected values
+	iter := mim.GetIterator()
+	got1 := iter.GetMap()
+	got2 := iter.GetMap()
+	got3 := iter.GetMap()
+	got4 := iter.GetMap()
+
+	// be sure the id is correct, as due to de marchaling the order is random
+	if got1.GetId() != 0 {
+		tmp := got1
+		got1 = got2
+		got2 = tmp
+
+		tmp = got3
+		got3 = got4
+		got4 = tmp
+	}
+
+	if compareMapMeta(&expected1, got1, t) {
 		t.Error("Error in first Map Iteration")
 		return
 	}
 
-	if compareMapMeta(&expected2, <- mim.maps, t) {
+	if compareMapMeta(&expected2, got2, t) {
 		t.Error("Error in second Map Iteration")
 		return
 	}
 
-	if mim.GetFilePath() != file.Name() {
-		t.Error("FilePath was set wrong in NewMapIterator")
+	// as the system wraps around test of got3 is equals to got1
+	if compareMapMeta(got1, got3, t) {
+		t.Error("Error while wrapping around")
+		return
+	}
+
+	// as the system wraps around test of got3 is equals to got1
+	if compareMapMeta(got2, got4, t) {
+		t.Error("Error while wrapping around")
+		return
 	}
 }
 
