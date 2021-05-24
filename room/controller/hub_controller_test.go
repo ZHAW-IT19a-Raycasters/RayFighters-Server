@@ -280,6 +280,51 @@ func TestHandleReadShooting(t *testing.T) {
 	}
 
 	if actual != nil {
+		t.Error("there should not be a returned value on shooting player")
+		return
+	}
+
+	gotten, err := cQueue.Dequeue()
+
+	if err != nil {
+		t.Errorf("An unexepected error happend\n[%s]", err.Error())
+		return
+	}
+
+	if !compareByteArrays(expected, gotten, t) {
+		t.Errorf("Happend in Shooting")
+	}
+}
+
+func TestHandleReadShootingHit(t *testing.T) {
+
+	mIm := testhelpers.SetupMapIterator(t)
+	mI := mIm.GetIterator()
+	hub := NewHubController()
+
+	defer hub.Shutdown(context.Background())
+	hub.NewMap(newMapMeta(mI.GetMap()))
+
+	cQueue, hQueue := rClient.NewWorkQueue()
+	const otherId uint8 = 2
+	hub.connections[otherId] = hQueue
+
+	_, hQueue = rClient.NewWorkQueue()
+	const userId uint8 = 1
+	hub.connections[userId] = hQueue
+
+	request := []byte{
+		client.ShootingOpcode.Value(),
+		0x00, 0x00, 0x00, 0x00, 0x00, 0xD0, 0x84, 0x40,
+	}
+	actual := hub.handleRead(request, userId)
+	expected := []byte{
+		server.ShootingPlayerOpcode.Value(),
+		1,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0xD0, 0x84, 0x40,
+	}
+
+	if actual != nil {
 		t.Error("there should not be a returned value on movement player")
 		return
 	}
@@ -530,5 +575,88 @@ func TestHandleReadRequestPlayerKDError(t *testing.T) {
 
 	if !compareByteArrays(expected, actual.Bytes(), t) {
 		t.Errorf("Happend in Request other Players KD Error")
+	}
+}
+
+func TestRespawnPlayer(t *testing.T) {
+	mIm := testhelpers.SetupMapIterator(t)
+	mI := mIm.GetIterator()
+	hub := NewHubController()
+
+	defer hub.Shutdown(context.Background())
+	hub.NewMap(newMapMeta(mI.GetMap()))
+
+	client2Meta, _ := getClientMeta(2)
+
+	hub.RegisterClient(client2Meta)
+
+	const userId uint8 = 1
+
+	client1Meta, _ := getClientMeta(1)
+
+	hub.RegisterClient(client1Meta)
+
+	hub.clientManager.GetPlayer(userId)
+
+	err := hub.respawnPlayer(userId)
+
+	if err != nil {
+		t.Error("respawnPlayer returned an error")
+	}
+}
+
+func TestRespawnPlayerError(t *testing.T) {
+	mIm := testhelpers.SetupMapIterator(t)
+	mI := mIm.GetIterator()
+	hub := NewHubController()
+
+	defer hub.Shutdown(context.Background())
+	hub.NewMap(newMapMeta(mI.GetMap()))
+
+	client2Meta, _ := getClientMeta(2)
+
+	hub.RegisterClient(client2Meta)
+
+	const userId uint8 = 1
+
+	client1Meta, _ := getClientMeta(1)
+
+	hub.RegisterClient(client1Meta)
+
+	hub.clientManager.GetPlayer(userId)
+
+	hub.Shutdown(context.TODO())
+
+	err := hub.respawnPlayer(userId)
+
+	if err != ErrHubControllerOffline {
+		t.Error("respawnPlayer should return an ErrHubControllerOffline")
+	}
+}
+
+func TestNewMap(t *testing.T) {
+	mIm := testhelpers.SetupMapIterator(t)
+	mI := mIm.GetIterator()
+	hub := NewHubController()
+
+	defer hub.Shutdown(context.Background())
+	hub.NewMap(newMapMeta(mI.GetMap()))
+
+	client2Meta, _ := getClientMeta(2)
+
+	hub.RegisterClient(client2Meta)
+
+	const userId uint8 = 1
+
+	client1Meta, _ := getClientMeta(1)
+
+	hub.RegisterClient(client1Meta)
+
+	hub.clientManager.GetPlayer(userId)
+
+	err := hub.NewMap(newMapMeta(mI.GetMap()))
+
+	if err != nil {
+		t.Error("NewMap returned an error even if it")
 	}
 }

@@ -66,7 +66,7 @@ func (map2d *Map2d) GetLegalSpawns() []Coordinate {
 	// check how many elements have to be allocated
 	for y := map2d.dim - 1; y > -1; y -= 1 {
 		for x := map2d.dim - 1; x > -1; x -= 1 {
-			if map2d.MapElementAt(y, x) != Wall {
+			if map2d.MapElementAt(x, y) != Wall {
 				counter += 1
 			}
 		}
@@ -78,7 +78,7 @@ func (map2d *Map2d) GetLegalSpawns() []Coordinate {
 	// fill up
 	for y := map2d.dim - 1; y > -1; y -= 1 {
 		for x := map2d.dim - 1; x > -1; x -= 1 {
-			if map2d.MapElementAt(y, x) != Wall {
+			if map2d.MapElementAt(x, y) != Wall {
 				legalSpawns = append(legalSpawns, NewCoordinate(float64(x), float64(y), 0))
 			}
 		}
