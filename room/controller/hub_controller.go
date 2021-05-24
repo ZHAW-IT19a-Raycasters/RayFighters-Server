@@ -45,15 +45,6 @@ type HubController struct {
 	// the currently killed players so that they
 	// can be reborn once the timeout runs out.
 	respawnHandler client.HubRespawnHandler
-
-	// TODO: remove legacy code
-	// timeoutItemQueue stores the currently timeout map elements
-	// so that they can be respawned once the timeout runs out.
-	/** timeoutItemQueue items.ItemTimer**/
-	// timeoutItemQueue stores the currently timeout map elements
-	// so that they can be respawned once the timeout runs out.
-	// timeoutMapQueue MapTimer
-
 	// mapChanging will be set True when the Map is being reloaded
 	// so we know when to reset everything to restart the game
 	mapChanging utils.AtomicBool
@@ -110,9 +101,6 @@ func NewHubController() *HubController {
 
 	hc.timeoutClientQueue = client.NewHubTimer(helpers.IdCountLimit, cTimeoutCallback)
 
-	// TODO: handle error
-	hc.timeoutClientQueue.Run()
-
 	// client respawn callbacks
 	cRespawnCallback := func(id uint8) {
 		if !hc.isActive.Get() {
@@ -128,10 +116,15 @@ func NewHubController() *HubController {
 
 	hc.respawnHandler = client.NewHubRespawnHandler(helpers.IdCountLimit, cRespawnCallback)
 
-	// TODO: handle error
-	hc.respawnHandler.Run()
-
 	return &hc
+}
+
+func (hc *HubController) run() error {
+	err := hc.timeoutClientQueue.Run()
+	if err != nil {
+		return err
+	}
+	return hc.respawnHandler.Run()
 }
 
 func (hc *HubController) NewMap(mapMeta mapTimeMeta) error {
@@ -334,7 +327,6 @@ func (hc *HubController) RegisterClient(meta client.ClientMeta) error {
 		return ErrHubControllerOffline
 	}
 
-	// TODO: register in the game state (if it is a new connection)
 	logger.Debugf("registering client in hub [%s]", meta.GetId().String())
 
 	// prepare the queues
@@ -518,7 +510,6 @@ func (hc *HubController) removeClient(meta client.ClientMeta) error {
 	_ = hc.Release()
 
 	return nil
-	// defer
 }
 
 // BroadCast will as the name implies broadcast a given
