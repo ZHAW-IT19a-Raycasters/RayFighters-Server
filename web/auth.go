@@ -155,12 +155,7 @@ func (auth *authenticationManager) AuthConnection() (HandleFunc func(w http.Resp
 		if isValidCookie {
 			// we already checked if the token is valid
 			oldCreds, err := parseUserInformation(w, r)
-			if err != nil {
-
-			} else if oldCreds.name == creds.Username {
-				// token is still valid
-				return
-			} else {
+			if !(err != nil || oldCreds.name == creds.Username) {
 				uuidVal = oldCreds.uid.String()
 			}
 		}
@@ -219,7 +214,6 @@ func (auth *authenticationManager) createCookie(creds *Credentials, uuidStr stri
 		return nil, err
 	}
 
-	// TODO: expiry time?
 	return &http.Cookie{
 		Name:     JwtCookieName,
 		Value:    string(signed[:]),

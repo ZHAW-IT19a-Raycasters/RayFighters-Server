@@ -52,6 +52,10 @@ func TestGetMap(t *testing.T) {
 
 	mim, err := NewMapIteratorManager(file.Name())
 
+	if err != nil {
+		t.Error("Error occurred in NewMapIteratorManager")
+		return
+	}
 	mi := mim.GetIterator()
 
 	expected1 := MapMeta{

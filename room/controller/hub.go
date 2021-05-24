@@ -150,6 +150,13 @@ func (h *Hub) Run() error {
 		return ErrHubIsAlreadyRunning
 	}
 
+	// start the controller
+	err := h.controller.run()
+	if err != nil {
+		h.isActive.SetFalse()
+		return err
+	}
+
 	// add two runners
 	h.wg.Add(workerCount)
 
