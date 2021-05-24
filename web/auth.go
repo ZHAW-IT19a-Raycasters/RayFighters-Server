@@ -132,14 +132,6 @@ func (auth *authenticationManager) AuthConnection() (HandleFunc func(w http.Resp
 		// there is no valid cookie
 		isValidCookie := auth.checkIfCookieValid(r) == nil
 
-		// not getting an error here means that the
-		// user already is authenticated.
-		// if isValidCookie {
-		// 	// check case that there is a
-		// 	// need to change the name
-		// 	return
-		// }
-
 		var creds Credentials
 		err := parseToCredentialsFromJSON(&creds, r.Body)
 
