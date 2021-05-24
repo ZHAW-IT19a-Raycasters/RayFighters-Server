@@ -731,9 +731,6 @@ func (hc *HubController) handleShooting(t []byte, shooterId uint8) protocol.Byte
 		hc.gameState.IncDeaths(victimId)
 		hc.gameState.IncKill(shooterId)
 
-		hc.gameState.IncDeaths(victimId)
-		hc.gameState.IncKill(shooterId)
-
 		// register the dead player for respawn
 		hc.respawnHandler.RegisterRespawn(victimId)
 	}
