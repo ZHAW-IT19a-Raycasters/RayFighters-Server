@@ -327,6 +327,9 @@ func (hc *HubController) RegisterClient(meta client.ClientMeta) error {
 		return ErrHubControllerOffline
 	}
 
+	// run the client computations
+	hc.wg.Add(1)
+
 	logger.Debugf("registering client in hub [%s]", meta.GetId().String())
 
 	// prepare the queues
@@ -343,6 +346,7 @@ func (hc *HubController) RegisterClient(meta client.ClientMeta) error {
 
 	// something went wrong while adding the client
 	if err != nil {
+		hc.wg.Done()
 		return err
 	}
 
@@ -375,6 +379,7 @@ func (hc *HubController) RegisterClient(meta client.ClientMeta) error {
 
 	coord, err := hc.mapController.AddClient(id)
 	if err != nil {
+		hc.wg.Done()
 		return err
 	}
 
@@ -384,9 +389,6 @@ func (hc *HubController) RegisterClient(meta client.ClientMeta) error {
 	hc.lock.Lock()
 	hc.connections[id] = hqueue
 	hc.lock.Unlock()
-
-	// run the client computations
-	hc.wg.Add(1)
 
 	go func() {
 		defer hc.wg.Done()
