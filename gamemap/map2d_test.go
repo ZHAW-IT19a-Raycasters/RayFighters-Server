@@ -233,31 +233,31 @@ func TestMap2dGetLegalSpawn(t *testing.T) {
 		{
 			name: "WallWithMedkit",
 			data: [][]MapElement{
-				{Floor, Floor, Floor, Floor},
-				{Wall, Wall, Medkit, Wall},
-				{Floor, Floor, Floor, Floor},
-				{Floor, Floor, Floor, Floor},
+						{Floor, Wall, Floor, Floor},
+						{Floor, Wall, Floor, Floor},
+						{Floor, Medkit, Floor, Floor},
+						{Floor, Wall, Floor, Floor},
+					},
+				exp: []Coordinate{
+					NewCoordinate(3, 3, 0),
+					NewCoordinate(2, 3, 0),
+					// NewCoordinate(1, 3, 0), => Wall
+					NewCoordinate(0, 3, 0),
+					NewCoordinate(3, 2, 0),
+					NewCoordinate(2, 2, 0),
+					NewCoordinate(1, 2, 0), // => MedKit
+					NewCoordinate(0, 2, 0),
+					NewCoordinate(3, 1, 0),
+					NewCoordinate(2, 1, 0),
+					// NewCoordinate(1, 1, 0), => Wall
+					NewCoordinate(0, 1, 0),
+					NewCoordinate(3, 0, 0),
+					NewCoordinate(2, 0, 0),
+					// NewCoordinate(1, 0, 0), => Wall
+					NewCoordinate(0, 0, 0),
+				},
 			},
-			exp: []Coordinate{
-				NewCoordinate(3, 3, 0),
-				NewCoordinate(2, 3, 0),
-				// NewCoordinate(1, 3, 0), => Wall
-				NewCoordinate(0, 3, 0),
-				NewCoordinate(3, 2, 0),
-				NewCoordinate(2, 2, 0),
-				NewCoordinate(1, 2, 0), // => MedKit
-				NewCoordinate(0, 2, 0),
-				NewCoordinate(3, 1, 0),
-				NewCoordinate(2, 1, 0),
-				// NewCoordinate(1, 1, 0), => Wall
-				NewCoordinate(0, 1, 0),
-				NewCoordinate(3, 0, 0),
-				NewCoordinate(2, 0, 0),
-				// NewCoordinate(1, 0, 0), => Wall
-				NewCoordinate(0, 0, 0),
-			},
-		},
-	}
+		}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -273,3 +273,77 @@ func TestMap2dGetLegalSpawn(t *testing.T) {
 		})
 	}
 }
+/*
+func TestLegalSpawns(t *testing.T) {
+	maps := `Super gritty city backyard
+assets/sceneries/skyline.jpg
+
+#303030;#010101
+#000000;32;0.5
+32
+11111111111111111111111111111111
+10000000000000000000000000000001
+10222222222300000322222222002221
+10200000000300000300000002000001
+10200000000000000000000002222001
+10200000000000000000000002002001
+10200000000000000000000002002001
+10200000300300300300300330002001
+10000000355555555555555300002001
+10200000300300300300300333333001
+10200000000000000000000000000001
+10000000000000000000000000000001
+10000000000050000000000000000201
+10200000000000000000000000000201
+10200000000000000000000500000201
+10200000000000000000000000000201
+10252525200025252520000000000201
+10200000000000000050000000000201
+10200000000000000020000005000201
+10200000000000000050000000000201
+10000000000000000020000000000201
+10000000000000000050000000000201
+10200000000000000020000000000001
+10200000000000000050000000000001
+10252525252525250520000000000001
+10200000000000020522222222222201
+10200000000000020000000000000201
+10200000000000020000000000000201
+10200000000000000000000000000201
+10220022222222222200000000022201
+10000000000000020000000000000001
+11111111111111111111111111111111
+5
+1 = assets/walls/fence_high.png
+2 = assets/walls/concrete.jpg
+3 = assets/walls/concrete_neon_pink.jpg
+4 = assets/walls/concrete_neon_blue.jpg
+5 = assets/walls/slate_pink.jpg`
+	tmpFile, err := ioutil.TempFile("", "surreal.txt")
+	if err != nil {
+		t.Error("Problem making Tempfile")
+		return
+	}
+
+	if tmpFile == nil {
+		t.Error("Tempfile == nil")
+		return
+	}
+
+	tmpFile.WriteString(maps)
+
+	map2d, err := LoadMap2d(tmpFile.Name())
+
+	if err != nil {
+		t.Error("Broke")
+		return
+	}
+	spawns := map2d.GetLegalSpawns()
+
+	t.Log(spawns)
+
+	for spawn := range spawns {
+		t.Logf("%f - %f", spawns[spawn].X(), spawns[spawn].Y())
+	}
+}
+*/
