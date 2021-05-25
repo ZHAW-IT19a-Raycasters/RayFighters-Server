@@ -65,7 +65,7 @@ var (
 )
 ```
 
-## func [CheckIfCORSDomainValid](<https://github.zhaw.ch/raycasters/server/blob/master/web/config/helpers.go#L294>)
+## func [CheckIfCORSDomainValid](<https://github.zhaw.ch/raycasters/server/blob/master/web/config/helpers.go#L296>)
 
 ```go
 func CheckIfCORSDomainValid(domain string) error
@@ -97,11 +97,13 @@ func CheckIfPortValid(rawValue string, allowed []int) error
 
 Checks if a port is valid or not
 
-## func [CheckIfRSAValid](<https://github.zhaw.ch/raycasters/server/blob/master/web/config/helpers.go#L235>)
+## func [CheckIfRSAValid](<https://github.zhaw.ch/raycasters/server/blob/master/web/config/helpers.go#L237>)
 
 ```go
 func CheckIfRSAValid(path string) error
 ```
+
+CheckIfRSAValid will check if the file given by the path is valid according to the internal requirements\.
 
 ## type [CORSConfig](<https://github.zhaw.ch/raycasters/server/blob/master/web/config/init.go#L60-L62>)
 
@@ -111,11 +113,13 @@ type CORSConfig struct {
 }
 ```
 
-### func \(\*CORSConfig\) [CheckConfiguration](<https://github.zhaw.ch/raycasters/server/blob/master/web/config/init.go#L64>)
+### func \(\*CORSConfig\) [CheckConfiguration](<https://github.zhaw.ch/raycasters/server/blob/master/web/config/init.go#L65>)
 
 ```go
 func (c *CORSConfig) CheckConfiguration() error
 ```
+
+CheckConfiguration satisfies the CheckConfig interface\.
 
 ## type [ErrInvalidCORSConfiguration](<https://github.zhaw.ch/raycasters/server/blob/master/web/config/helpers.go#L64-L66>)
 
@@ -133,7 +137,7 @@ type ErrInvalidCORSConfiguration struct {
 func (err ErrInvalidCORSConfiguration) Error() string
 ```
 
-Error satisfies the errorri equirements\.
+Error satisfies the error requirements\.
 
 ### func \(ErrInvalidCORSConfiguration\) [Is](<https://github.zhaw.ch/raycasters/server/blob/master/web/config/helpers.go#L74>)
 
@@ -149,7 +153,7 @@ Is satisfies the errors\.Is requirements\.
 func (err ErrInvalidCORSConfiguration) Unwrap() error
 ```
 
-Unwrap satisfies the errors\.Unrap requirements\.
+Unwrap satisfies the errors\.Unwrap requirements\.
 
 ## type [ErrUnableToParseUserHome](<https://github.zhaw.ch/raycasters/server/blob/master/web/config/helpers.go#L88-L91>)
 
@@ -167,7 +171,7 @@ type ErrUnableToParseUserHome struct {
 func (err ErrUnableToParseUserHome) Error() string
 ```
 
-Error satisfies the errorri equirements\.
+Error satisfies the error requirements\.
 
 ### func \(ErrUnableToParseUserHome\) [Is](<https://github.zhaw.ch/raycasters/server/blob/master/web/config/helpers.go#L99>)
 
@@ -223,7 +227,7 @@ The error interface
 
 ## type [InvalidRSAKeyPath](<https://github.zhaw.ch/raycasters/server/blob/master/web/config/helpers.go#L135-L138>)
 
-InvalidRSAKeyPath is the error returend when there is no such RSA private key file found\.
+InvalidRSAKeyPath is the error returned when there is no such RSA private key file found\.
 
 ```go
 type InvalidRSAKeyPath struct {
@@ -274,7 +278,7 @@ CheckConfiguration checks if the Jwt configuration is valid\.
 
 ## type [WebConfig](<https://github.zhaw.ch/raycasters/server/blob/master/web/config/init.go#L8-L17>)
 
-The configuration for the webserver
+The configuration for the web server
 
 ```go
 type WebConfig struct {

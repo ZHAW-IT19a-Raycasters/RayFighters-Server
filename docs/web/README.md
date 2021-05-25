@@ -19,6 +19,12 @@ import "github.zhaw.ch/raycasters/server/web"
   - [func (err ErrNoCookie) Error() string](<#func-errnocookie-error>)
 - [type ErrParseCookie](<#type-errparsecookie>)
   - [func (err ErrParseCookie) Error() string](<#func-errparsecookie-error>)
+- [type ErrUsernameInvalidLength](<#type-errusernameinvalidlength>)
+  - [func (err ErrUsernameInvalidLength) Error() string](<#func-errusernameinvalidlength-error>)
+  - [func (err ErrUsernameInvalidLength) Is(target error) bool](<#func-errusernameinvalidlength-is>)
+- [type ErrUsernameInvalidUtf8](<#type-errusernameinvalidutf8>)
+  - [func (err ErrUsernameInvalidUtf8) Error() string](<#func-errusernameinvalidutf8-error>)
+  - [func (err ErrUsernameInvalidUtf8) Is(target error) bool](<#func-errusernameinvalidutf8-is>)
 - [type Server](<#type-server>)
   - [func NewServer(conf *webconfig.WebConfig, mapConfig *room.MapConfig) (*Server, error)](<#func-newserver>)
   - [func (p *Server) ServerStop(ctx context.Context) error](<#func-server-serverstop>)
@@ -29,10 +35,19 @@ import "github.zhaw.ch/raycasters/server/web"
 
 ```go
 const (
+    // JwtCookieName is the actual token name visible in the browser.
     JwtCookieName string = "token"
-    JwtUserName   string = "username"
-    JwtUUID       string = "uuid"
+    // JwtUsername is the defined jwt identifier for the name.
+    JwtUserName string = "username"
+    // JwtUUID is the defined jwt identifier for the uuid.
+    JwtUUID string = "uuid"
 )
+```
+
+MaxUsernameLength is the defined maximal length supported in utf\-8 runes
+
+```go
+const MaxUsernameLength = 255
 ```
 
 ## Variables
@@ -43,7 +58,7 @@ ErrRoomIdUnavailable can be thrown when a room is requested that cannot currentl
 var ErrRoomIdUnavailable = errors.New("no Room available for the given ID")
 ```
 
-## type [Credentials](<https://github.zhaw.ch/raycasters/server/blob/master/web/auth.go#L71-L73>)
+## type [Credentials](<https://github.zhaw.ch/raycasters/server/blob/master/web/auth.go#L33-L35>)
 
 Create a struct to read the username and password from the request body
 
@@ -53,9 +68,9 @@ type Credentials struct {
 }
 ```
 
-## type [ErrAuthManagerFailure](<https://github.zhaw.ch/raycasters/server/blob/master/web/auth.go#L50-L52>)
+## type [ErrAuthManagerFailure](<https://github.zhaw.ch/raycasters/server/blob/master/web/helpers.go#L29-L31>)
 
-ErrAuthManagerFailour is the error that is returned once there is an authentication error of any kind\.
+ErrAuthManagerFailure is the error that is returned once there is an authentication error of any kind\.
 
 ```go
 type ErrAuthManagerFailure struct {
@@ -63,7 +78,7 @@ type ErrAuthManagerFailure struct {
 }
 ```
 
-### func \(ErrAuthManagerFailure\) [Error](<https://github.zhaw.ch/raycasters/server/blob/master/web/auth.go#L55>)
+### func \(ErrAuthManagerFailure\) [Error](<https://github.zhaw.ch/raycasters/server/blob/master/web/helpers.go#L34>)
 
 ```go
 func (err ErrAuthManagerFailure) Error() string
@@ -71,7 +86,7 @@ func (err ErrAuthManagerFailure) Error() string
 
 Error satisfies the error interface
 
-### func \(ErrAuthManagerFailure\) [Is](<https://github.zhaw.ch/raycasters/server/blob/master/web/auth.go#L60>)
+### func \(ErrAuthManagerFailure\) [Is](<https://github.zhaw.ch/raycasters/server/blob/master/web/helpers.go#L39>)
 
 ```go
 func (err ErrAuthManagerFailure) Is(target error) bool
@@ -79,7 +94,7 @@ func (err ErrAuthManagerFailure) Is(target error) bool
 
 Is satisfies the errors\.Is interface
 
-### func \(ErrAuthManagerFailure\) [Unwrap](<https://github.zhaw.ch/raycasters/server/blob/master/web/auth.go#L66>)
+### func \(ErrAuthManagerFailure\) [Unwrap](<https://github.zhaw.ch/raycasters/server/blob/master/web/helpers.go#L45>)
 
 ```go
 func (err ErrAuthManagerFailure) Unwrap() error
@@ -87,7 +102,7 @@ func (err ErrAuthManagerFailure) Unwrap() error
 
 Unwrap satisfies the errors\.Unwrap functionality\.
 
-## type [ErrNoCookie](<https://github.zhaw.ch/raycasters/server/blob/master/web/auth.go#L38-L41>)
+## type [ErrNoCookie](<https://github.zhaw.ch/raycasters/server/blob/master/web/helpers.go#L17-L20>)
 
 ErrParseCookie is the error that happens on a parse error
 
@@ -97,7 +112,7 @@ type ErrNoCookie struct {
 }
 ```
 
-### func \(ErrNoCookie\) [Error](<https://github.zhaw.ch/raycasters/server/blob/master/web/auth.go#L44>)
+### func \(ErrNoCookie\) [Error](<https://github.zhaw.ch/raycasters/server/blob/master/web/helpers.go#L23>)
 
 ```go
 func (err ErrNoCookie) Error() string
@@ -105,7 +120,7 @@ func (err ErrNoCookie) Error() string
 
 Error satisfies the error interface
 
-## type [ErrParseCookie](<https://github.zhaw.ch/raycasters/server/blob/master/web/auth.go#L27-L30>)
+## type [ErrParseCookie](<https://github.zhaw.ch/raycasters/server/blob/master/web/helpers.go#L6-L9>)
 
 ErrParseCookie is the error that happens on a parse error
 
@@ -115,7 +130,7 @@ type ErrParseCookie struct {
 }
 ```
 
-### func \(ErrParseCookie\) [Error](<https://github.zhaw.ch/raycasters/server/blob/master/web/auth.go#L33>)
+### func \(ErrParseCookie\) [Error](<https://github.zhaw.ch/raycasters/server/blob/master/web/helpers.go#L12>)
 
 ```go
 func (err ErrParseCookie) Error() string
@@ -123,7 +138,59 @@ func (err ErrParseCookie) Error() string
 
 Error satisfies the error interface
 
-## type [Server](<https://github.zhaw.ch/raycasters/server/blob/master/web/router.go#L34-L39>)
+## type [ErrUsernameInvalidLength](<https://github.zhaw.ch/raycasters/server/blob/master/web/helpers.go#L68-L71>)
+
+ErrUsernameInvalidLength is the error that is returned once the username is of invalid length\, such as 0 or longer then 255\.
+
+```go
+type ErrUsernameInvalidLength struct {
+    // contains filtered or unexported fields
+}
+```
+
+### func \(ErrUsernameInvalidLength\) [Error](<https://github.zhaw.ch/raycasters/server/blob/master/web/helpers.go#L74>)
+
+```go
+func (err ErrUsernameInvalidLength) Error() string
+```
+
+Error satisfies the error interface
+
+### func \(ErrUsernameInvalidLength\) [Is](<https://github.zhaw.ch/raycasters/server/blob/master/web/helpers.go#L79>)
+
+```go
+func (err ErrUsernameInvalidLength) Is(target error) bool
+```
+
+Is satisfies the errors\.Is interface
+
+## type [ErrUsernameInvalidUtf8](<https://github.zhaw.ch/raycasters/server/blob/master/web/helpers.go#L51-L53>)
+
+ErrUsernameInvalidUtf8 is the error that is returned once there is an invalid rune in the given user name\.
+
+```go
+type ErrUsernameInvalidUtf8 struct {
+    // contains filtered or unexported fields
+}
+```
+
+### func \(ErrUsernameInvalidUtf8\) [Error](<https://github.zhaw.ch/raycasters/server/blob/master/web/helpers.go#L56>)
+
+```go
+func (err ErrUsernameInvalidUtf8) Error() string
+```
+
+Error satisfies the error interface
+
+### func \(ErrUsernameInvalidUtf8\) [Is](<https://github.zhaw.ch/raycasters/server/blob/master/web/helpers.go#L61>)
+
+```go
+func (err ErrUsernameInvalidUtf8) Is(target error) bool
+```
+
+Is satisfies the errors\.Is interface
+
+## type [Server](<https://github.zhaw.ch/raycasters/server/blob/master/web/router.go#L35-L40>)
 
 Server holds all endpoints for a server
 
@@ -133,15 +200,15 @@ type Server struct {
 }
 ```
 
-### func [NewServer](<https://github.zhaw.ch/raycasters/server/blob/master/web/router.go#L90>)
+### func [NewServer](<https://github.zhaw.ch/raycasters/server/blob/master/web/router.go#L93>)
 
 ```go
 func NewServer(conf *webconfig.WebConfig, mapConfig *room.MapConfig) (*Server, error)
 ```
 
-NewServer registers routes for all exposed endpoints and attaches the appropriate routehandler functions
+NewServer registers routes for all exposed endpoints and attaches the appropriate route handler functions
 
-### func \(\*Server\) [ServerStop](<https://github.zhaw.ch/raycasters/server/blob/master/web/router.go#L147>)
+### func \(\*Server\) [ServerStop](<https://github.zhaw.ch/raycasters/server/blob/master/web/router.go#L150>)
 
 ```go
 func (p *Server) ServerStop(ctx context.Context) error
@@ -149,7 +216,7 @@ func (p *Server) ServerStop(ctx context.Context) error
 
 ServerStop will initialize a graceful shutdown of the server\.
 
-### func \(\*Server\) [Start](<https://github.zhaw.ch/raycasters/server/blob/master/web/router.go#L141>)
+### func \(\*Server\) [Start](<https://github.zhaw.ch/raycasters/server/blob/master/web/router.go#L144>)
 
 ```go
 func (p *Server) Start() error
