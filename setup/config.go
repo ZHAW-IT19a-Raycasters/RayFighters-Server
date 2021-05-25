@@ -2,8 +2,9 @@ package setup
 
 import (
 	"fmt"
-	"github.zhaw.ch/raycasters/server/room"
 	"reflect"
+
+	"github.zhaw.ch/raycasters/server/room"
 
 	webconfig "github.zhaw.ch/raycasters/server/web/config"
 )
@@ -18,13 +19,13 @@ const (
 // As per definition if there is a config file in here
 // It must implement the CheckConfig interface.
 type Configuration struct {
-	MapConfig   room.MapConfig		`toml:"Map"`
-	Web    		webconfig.WebConfig `toml:"Webconfig"`
-	Logger 		LoggerConfig        `toml:"Logging"`
+	MapConfig room.MapConfig      `toml:"Map"`
+	Web       webconfig.WebConfig `toml:"Webconfig"`
+	Logger    LoggerConfig        `toml:"Logging"`
 }
 
 // CheckIfConfigIsLegal will check that the configurated values are legal
-// Attention this function uses reflextion in a recursive loop and will
+// Attention this function uses reflection in a recursive loop and will
 // panic if any struct inside of configuration do not implement
 // the CheckConfig interface.
 func CheckIfConfigIsLegal(conf *Configuration) error {
@@ -83,7 +84,7 @@ func checkIfConfigCaseStruct(valRaw reflect.Value, valInt interface{}) error {
 
 	// first make a copy of the object type (fake pointer)
 	valRawPtr := reflect.New(reflect.TypeOf(valInt))
-	// second add to the object the subobject
+	// second add to the object the sub object
 	// (makes a pointer out of the raw object type)
 	valRawPtr.Elem().Set(reflect.ValueOf(valInt))
 
@@ -101,7 +102,7 @@ func checkIfConfigCaseStruct(valRaw reflect.Value, valInt interface{}) error {
 	return checkIfConfigRunCheck(checkAble, valRaw)
 }
 
-// checkIfConfigHandleElement will handle the actuall reflected values
+// checkIfConfigHandleElement will handle the actual reflected values
 // so that they can be processed as required.
 func checkIfConfigHandleElement(valRaw reflect.Value) error {
 
@@ -130,11 +131,11 @@ func checkIfConfigHandleElement(valRaw reflect.Value) error {
 		return err
 	}
 
-	// recurse over the checked value
+	// recurs over the checked value
 	return checkIfConfigRecurse(valInt)
 }
 
-// checkIfConfigRecurse will check if the valuies
+// checkIfConfigRecurse will check if the values
 func checkIfConfigRecurse(val interface{}) error {
 
 	// prepare the system

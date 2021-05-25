@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-// rawLogger is the most innner data structure
+// rawLogger is the most inner data structure
 // that does directly interact with the
 // underlying logger structure.
 type rawLogger struct {
@@ -49,14 +49,14 @@ func (log *rawLogger) checkLevel(level Level) bool {
 }
 
 func (log *rawLogger) prepateBuilder(level Level) *bytes.Buffer {
-	// using a string builder for faster concatination
+	// using a string builder for faster concatenation
 	builder := log.bPool.Get().(*bytes.Buffer)
 	builder.Reset()
 	// calculate the base size of the builder
-	// to avoid some unneded allocations
+	// to avoid some unneeded allocations
 	size := 0
 
-	size += 2 + 30           // formated date time
+	size += 2 + 30           // formatted date time
 	size += 1                // spacing between date and level
 	size += 2 + maxPrefixLen // prefix like [DEBUG] plus size padding
 	size += 1                // spacing between base and prefix

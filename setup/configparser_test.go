@@ -2,11 +2,12 @@ package setup
 
 import (
 	"errors"
-	"github.zhaw.ch/raycasters/server/room"
 	"io/ioutil"
 	"os"
 	"strings"
 	"testing"
+
+	"github.zhaw.ch/raycasters/server/room"
 
 	"github.com/pelletier/go-toml"
 	webconfig "github.zhaw.ch/raycasters/server/web/config"
@@ -83,7 +84,7 @@ func newConfigurationLegal(t *testing.T) Configuration {
 	rsaFile := writeRSAFile(t)
 	logFile := tmpFileSetup(t)
 	mapFile := tmpFileSetup(t)
-	os.WriteFile(mapFile, []byte("[]"), 666)
+	os.WriteFile(mapFile, []byte("[]"), 0666)
 	return Configuration{
 		MapConfig: room.MapConfig{
 			JsonPath: mapFile,

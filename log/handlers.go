@@ -5,11 +5,18 @@ import (
 	"os"
 )
 
+// WriterHandler is a handler used as a base for
+// for any io.Writer loggers.
 type WriterHandler struct {
+	// level is the level limit
 	level Level
-	out   io.Writer
+	// out is the exit point to which
+	// the logs are propagated.
+	out io.Writer
 }
 
+// NewWriterHandler will create a new writer handler
+// based on the writer parameter.
 func NewWriterHandler(level Level, writer io.Writer) WriterHandler {
 	return WriterHandler{
 		level: level,
@@ -17,21 +24,28 @@ func NewWriterHandler(level Level, writer io.Writer) WriterHandler {
 	}
 }
 
+// Build will create the internal logger handler
+// that can then be added to the system.
 func (wh WriterHandler) Build() (LogHandler, error) {
 	return newRawLogger(wh.level, wh.out), nil
 
 }
 
+// ConsoleHandler will log to the console.
 type ConsoleHandler struct {
 	WriterHandler
 }
 
+// NewConsoleHandler will create a new console handler
+// and set it up to log the given level on.
 func NewConsoleHandler(level Level) ConsoleHandler {
 	return ConsoleHandler{
 		WriterHandler: NewWriterHandler(level, os.Stdout),
 	}
 }
 
+// FileHandler is the handler struct for logging to
+// the file system.
 type FileHandler struct {
 	// openFile is the os functionality used for opening files.
 	// The function is stored here so that it is possible to mock
@@ -39,9 +53,12 @@ type FileHandler struct {
 	openFile func() (*os.File, error)
 	// fileName where to the log will be stored to
 	fileName string
-	level    Level
+	// level is the level limit
+	level Level
 }
 
+// NewFileHandler will create and open if needed a
+// logging file on the file system.
 func NewFileHandler(level Level, fileName string) FileHandler {
 	return FileHandler{
 		fileName: fileName,
@@ -52,14 +69,21 @@ func NewFileHandler(level Level, fileName string) FileHandler {
 	}
 }
 
+// Level will return the minimal level the handler
+// log from.
 func (fh FileHandler) Level() Level {
 	return fh.level
 }
 
+// FileName will return the file location to which
+// the log handler will propagate the logs to.
 func (fh FileHandler) FileName() string {
 	return fh.fileName
 }
 
+// Build will create the actual logging instance.
+// And if needed create the file on the file system
+// as well.
 func (fh FileHandler) Build() (LogHandler, error) {
 	out, err := fh.openFile()
 	if err != nil {
