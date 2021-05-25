@@ -45,7 +45,7 @@ func NewConsoleHandler(level Level) ConsoleHandler {
 }
 
 // FileHandler is the handler struct for logging to
-// the filesystem.
+// the file system.
 type FileHandler struct {
 	// openFile is the os functionality used for opening files.
 	// The function is stored here so that it is possible to mock
@@ -58,7 +58,7 @@ type FileHandler struct {
 }
 
 // NewFileHandler will create and open if needed a
-// logging file on the filesystem.
+// logging file on the file system.
 func NewFileHandler(level Level, fileName string) FileHandler {
 	return FileHandler{
 		fileName: fileName,
@@ -81,8 +81,8 @@ func (fh FileHandler) FileName() string {
 	return fh.fileName
 }
 
-// Build will create the actuall logging instance.
-// And if needed create the file on the filesystem
+// Build will create the actual logging instance.
+// And if needed create the file on the file system
 // as well.
 func (fh FileHandler) Build() (LogHandler, error) {
 	out, err := fh.openFile()
