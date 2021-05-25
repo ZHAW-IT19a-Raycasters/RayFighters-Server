@@ -22,10 +22,11 @@ import (
 )
 
 const (
-	hubsCount           int           = 3
-	websocketBufferSize int           = 1024
-	serverTimeout       time.Duration = 15 * time.Second
+	hubsCount           int = 3
+	websocketBufferSize int = 1024
 )
+
+const serverTimeout time.Duration = 15 * time.Second
 
 // logger is the logging instance used here.
 var logger = log.Log()
@@ -41,6 +42,8 @@ type Server struct {
 // ErrRoomIdUnavailable can be thrown when a room is requested that cannot currently be accessed.
 var ErrRoomIdUnavailable = errors.New("no Room available for the given ID")
 
+// setupHubManager is a helper function that will setup the hub manager
+// and all its child hubs.
 func setupHubManager(mapConf *room.MapConfig) (*room.HubManager, error) {
 	// instantiate hubs
 	hm, err := room.NewHubManager(mapConf.JsonPath)
@@ -59,7 +62,7 @@ func setupHubManager(mapConf *room.MapConfig) (*room.HubManager, error) {
 }
 
 // setupRouter will take care of creating all the needed routes
-// in which the requestes can thnen be handled accordingly.
+// in which the requests can then be handled accordingly.
 func setupRouter(hm *room.HubManager, auth *authenticationManager) (*mux.Router, error) {
 
 	router := mux.NewRouter()
@@ -86,7 +89,7 @@ func setupRouter(hm *room.HubManager, auth *authenticationManager) (*mux.Router,
 }
 
 // NewServer registers routes for all exposed endpoints
-// and attaches the appropriate routehandler functions
+// and attaches the appropriate route handler functions
 func NewServer(conf *webconfig.WebConfig, mapConfig *room.MapConfig) (*Server, error) {
 
 	hm, err := setupHubManager(mapConfig)
@@ -187,7 +190,7 @@ func serveWs(hm *room.HubManager, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// this check is in theory not threadsafe as there is a lot time happing
+	// this check is in theory not threadsafe as there is a lot time happening
 	// until the connection build up is done, but this can handle some
 	// wrong connection creations, especially under heavy load.
 	if hub.Full() {
@@ -207,7 +210,7 @@ func serveWs(hm *room.HubManager, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// upgrade HTTP to Websocket connection
+	// upgrade HTTP to websocket connection
 	var upgrader = websocket.Upgrader{
 		ReadBufferSize:  websocketBufferSize,
 		WriteBufferSize: websocketBufferSize,
