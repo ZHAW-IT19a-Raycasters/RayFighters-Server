@@ -36,7 +36,7 @@ func (lg *internalLogger) copy(from []LogHandler) error {
 	}
 
 	// copying the slice, so that there is no change
-	// of changing anything after assigment
+	// of changing anything after assignment
 	lg.handlers = make([]LogHandler, len(from))
 	copy(lg.handlers, from)
 
@@ -58,7 +58,7 @@ func (lg *internalLogger) log(level Level, v ...interface{}) {
 	lg.lock.RLock()
 	defer lg.lock.RUnlock()
 	// this is valid as if the handler array is nil
-	// it is translated to be of lenght zero, so
+	// it is translated to be of length zero, so
 	// this loop will do nothing
 	for _, handler := range lg.handlers {
 		handler.log(level, v...)
@@ -70,7 +70,7 @@ func (lg *internalLogger) logf(level Level, format string, v ...interface{}) {
 	lg.lock.RLock()
 	defer lg.lock.RUnlock()
 	// this is valid as if the handler array is nil
-	// it is translated to be of lenght zero, so
+	// it is translated to be of length zero, so
 	// this loop will do nothing
 	for _, handler := range lg.handlers {
 		handler.logf(level, format, v...)

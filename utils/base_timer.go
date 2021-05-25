@@ -18,7 +18,7 @@ var (
 
 // ElementInterface is the interface needed for satisfying
 // the base timer abstraction.
-// Please do only use this struture correctly abstracted.
+// Please do only use this structure correctly abstracted.
 // So that there can never actually be an incorrect
 // casting.
 type ElementInterface interface {
@@ -31,7 +31,7 @@ type ElementInterface interface {
 // Attention never use this struct on it's
 // own rather embed it in a wrapper type
 // in which safe abstractions around the
-// raw interfact channel and callback
+// raw interface channel and callback
 // are build.
 type BaseTimer struct {
 	callback    func(elem interface{})
@@ -87,8 +87,8 @@ func (t *BaseTimer) Run() error {
 	return nil
 }
 
-// runTimer is the actuall function used for the timer.
-// It handles runnin the callback function for the queued
+// runTimer is the actual function used for the timer.
+// It handles running the callback function for the queued
 // up element once the specified time has run out.
 func (t *BaseTimer) runTimer() {
 	defer t.wg.Done()
@@ -98,7 +98,7 @@ func (t *BaseTimer) runTimer() {
 	// make sure the timer is expired
 	<-timerHandler.C
 
-	// temporily save the current client to wait for
+	// temporarily save the current client to wait for
 	var currentWaiter ElementInterface
 
 	for {
