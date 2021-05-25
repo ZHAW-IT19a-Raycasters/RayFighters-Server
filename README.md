@@ -1,6 +1,6 @@
-[![Build status](https://ci.cloudlab.zhaw.ch/api/projects/status/5llpgt4pyiqwyo0p/branch/master?svg=true)](https://ci.cloudlab.zhaw.ch/project/fuerbsev/server/branch/master)
-# RayFighers Multiplayer Server
 
+# RayFighers Multiplayer Server
+[![Build status](https://ci.cloudlab.zhaw.ch/api/projects/status/5llpgt4pyiqwyo0p/branch/master?svg=true)](https://ci.cloudlab.zhaw.ch/project/fuerbsev/server/branch/master)
 ## Getting Started
 
 Make sure you have a working version of go.
