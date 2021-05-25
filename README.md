@@ -10,7 +10,7 @@ Make sure you have a working version of go.
 
 ## Documentation
 
-For in-depth information on the different components of the server and how they interact with each other check the [Server Wiki](https://github.zhaw.ch/raycasters/docs/wiki/Server).
+For in-depth information on the different components of the server and how they interact with each other check the [Wiki Home](https://github.zhaw.ch/raycasters/docs/wiki) or the [Server Wiki](https://github.zhaw.ch/raycasters/docs/wiki/Server).
 
 ### Miscellaneous
 [Quality Gate Status](http://160.85.252.133:9000/dashboard?id=PM4_RayCaster_Game_Server)
