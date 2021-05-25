@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -140,6 +141,21 @@ func (manager *ClientManager) GetClientStatus(id uint8) (ConnectionStatus, bool)
 	}
 
 	return client.GetStatus(), ok
+}
+
+func (manager *ClientManager) SetClientStatus(id uint8, statusNew ConnectionStatus) (ConnectionStatus, error) {
+	manager.lock.RLock()
+	defer manager.lock.RUnlock()
+	status := Offline
+	client, ok := manager.clients[id]
+	if !ok {
+		// TODO: nice error
+		return status, errors.New("client does not exist")
+	}
+	status = client.status
+	client.status = statusNew
+
+	return status, nil
 }
 
 // GetPlayers will return the senable player configuration

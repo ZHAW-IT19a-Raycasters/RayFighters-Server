@@ -22,7 +22,7 @@ var ErrHubControllerOffline = errors.New("the hub controller is offline")
 
 // ErrHubControllerChangingMap is the error returned in the
 // case that there is a map change currently going on.
-var ErrHubControllerChangingMap = errors.New("the hub conrtroller is currently changing the map")
+var ErrHubControllerChangingMap = errors.New("the hub controller is currently changing the map")
 
 // HubController is the main brain of the hub
 // it is solely responsible for all the interactions
@@ -244,6 +244,8 @@ func (hc *HubController) removeClientIfTimeout(id uint8) error {
 			id: id,
 		}
 	}
+	hc.clientManager.SetClientStatus(id, client.Timedout)
+
 	return hc.removeClient(meta)
 }
 
