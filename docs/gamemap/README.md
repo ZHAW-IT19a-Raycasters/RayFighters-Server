@@ -86,7 +86,9 @@ func IsValid(jsonPath string) error
 
 IsValid is a small helper function that checks if the given string is a valid index\.json file or not\.
 
-## type [Coordinate](<https://github.zhaw.ch/raycasters/server/blob/master/gamemap/position.go#L28-L33>)
+## type [Coordinate](<https://github.zhaw.ch/raycasters/server/blob/master/gamemap/position.go#L36-L41>)
+
+Coordinate saves a more precise position inside a map x and y are float64 so a position can be saves inside a MapCoordinate square
 
 ```go
 type Coordinate struct {
@@ -94,13 +96,15 @@ type Coordinate struct {
 }
 ```
 
-### func [NewCoordinate](<https://github.zhaw.ch/raycasters/server/blob/master/gamemap/position.go#L35>)
+### func [NewCoordinate](<https://github.zhaw.ch/raycasters/server/blob/master/gamemap/position.go#L44>)
 
 ```go
 func NewCoordinate(x, y, angle float64) Coordinate
 ```
 
-### func [NewCustomCoordinate](<https://github.zhaw.ch/raycasters/server/blob/master/gamemap/position.go#L45>)
+NewCoordinate creates a Coordinate element
+
+### func [NewCustomCoordinate](<https://github.zhaw.ch/raycasters/server/blob/master/gamemap/position.go#L54>)
 
 ```go
 func NewCustomCoordinate(x, y float64) *Coordinate
@@ -108,47 +112,61 @@ func NewCustomCoordinate(x, y float64) *Coordinate
 
 NewCustomCoordinate is convenience function used for testing purposes
 
-### func \(\*Coordinate\) [Angle](<https://github.zhaw.ch/raycasters/server/blob/master/gamemap/position.go#L71>)
+### func \(\*Coordinate\) [Angle](<https://github.zhaw.ch/raycasters/server/blob/master/gamemap/position.go#L85>)
 
 ```go
 func (c *Coordinate) Angle() float64
 ```
 
-### func \(\*Coordinate\) [GetMapCoordinate](<https://github.zhaw.ch/raycasters/server/blob/master/gamemap/position.go#L52>)
+Angle return the angle value of a Coordinate
+
+### func \(\*Coordinate\) [GetMapCoordinate](<https://github.zhaw.ch/raycasters/server/blob/master/gamemap/position.go#L63>)
 
 ```go
 func (c *Coordinate) GetMapCoordinate() MapCoordinate
 ```
 
-### func \(\*Coordinate\) [SetAngle](<https://github.zhaw.ch/raycasters/server/blob/master/gamemap/position.go#L89>)
+GetMapCoordinate return the MapCoordinate of a Coordinate
+
+### func \(\*Coordinate\) [SetAngle](<https://github.zhaw.ch/raycasters/server/blob/master/gamemap/position.go#L106>)
 
 ```go
 func (c *Coordinate) SetAngle(angle float64)
 ```
 
-### func \(\*Coordinate\) [SetX](<https://github.zhaw.ch/raycasters/server/blob/master/gamemap/position.go#L77>)
+SetAngle stores the angle value in a Coordinate
+
+### func \(\*Coordinate\) [SetX](<https://github.zhaw.ch/raycasters/server/blob/master/gamemap/position.go#L92>)
 
 ```go
 func (c *Coordinate) SetX(x float64)
 ```
 
-### func \(\*Coordinate\) [SetY](<https://github.zhaw.ch/raycasters/server/blob/master/gamemap/position.go#L83>)
+SetX stores the x value in a Coordinate
+
+### func \(\*Coordinate\) [SetY](<https://github.zhaw.ch/raycasters/server/blob/master/gamemap/position.go#L99>)
 
 ```go
 func (c *Coordinate) SetY(y float64)
 ```
 
-### func \(\*Coordinate\) [X](<https://github.zhaw.ch/raycasters/server/blob/master/gamemap/position.go#L59>)
+SetY stores the x value in a Coordinate
+
+### func \(\*Coordinate\) [X](<https://github.zhaw.ch/raycasters/server/blob/master/gamemap/position.go#L71>)
 
 ```go
 func (c *Coordinate) X() float64
 ```
 
-### func \(\*Coordinate\) [Y](<https://github.zhaw.ch/raycasters/server/blob/master/gamemap/position.go#L65>)
+X return the x value of a Coordinate
+
+### func \(\*Coordinate\) [Y](<https://github.zhaw.ch/raycasters/server/blob/master/gamemap/position.go#L78>)
 
 ```go
 func (c *Coordinate) Y() float64
 ```
+
+Y return the x value of a Coordinate
 
 ## type [Map2d](<https://github.zhaw.ch/raycasters/server/blob/master/gamemap/map2d.go#L8-L11>)
 
@@ -224,7 +242,9 @@ func (map2d *Map2d) SetMapElement(x, y int, mapElement MapElement)
 
 SetMapElement will put given MapElement at given Location
 
-## type [MapCoordinate](<https://github.zhaw.ch/raycasters/server/blob/master/gamemap/position.go#L8-L11>)
+## type [MapCoordinate](<https://github.zhaw.ch/raycasters/server/blob/master/gamemap/position.go#L10-L13>)
+
+MapCoordinate is a square in a map x and y are int because it
 
 ```go
 type MapCoordinate struct {
@@ -232,23 +252,29 @@ type MapCoordinate struct {
 }
 ```
 
-### func [NewMapCoordinate](<https://github.zhaw.ch/raycasters/server/blob/master/gamemap/position.go#L13>)
+### func [NewMapCoordinate](<https://github.zhaw.ch/raycasters/server/blob/master/gamemap/position.go#L16>)
 
 ```go
 func NewMapCoordinate(x, y float64) MapCoordinate
 ```
 
-### func \(MapCoordinate\) [X](<https://github.zhaw.ch/raycasters/server/blob/master/gamemap/position.go#L20>)
+NewMapCoordinate creates a New Coordinate Struct
+
+### func \(MapCoordinate\) [X](<https://github.zhaw.ch/raycasters/server/blob/master/gamemap/position.go#L24>)
 
 ```go
 func (mc MapCoordinate) X() int
 ```
 
-### func \(MapCoordinate\) [Y](<https://github.zhaw.ch/raycasters/server/blob/master/gamemap/position.go#L24>)
+X return the x coordinate of a MapCoordinate
+
+### func \(MapCoordinate\) [Y](<https://github.zhaw.ch/raycasters/server/blob/master/gamemap/position.go#L29>)
 
 ```go
 func (mc MapCoordinate) Y() int
 ```
+
+Y return the y coordinate of a MapCoordinate
 
 ## type [MapElement](<https://github.zhaw.ch/raycasters/server/blob/master/gamemap/mapelement.go#L13>)
 
@@ -319,7 +345,9 @@ func (mim *MapIteratorManager) GetIterator() *MapIterator
 
 GetIterator will create a child iterator\, to be used by an individual hub\.
 
-## type [MapMeta](<https://github.zhaw.ch/raycasters/server/blob/master/gamemap/map_meta.go#L22-L25>)
+## type [MapMeta](<https://github.zhaw.ch/raycasters/server/blob/master/gamemap/map_meta.go#L26-L29>)
+
+MapMeta saves the internal meta information of a map
 
 ```go
 type MapMeta struct {
@@ -327,29 +355,37 @@ type MapMeta struct {
 }
 ```
 
-### func \(MapMeta\) [GetFilePath](<https://github.zhaw.ch/raycasters/server/blob/master/gamemap/map_meta.go#L35>)
+### func \(MapMeta\) [GetFilePath](<https://github.zhaw.ch/raycasters/server/blob/master/gamemap/map_meta.go#L42>)
 
 ```go
 func (mm MapMeta) GetFilePath() string
 ```
 
-### func \(MapMeta\) [GetId](<https://github.zhaw.ch/raycasters/server/blob/master/gamemap/map_meta.go#L27>)
+getFilePath returns the file path of a map
+
+### func \(MapMeta\) [GetId](<https://github.zhaw.ch/raycasters/server/blob/master/gamemap/map_meta.go#L32>)
 
 ```go
 func (mm MapMeta) GetId() uint8
 ```
 
-### func \(MapMeta\) [GetName](<https://github.zhaw.ch/raycasters/server/blob/master/gamemap/map_meta.go#L31>)
+getId returns the id of a map
+
+### func \(MapMeta\) [GetName](<https://github.zhaw.ch/raycasters/server/blob/master/gamemap/map_meta.go#L37>)
 
 ```go
 func (mm MapMeta) GetName() string
 ```
 
-### func \(MapMeta\) [LoadFile](<https://github.zhaw.ch/raycasters/server/blob/master/gamemap/map_meta.go#L39>)
+getName returns the name of a map
+
+### func \(MapMeta\) [LoadFile](<https://github.zhaw.ch/raycasters/server/blob/master/gamemap/map_meta.go#L48>)
 
 ```go
 func (mm MapMeta) LoadFile() (Map2d, error)
 ```
+
+Loadfile generates a map2d struct from the MapMeta it returns the map2d element and a error
 
 
 

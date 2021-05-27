@@ -95,7 +95,7 @@ Is satisfies the errors\.Is definition
 
 ## type [FileHandler](<https://github.zhaw.ch/raycasters/server/blob/master/log/handlers.go#L49-L58>)
 
-FileHandler is the handler struct for logging to the filesystem\.
+FileHandler is the handler struct for logging to the file system\.
 
 ```go
 type FileHandler struct {
@@ -109,7 +109,7 @@ type FileHandler struct {
 func NewFileHandler(level Level, fileName string) FileHandler
 ```
 
-NewFileHandler will create and open if needed a logging file on the filesystem\.
+NewFileHandler will create and open if needed a logging file on the file system\.
 
 ### func \(FileHandler\) [Build](<https://github.zhaw.ch/raycasters/server/blob/master/log/handlers.go#L87>)
 
@@ -117,7 +117,7 @@ NewFileHandler will create and open if needed a logging file on the filesystem\.
 func (fh FileHandler) Build() (LogHandler, error)
 ```
 
-Build will create the actuall logging instance\. And if needed create the file on the filesystem as well\.
+Build will create the actual logging instance\. And if needed create the file on the file system as well\.
 
 ### func \(FileHandler\) [FileName](<https://github.zhaw.ch/raycasters/server/blob/master/log/handlers.go#L80>)
 

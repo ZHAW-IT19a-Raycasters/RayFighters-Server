@@ -34,7 +34,7 @@ import "github.zhaw.ch/raycasters/server/room/mapstate"
   - [func (mc *MapController) RemoveClient(id uint8) error](<#func-mapcontroller-removeclient>)
 
 
-## func [CreateCustomClientMap](<https://github.zhaw.ch/raycasters/server/blob/master/room/mapstate/map_controller.go#L431>)
+## func [CreateCustomClientMap](<https://github.zhaw.ch/raycasters/server/blob/master/room/mapstate/map_controller.go#L440>)
 
 ```go
 func CreateCustomClientMap(ids []uint8, coords []float64) *map[uint8]*gamemap.Coordinate
@@ -120,7 +120,9 @@ func (err ErrWalkedIntoWall) Is(target error) bool
 
 Is satisfies the error\.Is configuration
 
-## type [MapController](<https://github.zhaw.ch/raycasters/server/blob/master/room/mapstate/map_controller.go#L32-L38>)
+## type [MapController](<https://github.zhaw.ch/raycasters/server/blob/master/room/mapstate/map_controller.go#L37-L43>)
+
+MapController is a struct to save all necessary information about a map
 
 ```go
 type MapController struct {
@@ -128,13 +130,15 @@ type MapController struct {
 }
 ```
 
-### func [NewMapController](<https://github.zhaw.ch/raycasters/server/blob/master/room/mapstate/map_controller.go#L40>)
+### func [NewMapController](<https://github.zhaw.ch/raycasters/server/blob/master/room/mapstate/map_controller.go#L47>)
 
 ```go
 func NewMapController(filePath string) (MapController, error)
 ```
 
-### func \(\*MapController\) [AddClient](<https://github.zhaw.ch/raycasters/server/blob/master/room/mapstate/map_controller.go#L90>)
+NewMapController creates a new MapController element it requires a filepath to the map\.txt
+
+### func \(\*MapController\) [AddClient](<https://github.zhaw.ch/raycasters/server/blob/master/room/mapstate/map_controller.go#L97>)
 
 ```go
 func (mc *MapController) AddClient(id uint8) (gamemap.Coordinate, error)
@@ -142,7 +146,7 @@ func (mc *MapController) AddClient(id uint8) (gamemap.Coordinate, error)
 
 AddClient will add a new client to the game map
 
-### func \(\*MapController\) [ChangeMap](<https://github.zhaw.ch/raycasters/server/blob/master/room/mapstate/map_controller.go#L55>)
+### func \(\*MapController\) [ChangeMap](<https://github.zhaw.ch/raycasters/server/blob/master/room/mapstate/map_controller.go#L62>)
 
 ```go
 func (mc *MapController) ChangeMap(filePath string) (map[uint8]*gamemap.Coordinate, error)
@@ -150,7 +154,7 @@ func (mc *MapController) ChangeMap(filePath string) (map[uint8]*gamemap.Coordina
 
 ChangeMap reloads map2d and spawningarea when the map is changing
 
-### func \(\*MapController\) [CheckShooting](<https://github.zhaw.ch/raycasters/server/blob/master/room/mapstate/map_controller.go#L306>)
+### func \(\*MapController\) [CheckShooting](<https://github.zhaw.ch/raycasters/server/blob/master/room/mapstate/map_controller.go#L315>)
 
 ```go
 func (mc *MapController) CheckShooting(shooterID uint8, shotAngle float64) (hit bool, victimID uint8)
@@ -158,7 +162,7 @@ func (mc *MapController) CheckShooting(shooterID uint8, shotAngle float64) (hit 
 
 raycasting return true if some player was hit and uid of victim\, else \(false\, 0\) is returnedx shotAngle is in radians
 
-### func \(\*MapController\) [GetClient](<https://github.zhaw.ch/raycasters/server/blob/master/room/mapstate/map_controller.go#L191>)
+### func \(\*MapController\) [GetClient](<https://github.zhaw.ch/raycasters/server/blob/master/room/mapstate/map_controller.go#L198>)
 
 ```go
 func (mc *MapController) GetClient(id uint8) (gamemap.Coordinate, bool)
@@ -166,13 +170,15 @@ func (mc *MapController) GetClient(id uint8) (gamemap.Coordinate, bool)
 
 GetClient will return a the state of a specific client\. And if the client could not be found false will be returned
 
-### func \(\*MapController\) [GetMapCoordinates](<https://github.zhaw.ch/raycasters/server/blob/master/room/mapstate/map_controller.go#L209>)
+### func \(\*MapController\) [GetMapCoordinates](<https://github.zhaw.ch/raycasters/server/blob/master/room/mapstate/map_controller.go#L218>)
 
 ```go
 func (mc *MapController) GetMapCoordinates(userId uint8) (x int, y int, ok bool)
 ```
 
-### func \(\*MapController\) [GetNearestHit](<https://github.zhaw.ch/raycasters/server/blob/master/room/mapstate/map_controller.go#L223>)
+GetMapCoordinates returns the map coordinates of the square where the client is
+
+### func \(\*MapController\) [GetNearestHit](<https://github.zhaw.ch/raycasters/server/blob/master/room/mapstate/map_controller.go#L232>)
 
 ```go
 func (mc *MapController) GetNearestHit(shooterID uint8, shotAngle, xShooter, yShooter float64) (bool, uint8, float64, float64)
@@ -180,19 +186,21 @@ func (mc *MapController) GetNearestHit(shooterID uint8, shotAngle, xShooter, ySh
 
 GetNearestHit returns uid of the nearest client\, which may be hit by the shot\, given there are no impenetrable obstacles on the way\.
 
-### func \(\*MapController\) [GetNearestObstacleOnTrajectoryInShotDirection](<https://github.zhaw.ch/raycasters/server/blob/master/room/mapstate/map_controller.go#L347>)
+### func \(\*MapController\) [GetNearestObstacleOnTrajectoryInShotDirection](<https://github.zhaw.ch/raycasters/server/blob/master/room/mapstate/map_controller.go#L356>)
 
 ```go
 func (mc *MapController) GetNearestObstacleOnTrajectoryInShotDirection(shooterID uint8, shotAngle, rayStartX, rayStartY float64) (foundObstacle bool, xObstacle int, yObstacle int)
 ```
 
-### func \(\*MapController\) [GetPosition](<https://github.zhaw.ch/raycasters/server/blob/master/room/mapstate/map_controller.go#L201>)
+### func \(\*MapController\) [GetPosition](<https://github.zhaw.ch/raycasters/server/blob/master/room/mapstate/map_controller.go#L209>)
 
 ```go
 func (mc *MapController) GetPosition(userId uint8) (x float64, y float64, ok bool)
 ```
 
-### func \(\*MapController\) [IsPenetrable](<https://github.zhaw.ch/raycasters/server/blob/master/room/mapstate/map_controller.go#L218>)
+GetPosition returns the current position of a client
+
+### func \(\*MapController\) [IsPenetrable](<https://github.zhaw.ch/raycasters/server/blob/master/room/mapstate/map_controller.go#L227>)
 
 ```go
 func (mc *MapController) IsPenetrable(x int, y int) bool
@@ -200,7 +208,7 @@ func (mc *MapController) IsPenetrable(x int, y int) bool
 
 IsPenetrable true if a bullet can pass through it
 
-### func \(\*MapController\) [MoveClient](<https://github.zhaw.ch/raycasters/server/blob/master/room/mapstate/map_controller.go#L162>)
+### func \(\*MapController\) [MoveClient](<https://github.zhaw.ch/raycasters/server/blob/master/room/mapstate/map_controller.go#L169>)
 
 ```go
 func (mc *MapController) MoveClient(id uint8, x, y, angle float64) (gamemap.Coordinate, error)
@@ -208,7 +216,7 @@ func (mc *MapController) MoveClient(id uint8, x, y, angle float64) (gamemap.Coor
 
 MoveClient will move the specified client to the given location
 
-### func \(\*MapController\) [RandomSpawn](<https://github.zhaw.ch/raycasters/server/blob/master/room/mapstate/map_controller.go#L128>)
+### func \(\*MapController\) [RandomSpawn](<https://github.zhaw.ch/raycasters/server/blob/master/room/mapstate/map_controller.go#L135>)
 
 ```go
 func (mc *MapController) RandomSpawn(id uint8) (gamemap.Coordinate, error)
@@ -216,7 +224,7 @@ func (mc *MapController) RandomSpawn(id uint8) (gamemap.Coordinate, error)
 
 RandomSpawn will move a players location as to respawn it into the game\.
 
-### func \(\*MapController\) [RemoveClient](<https://github.zhaw.ch/raycasters/server/blob/master/room/mapstate/map_controller.go#L145>)
+### func \(\*MapController\) [RemoveClient](<https://github.zhaw.ch/raycasters/server/blob/master/room/mapstate/map_controller.go#L152>)
 
 ```go
 func (mc *MapController) RemoveClient(id uint8) error
