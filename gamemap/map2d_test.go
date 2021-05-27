@@ -233,31 +233,31 @@ func TestMap2dGetLegalSpawn(t *testing.T) {
 		{
 			name: "WallWithMedkit",
 			data: [][]MapElement{
-						{Floor, Wall, Floor, Floor},
-						{Floor, Wall, Floor, Floor},
-						{Floor, Medkit, Floor, Floor},
-						{Floor, Wall, Floor, Floor},
-					},
-				exp: []Coordinate{
-					NewCoordinate(3, 3, 0),
-					NewCoordinate(2, 3, 0),
-					// NewCoordinate(1, 3, 0), => Wall
-					NewCoordinate(0, 3, 0),
-					NewCoordinate(3, 2, 0),
-					NewCoordinate(2, 2, 0),
-					NewCoordinate(1, 2, 0), // => MedKit
-					NewCoordinate(0, 2, 0),
-					NewCoordinate(3, 1, 0),
-					NewCoordinate(2, 1, 0),
-					// NewCoordinate(1, 1, 0), => Wall
-					NewCoordinate(0, 1, 0),
-					NewCoordinate(3, 0, 0),
-					NewCoordinate(2, 0, 0),
-					// NewCoordinate(1, 0, 0), => Wall
-					NewCoordinate(0, 0, 0),
-				},
+				{Floor, Wall, Floor, Floor},
+				{Floor, Wall, Floor, Floor},
+				{Floor, Medkit, Floor, Floor},
+				{Floor, Wall, Floor, Floor},
 			},
-		}
+			exp: []Coordinate{
+				NewCoordinate(3, 3, 0),
+				NewCoordinate(2, 3, 0),
+				// NewCoordinate(1, 3, 0), => Wall
+				NewCoordinate(0, 3, 0),
+				NewCoordinate(3, 2, 0),
+				NewCoordinate(2, 2, 0),
+				NewCoordinate(1, 2, 0), // => MedKit
+				NewCoordinate(0, 2, 0),
+				NewCoordinate(3, 1, 0),
+				NewCoordinate(2, 1, 0),
+				// NewCoordinate(1, 1, 0), => Wall
+				NewCoordinate(0, 1, 0),
+				NewCoordinate(3, 0, 0),
+				NewCoordinate(2, 0, 0),
+				// NewCoordinate(1, 0, 0), => Wall
+				NewCoordinate(0, 0, 0),
+			},
+		},
+	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

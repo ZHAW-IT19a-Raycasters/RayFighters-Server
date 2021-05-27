@@ -63,7 +63,7 @@ func TestHub(t *testing.T) {
 		}
 	}
 
-	<- mock.Done
+	<-mock.Done
 
 	hub.Shutdown(context.TODO())
 

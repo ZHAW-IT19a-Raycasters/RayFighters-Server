@@ -143,6 +143,8 @@ func (manager *ClientManager) GetClientStatus(id uint8) (ConnectionStatus, bool)
 	return client.GetStatus(), ok
 }
 
+// SetClientStatus sets the ConnectionStatus of a Client
+// it return the new ConnectionStatus and an error
 func (manager *ClientManager) SetClientStatus(id uint8, statusNew ConnectionStatus) (ConnectionStatus, error) {
 	manager.lock.RLock()
 	defer manager.lock.RUnlock()
@@ -171,7 +173,7 @@ func (manager *ClientManager) GetPlayer(id uint8) (server.Player, bool) {
 	return client.meta.GetPlayer(), ok
 }
 
-// GetPlayers will retuen a slice of all the currently
+// GetPlayers will return a slice of all the currently
 // registered players in the server.
 func (manager *ClientManager) GetPlayers() []server.Player {
 	manager.lock.RLock()
