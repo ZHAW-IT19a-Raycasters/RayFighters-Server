@@ -30,7 +30,9 @@ const (
 	// Attention this state also means that the
 	// previous connections is dead.
 	Timeout
-	// TODO
+	// TimedOut is a state which the client is
+	// set after he hasn't moved for some time
+	// and we are about to shut him down
 	Timedout
 	// ShuttingDown is a temporary state where
 	// the client connection is in while

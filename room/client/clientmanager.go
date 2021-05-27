@@ -2,7 +2,6 @@ package client
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -151,8 +150,7 @@ func (manager *ClientManager) SetClientStatus(id uint8, statusNew ConnectionStat
 	status := Offline
 	client, ok := manager.clients[id]
 	if !ok {
-		// TODO: nice error
-		return status, errors.New("client does not exist")
+		return status, NewErrClientDoesntExist(manager.clients[id].meta.GetMeta())
 	}
 	status = client.status
 	client.status = statusNew
