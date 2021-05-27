@@ -1,8 +1,9 @@
 package client
 
 import (
-	"github.zhaw.ch/raycasters/server/utils"
 	"sync/atomic"
+
+	"github.zhaw.ch/raycasters/server/utils"
 
 	"github.com/google/uuid"
 	"github.zhaw.ch/raycasters/server/protocol/server"
@@ -29,6 +30,8 @@ const (
 	// Attention this state also means that the
 	// previous connections is dead.
 	Timeout
+	// TODO
+	Timedout
 	// ShuttingDown is a temporary state where
 	// the client connection is in while
 	// waiting for the workers to shutdown
@@ -52,34 +55,19 @@ type Position struct {
 	y float64
 }
 
-func NewPosition() Position {
-	return Position{
-		x: 0,
-		y: 0,
-	}
-}
-
-func (p Position) GetX() float64 {
-	return p.x
-}
-
-func (p Position) GetY() float64 {
-	return p.y
-}
-
 // ClientGame represents the state of the client in the game
 type ClientGame struct {
-	kills    uint32
-	deaths   uint32
-	IsDead	 utils.AtomicBool
+	kills  uint32
+	deaths uint32
+	IsDead utils.AtomicBool
 }
 
 // NewClientGame creates the default client object.
 func NewClientGame() ClientGame {
 	return ClientGame{
-		kills:    0,
-		deaths:   0,
-		IsDead:	  utils.NewAtomicBool(false),
+		kills:  0,
+		deaths: 0,
+		IsDead: utils.NewAtomicBool(false),
 	}
 }
 

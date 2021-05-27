@@ -18,54 +18,16 @@ import (
 )
 
 const (
+	// JwtCookieName is the actual token name visible in the browser.
 	JwtCookieName string = "token"
-	JwtUserName   string = "username"
-	JwtUUID       string = "uuid"
+	// JwtUsername is the defined jwt identifier for the name.
+	JwtUserName string = "username"
+	// JwtUUID is the defined jwt identifier for the uuid.
+	JwtUUID string = "uuid"
 )
 
-// ErrParseCookie is the error that happens on a parse error
-type ErrParseCookie struct {
-	logMsg, httpMsg string
-	status          int
-}
-
-// Error satisfies the error interface
-func (err ErrParseCookie) Error() string {
-	return fmt.Sprintf("[%d] - [%s]", err.status, err.logMsg)
-}
-
-// ErrParseCookie is the error that happens on a parse error
-type ErrNoCookie struct {
-	logMsg, httpMsg string
-	status          int
-}
-
-// Error satisfies the error interface
-func (err ErrNoCookie) Error() string {
-	return fmt.Sprintf("[%d] - [%s]", err.status, err.logMsg)
-}
-
-// ErrAuthManagerFailour is the error that is returned once
-// there is an authentication error of any kind.
-type ErrAuthManagerFailure struct {
-	internal error
-}
-
-// Error satisfies the error interface
-func (err ErrAuthManagerFailure) Error() string {
-	return fmt.Sprintf("an error happend while creating the auth manager [%s]", err.Unwrap().Error())
-}
-
-// Is satisfies the errors.Is interface
-func (err ErrAuthManagerFailure) Is(target error) bool {
-	_, ok := target.(ErrAuthManagerFailure)
-	return ok
-}
-
-// Unwrap satisfies the errors.Unwrap functionality.
-func (err ErrAuthManagerFailure) Unwrap() error {
-	return err.internal
-}
+// MaxUsernameLength is the defined maximal length supported in utf-8 runes
+const MaxUsernameLength = 255
 
 // Create a struct to read the username and password from the request body
 type Credentials struct {
@@ -132,14 +94,6 @@ func (auth *authenticationManager) AuthConnection() (HandleFunc func(w http.Resp
 		// there is no valid cookie
 		isValidCookie := auth.checkIfCookieValid(r) == nil
 
-		// not getting an error here means that the
-		// user already is authenticated.
-		// if isValidCookie {
-		// 	// check case that there is a
-		// 	// need to change the name
-		// 	return
-		// }
-
 		var creds Credentials
 		err := parseToCredentialsFromJSON(&creds, r.Body)
 
@@ -155,12 +109,7 @@ func (auth *authenticationManager) AuthConnection() (HandleFunc func(w http.Resp
 		if isValidCookie {
 			// we already checked if the token is valid
 			oldCreds, err := parseUserInformation(w, r)
-			if err != nil {
-
-			} else if oldCreds.name == creds.Username {
-				// token is still valid
-				return
-			} else {
+			if !(err != nil || oldCreds.name == creds.Username) {
 				uuidVal = oldCreds.uid.String()
 			}
 		}
@@ -170,7 +119,7 @@ func (auth *authenticationManager) AuthConnection() (HandleFunc func(w http.Resp
 
 		cookie, err := auth.createCookie(&creds, uuidVal)
 		if err != nil {
-			// also wraps a json marshalling error
+			// also wraps a json marshaling error
 			logger.Warnf("failed to sign token: %s", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
@@ -213,13 +162,12 @@ func (auth *authenticationManager) createCookie(creds *Credentials, uuidStr stri
 	t.Set(JwtUUID, uuidStr)
 
 	// Signing the token (using raw rsa.PrivateKey)
-	// also marshalls to JSON
+	// also marshals to JSON
 	signed, err := jwt.Sign(t, jwa.RS512, auth.privateKey)
 	if err != nil {
 		return nil, err
 	}
 
-	// TODO: expiry time?
 	return &http.Cookie{
 		Name:     JwtCookieName,
 		Value:    string(signed[:]),
@@ -295,14 +243,17 @@ func (amw *authenticationManager) Middleware(next http.Handler) http.Handler {
 
 // runs validity checks against a received username
 func validUsername(str string) (string, error) {
-	// in utf-8 runes
-	const maxUsernameLength = 255
 	if !utf8.ValidString(str) {
-		return "", fmt.Errorf("invalid utf-8 runes in username %s", str)
+		return "", ErrUsernameInvalidUtf8{
+			name: str,
+		}
 	}
-	strLen := utf8.RuneCountInString(str)
-	if strLen == 0 || strLen > maxUsernameLength {
-		return "", fmt.Errorf("username contains too many runes %d, %s", utf8.RuneCountInString(str), str)
+	runeLen := utf8.RuneCountInString(str)
+	if runeLen == 0 || runeLen > MaxUsernameLength {
+		return "", ErrUsernameInvalidLength{
+			name:    str,
+			runeLen: runeLen,
+		}
 	}
 
 	escaped := html.EscapeString(str)
@@ -317,7 +268,7 @@ func parseToCredentialsFromJSON(creds *Credentials, r io.Reader) error {
 
 // userInfo is an internal struct used
 // to transport the user information out
-// of the parse funtion.
+// of the parse function.
 type userInfo struct {
 	uid  uuid.UUID
 	name string

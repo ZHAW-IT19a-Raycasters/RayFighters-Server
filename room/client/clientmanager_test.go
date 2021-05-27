@@ -13,14 +13,27 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.zhaw.ch/raycasters/server/log"
+	"github.zhaw.ch/raycasters/server/room/testhelpers"
 )
 
-func getClientMeta(i int) (ClientMeta, *MockedConnection) {
+func helpTimeout() (HubTimeoutHandler, func(id uint8) ClientTimer) {
+
+	// empty callback as it make no sense in this context
+	callback := func(id uint8) {}
+
+	ht := NewHubTimer(hubTimerSize, callback)
+	f := func(id uint8) ClientTimer {
+		return ht.NewClientTimer(id)
+	}
+	return ht, f
+}
+
+func getClientMeta(i int) (ClientMeta, *testhelpers.MockedConnection) {
 	// as uuids should be unique, it makes no difference,
 	// if a new one is called here.
 	uuid := uuid.New()
 	name := fmt.Sprintf("id: %d", i)
-	mock := NewMockedConnection()
+	mock := testhelpers.NewMockedConnection()
 	pmock := &mock
 	return NewClientMeta(uuid, name, pmock), pmock
 }
@@ -65,8 +78,7 @@ func TestClientManagerAddClientSingle(t *testing.T) {
 		return
 	}
 
-	clientMeta, meta := getClientMeta(0)
-	_, _, _ = setupMock(meta)
+	clientMeta, _ := getClientMeta(0)
 
 	clientQueue, _ := NewWorkQueue()
 
@@ -121,7 +133,7 @@ func TestClientManagerAddClientTwice(t *testing.T) {
 	defer cm.Shutdown(context.Background())
 
 	clientMeta, pmock := getClientMeta(0)
-	done, funcReader, _ := setupMock(pmock)
+	// done, funcReader, _ := setupMock(pmock)
 
 	clientQueue, _ := NewWorkQueue()
 
@@ -139,14 +151,14 @@ func TestClientManagerAddClientTwice(t *testing.T) {
 	val := cm.clients[id]
 
 	// shutdown the system
-	funcReader <- func() (int, io.Reader, error) {
+	pmock.FuncReader <- func() (int, io.Reader, error) {
 		return 0, nil, &websocket.CloseError{
 			Code: websocket.CloseAbnormalClosure,
 		}
 	}
 
 	// check that client is shutdown
-	<-done
+	<-pmock.Done
 	waiter := make(chan struct{})
 
 	go func() {
@@ -169,9 +181,9 @@ func TestClientManagerAddClientTwice(t *testing.T) {
 	}
 
 	// adding a connection, while client conn is still active
-	mock := NewMockedConnection()
+	mock := testhelpers.NewMockedConnection()
 	pmock = &mock
-	_, _, _ = setupMock(pmock)
+
 	pmock.Close()
 
 	clientMeta.conn = pmock

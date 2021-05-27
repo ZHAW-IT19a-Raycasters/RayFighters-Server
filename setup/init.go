@@ -1,3 +1,5 @@
+// Package setup is responsible for setting up
+// system with the parameters gathers from outside.
 package setup
 
 // Setup is the struct that handles all the setup required
@@ -18,7 +20,7 @@ func NewSetup() Setup {
 	}
 }
 
-// writeArgsToConfig will write back the parsed commandline parameters to the configuration data.
+// writeArgsToConfig will write back the parsed command line parameters to the configuration data.
 func writeArgsToConfig(conf *Configuration, args *commandlineArguments) {
 
 	if *args.Ip != "" {
@@ -31,7 +33,7 @@ func writeArgsToConfig(conf *Configuration, args *commandlineArguments) {
 }
 
 // Configuration will parse the arguments from both the configuration file as well as
-// the commandline arguments. If there was an error of any kind will print the given
+// the command line arguments. If there was an error of any kind will print the given
 // help message and return nil.
 func (s Setup) Configuration() *Configuration {
 	argParser, err := s.args()

@@ -233,10 +233,10 @@ func TestMap2dGetLegalSpawn(t *testing.T) {
 		{
 			name: "WallWithMedkit",
 			data: [][]MapElement{
-				{Floor, Floor, Floor, Floor},
-				{Wall, Wall, Medkit, Wall},
-				{Floor, Floor, Floor, Floor},
-				{Floor, Floor, Floor, Floor},
+				{Floor, Wall, Floor, Floor},
+				{Floor, Wall, Floor, Floor},
+				{Floor, Medkit, Floor, Floor},
+				{Floor, Wall, Floor, Floor},
 			},
 			exp: []Coordinate{
 				NewCoordinate(3, 3, 0),

@@ -67,7 +67,7 @@ func (cp configParser) Parse() (*Configuration, error) {
 	// create the configuration object
 	conf := &Configuration{}
 
-	// do the unmarshalling
+	// do the unmarshaling
 	err = toml.Unmarshal(data, conf)
 
 	if err != nil {

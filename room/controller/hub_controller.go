@@ -3,17 +3,14 @@ package controller
 import (
 	"context"
 	"errors"
-	"fmt"
-	"path/filepath"
-	"runtime"
 	"sync"
 
 	"github.zhaw.ch/raycasters/server/room/mapstate"
 
+	"github.zhaw.ch/raycasters/server/protocol"
 	"github.zhaw.ch/raycasters/server/protocol/server"
 	"github.zhaw.ch/raycasters/server/utils"
 
-	"github.zhaw.ch/raycasters/server/protocol"
 	pclient "github.zhaw.ch/raycasters/server/protocol/client"
 	"github.zhaw.ch/raycasters/server/room/client"
 	"github.zhaw.ch/raycasters/server/room/helpers"
@@ -23,31 +20,37 @@ import (
 // case that the controller is offline.
 var ErrHubControllerOffline = errors.New("the hub controller is offline")
 
+// ErrHubControllerChangingMap is the error returned in the
+// case that there is a map change currently going on.
+var ErrHubControllerChangingMap = errors.New("the hub controller is currently changing the map")
+
 // HubController is the main brain of the hub
-// it is soley responsible for all the interactions
+// it is solely responsible for all the interactions
 // done by the user.
 type HubController struct {
 	// The manager of the different client with the different connections.
 	clientManager client.ClientManager
-	// connections stores the hub queues the soley conneciton
+	// connections stores the hub queues the solely connection
 	// points to the clients.
 	connections map[uint8]client.HubQueue
 	// gameState stores the current state of the game
 	// such as player kills and their deaths.
 	gameState GameState
 	// mapManager is a Manager controlling the events of the map
-	mapController mapstate.MapController
-	// timeoutClientQueue stores the currently timedout clients
+	mapController *mapstate.MapController
+	// timeoutClientQueue stores the currently timeout clients
 	// so that they can be removed once the timeout runs out.
 	timeoutClientQueue client.HubTimeoutHandler
 	// respawnHandler stores and later on handles
 	// the currently killed players so that they
 	// can be reborn once the timeout runs out.
 	respawnHandler client.HubRespawnHandler
-	// timeoutItemQueue stores the currently timedout map elements
-	// so that they can be respawned once the timeout runs out.
-	// timeoutItemQueue items.ItemTimer
-
+	// mapChanging will be set True when the Map is being reloaded
+	// so we know when to reset everything to restart the game
+	mapChanging utils.AtomicBool
+	// currentMap is the struct holding all the information
+	// about the current map
+	currentMap mapTimeMeta
 	// Semaphore, counts the totally active
 	// player connections, although that number is already available
 	// via the client map length, is would have to be accessed
@@ -58,7 +61,7 @@ type HubController struct {
 	// isActive checks if the current controller is still active
 	// to add clients or not.
 	isActive utils.AtomicBool
-	// wg is the wait group used for counting the ammout
+	// wg is the wait group used for counting the amount
 	// of active hub workers.
 	wg sync.WaitGroup
 	// lock is used to limit the access to the connections.
@@ -66,40 +69,24 @@ type HubController struct {
 	lock sync.RWMutex
 }
 
-func getMap() string {
-	_, filename, _, _ := runtime.Caller(0)
-	p := filepath.Dir(filename)
-	p = filepath.Dir(p)
-	p = filepath.Dir(p)
-
-	return filepath.Join(p, "maps", "desert.txt")
-}
-
 // NewHubController will create a new controller
 func NewHubController() *HubController {
-	// TODO: handle error
-	// TODO: fix issue with file paths...
-	// TODO: remove panics :(
-	path := getMap()
-	mapController, err := mapstate.NewMapController(path)
-	if err != nil {
-		panic(fmt.Sprintf("error happend while opening the map controller [%s]", err.Error()))
-	}
 
 	hc := HubController{
 		clientManager: client.NewClientManager(),
 		connections:   make(map[uint8]client.HubQueue),
 		gameState:     NewGameState(),
-		mapController: mapController,
-		semaphore:     utils.NewCountingSemaphore(uint32(helpers.IdCountLimit)),
+		mapController: nil,
+		mapChanging:   utils.NewAtomicBool(false),
 		isActive:      utils.NewAtomicBool(true),
+		semaphore:     utils.NewCountingSemaphore(uint32(helpers.IdCountLimit)),
 		wg:            sync.WaitGroup{},
 		lock:          sync.RWMutex{},
 	}
 
 	// implement item timer callbacks (blocked by missing map implementation)
 	// Attention this is not done anymore, but the comment is kept here as
-	// a reminder for possible continued developement.
+	// a reminder for possible continued development.
 
 	// client timer callbacks
 	cTimeoutCallback := func(id uint8) {
@@ -113,9 +100,6 @@ func NewHubController() *HubController {
 	}
 
 	hc.timeoutClientQueue = client.NewHubTimer(helpers.IdCountLimit, cTimeoutCallback)
-
-	// TODO: handle error
-	hc.timeoutClientQueue.Run()
 
 	// client respawn callbacks
 	cRespawnCallback := func(id uint8) {
@@ -132,18 +116,74 @@ func NewHubController() *HubController {
 
 	hc.respawnHandler = client.NewHubRespawnHandler(helpers.IdCountLimit, cRespawnCallback)
 
-	// TODO: handle error
-	hc.respawnHandler.Run()
-
 	return &hc
 }
 
+// run starts client Timeout Queue as well as the respawn handler
+func (hc *HubController) run() error {
+	err := hc.timeoutClientQueue.Run()
+	if err != nil {
+		return err
+	}
+	return hc.respawnHandler.Run()
+}
+
+// NewMap changes the map of the hub if its not set it sets it instead.
+// it requires a mapTimeMeta of the new current map as the a parameter
+// it return an error if none happens it returns nil
+func (hc *HubController) NewMap(mapMeta mapTimeMeta) error {
+	if !hc.mapChanging.SetTrue() {
+		return ErrHubControllerChangingMap
+	}
+	defer hc.mapChanging.SetFalse()
+
+	hc.lock.Lock()
+	defer hc.lock.Unlock()
+
+	hc.currentMap = mapMeta
+	mapPath := mapMeta.meta.GetFilePath()
+	if hc.mapController == nil {
+		// the case where the map is currenly
+		// not completly setup
+		ms, err := mapstate.NewMapController(mapPath)
+		if err != nil {
+			return err
+		}
+		hc.mapController = &ms
+		return nil
+	}
+
+	logger.Debugf("Moving to map [%d]", mapMeta.meta.GetId())
+
+	mc := server.NewMapChange(mapMeta.meta.GetId(), mapMeta.since.UnixNano())
+
+	emptySet := helpers.NewIdSet()
+
+	hc.unsafeBroadCast(mc, emptySet)
+
+	clients, err := hc.mapController.ChangeMap(hc.currentMap.meta.GetFilePath())
+
+	if err != nil {
+		return err
+	}
+	for id, lClient := range clients {
+		logger.Debugf("teleporting player [%d] into the map [%d]", id, mapMeta.meta.GetId())
+		// teleport the player back into the game
+		tp := server.NewTeleportPlayer(id, lClient.X(), lClient.Y())
+		hc.unsafeBroadCast(tp, emptySet)
+	}
+
+	return nil
+}
+
+// respawnPlayer respawns a dead Player on a new random Location
+// if something goes wrong an error will be returned, else nil will return
 func (hc *HubController) respawnPlayer(id uint8) error {
 	if !hc.isActive.Get() {
 		return ErrHubControllerOffline
 	}
 	logger.Debugf("trying to respawn player [%d]", id)
-	// check if the player is stil active
+	// check if the player is still active
 	// only respawn if the client is still
 	// active.
 	err := hc.checkClientState(id, client.Active)
@@ -171,6 +211,8 @@ func (hc *HubController) respawnPlayer(id uint8) error {
 	return nil
 }
 
+// checkClientState checks if client has a valid state
+// if not it returns an error
 func (hc *HubController) checkClientState(id uint8, expectedState client.ConnectionStatus) error {
 	hc.lock.RLock()
 	defer hc.lock.RUnlock()
@@ -189,7 +231,7 @@ func (hc *HubController) checkClientState(id uint8, expectedState client.Connect
 }
 
 // removeClientIfTimeout will remove a client only
-// if the client is timedout
+// if the client is timeout
 func (hc *HubController) removeClientIfTimeout(id uint8) error {
 
 	err := hc.checkClientState(id, client.Timeout)
@@ -210,6 +252,8 @@ func (hc *HubController) removeClientIfTimeout(id uint8) error {
 			id: id,
 		}
 	}
+	hc.clientManager.SetClientStatus(id, client.Timedout)
+
 	return hc.removeClient(meta)
 }
 
@@ -293,7 +337,9 @@ func (hc *HubController) RegisterClient(meta client.ClientMeta) error {
 		return ErrHubControllerOffline
 	}
 
-	// TODO: register in the game state (if it is a new connection)
+	// run the client computations
+	hc.wg.Add(1)
+
 	logger.Debugf("registering client in hub [%s]", meta.GetId().String())
 
 	// prepare the queues
@@ -302,6 +348,7 @@ func (hc *HubController) RegisterClient(meta client.ClientMeta) error {
 	// prepare messages without the new player information
 	sendAllPLayerKd := hc.gameState.GetPlayersKD()
 	sendAllPlayerInfo := server.NewSendAllPlayerInfo(hc.clientManager.GetPlayers())
+	mapInfo := server.NewMapChange(hc.currentMap.meta.GetId(), hc.currentMap.since.UnixNano())
 
 	// directly add the client to the manager and
 	// let it figure out, what to do here
@@ -309,6 +356,7 @@ func (hc *HubController) RegisterClient(meta client.ClientMeta) error {
 
 	// something went wrong while adding the client
 	if err != nil {
+		hc.wg.Done()
 		return err
 	}
 
@@ -332,6 +380,7 @@ func (hc *HubController) RegisterClient(meta client.ClientMeta) error {
 		youAreCalled,
 		sendAllPLayerKd,
 		sendAllPlayerInfo,
+		mapInfo,
 	}
 
 	for _, message := range messages {
@@ -340,6 +389,7 @@ func (hc *HubController) RegisterClient(meta client.ClientMeta) error {
 
 	coord, err := hc.mapController.AddClient(id)
 	if err != nil {
+		hc.wg.Done()
 		return err
 	}
 
@@ -349,9 +399,6 @@ func (hc *HubController) RegisterClient(meta client.ClientMeta) error {
 	hc.lock.Lock()
 	hc.connections[id] = hqueue
 	hc.lock.Unlock()
-
-	// run the client computations
-	hc.wg.Add(1)
 
 	go func() {
 		defer hc.wg.Done()
@@ -475,7 +522,6 @@ func (hc *HubController) removeClient(meta client.ClientMeta) error {
 	_ = hc.Release()
 
 	return nil
-	// defer
 }
 
 // BroadCast will as the name implies broadcast a given
@@ -486,6 +532,9 @@ func (hc *HubController) broadCast(msg protocol.Bytefy, except helpers.IdSet) {
 	hc.unsafeBroadCast(msg, except)
 }
 
+// unsafeBroadCast is a helper function that broadcasts a message
+// without a Lock on the hubcontroller
+// it requires a protocol msg and the id's of clients which shouldn't get the message
 func (hc *HubController) unsafeBroadCast(msg protocol.Bytefy, except helpers.IdSet) {
 	// get the bytes first
 	data := msg.Bytes()
@@ -557,36 +606,55 @@ func (hc *HubController) handleRead(data []byte, id uint8) protocol.Bytefy {
 	if len(data) == 0 {
 		return hc.handleUnknown(id)
 	}
-	switch pclient.Detect(data[0]) {
+
+	// opcodes that always will be processed no matter the state
+	// execution
+	opcode := pclient.Detect(data[0])
+
+	switch opcode {
 	case pclient.DisconnectOpcode:
 		// Received a Disconnect request from client
 		return hc.handleDisconnect(data, id)
 	case pclient.WhoAmIOpcode:
 		// Received a WhoAmI request from client
 		return hc.handleWhoAmI(data, id)
-	case pclient.MovementOpcode:
-		// Received a Movement request from client
-		return hc.handleMovement(data, id)
-	case pclient.ShootingOpcode:
-		// Received a Shooting request from client
-		return hc.handleShooting(data, id)
 	case pclient.RequestOtherPlayersOpcode:
 		// Received a RequestOtherPlayers request from client
 		return hc.handleRequestOtherPlayer(data)
 	case pclient.RequestPlayerKDOpcode:
 		// Received a RequestOtherPlayers request from client
 		return hc.handleRequestPlayerKD(data)
-	default:
+	case pclient.UnknownOpcode:
 		// Received Unknown Code from client
 		return hc.handleUnknown(id)
 	}
+
+	// check if the hub state is
+	// map changing, if so
+	// ignore the message
+	if hc.mapChanging.Get() {
+		return nil
+	}
+
+	switch opcode {
+	case pclient.MovementOpcode:
+		// Received a Movement request from client
+		return hc.handleMovement(data, id)
+	case pclient.ShootingOpcode:
+		// Received a Shooting request from client
+		return hc.handleShooting(data, id)
+	}
+	// this is an impossible case, but safe is safe
+	return nil
 }
 
+// handleUnknown handles a unknown opcode received
 func (hc *HubController) handleUnknown(id uint8) protocol.Bytefy {
 	logger.Errorf("Received Unknown Opcode from Client[%d]", id)
 	return nil
 }
 
+// handleDisconnect handles a disconnect opcode received
 func (hc *HubController) handleDisconnect(t []byte, id uint8) protocol.Bytefy {
 	_, err := pclient.NewDisconnectByte(t)
 	if err != nil {
@@ -602,6 +670,7 @@ func (hc *HubController) handleDisconnect(t []byte, id uint8) protocol.Bytefy {
 	return newDisconnect
 }
 
+// handleWhoAmI handles a whoami opcode received
 func (hc *HubController) handleWhoAmI(t []byte, id uint8) protocol.Bytefy {
 	_, err := pclient.NewWhoAmIByte(t)
 	if err != nil {
@@ -613,6 +682,7 @@ func (hc *HubController) handleWhoAmI(t []byte, id uint8) protocol.Bytefy {
 	return newYouAreCalled
 }
 
+// handleMovement handles a movement opcode received
 func (hc *HubController) handleMovement(message []byte, id uint8) protocol.Bytefy {
 	movement, err := pclient.NewMovementByte(message)
 	if err != nil {
@@ -638,6 +708,7 @@ func (hc *HubController) handleMovement(message []byte, id uint8) protocol.Bytef
 	return nil
 }
 
+// handleShooting handles a shooting opcode received
 func (hc *HubController) handleShooting(t []byte, shooterId uint8) protocol.Bytefy {
 	shot, err := pclient.NewShootingBytes(t)
 	if err != nil {
@@ -668,7 +739,6 @@ func (hc *HubController) handleShooting(t []byte, shooterId uint8) protocol.Byte
 
 		// broadcast the death to all players
 		hc.broadCast(death, helpers.NewIdSet())
-
 		hc.gameState.IncDeaths(victimId)
 		hc.gameState.IncKill(shooterId)
 
@@ -679,6 +749,7 @@ func (hc *HubController) handleShooting(t []byte, shooterId uint8) protocol.Byte
 	return nil
 }
 
+// handleRequestOtherPlayer handles a RequestOtherPlayer opcode received
 func (hc *HubController) handleRequestOtherPlayer(t []byte) protocol.Bytefy {
 	_, err := pclient.NewRequestOtherPlayersBytes(t)
 	if err != nil {
@@ -691,6 +762,7 @@ func (hc *HubController) handleRequestOtherPlayer(t []byte) protocol.Bytefy {
 	return newPlayerInfo
 }
 
+// handleRequestPlayerKD handles a RequestPlayerKD opcode received
 func (hc *HubController) handleRequestPlayerKD(t []byte) protocol.Bytefy {
 	_, err := pclient.NewRequestPlayerKDByte(t)
 	if err != nil {

@@ -1,3 +1,8 @@
+// Package client defines the structs required for parsing
+// the client side raycaster protocol.
+//
+// see definition here
+// https://github.zhaw.ch/raycasters/docs/wiki/Protocol#frontend.
 package client
 
 import (
@@ -9,6 +14,9 @@ import (
 // A Client Opcode represents the internal representations
 // of all the defined client side operational
 // codes that control the game flow.
+//
+// see definition here
+// https://github.zhaw.ch/raycasters/docs/wiki/Protocol#frontend.
 type ClientOpcode uint8
 
 const (
@@ -22,6 +30,8 @@ const (
 	RequestPlayerKDOpcode     ClientOpcode = 0x1F
 )
 
+// Overview gives an iterable array over all the
+// available opcodes.
 var Overview = [...]ClientOpcode{
 	DisconnectOpcode,
 	UnknownOpcode,
@@ -63,7 +73,7 @@ func (o ClientOpcode) String() string {
 	default:
 		// this panic should never be hit,
 		// if it is hit it means there is some
-		// illigal programming state.
+		// illegal programming state.
 		panic("Unknown client interface")
 	}
 }
@@ -88,7 +98,7 @@ func (o ClientOpcode) ByteSize() int {
 		// Opcode + 3 * Float64
 		return 1 + 3*8
 	case ShootingOpcode:
-		// Opcode + Flaot64
+		// Opcode + Float64
 		return 1 + 8
 	case RequestOtherPlayersOpcode:
 		// Opcode
@@ -99,15 +109,16 @@ func (o ClientOpcode) ByteSize() int {
 	default:
 		// this panic should never be hit,
 		// if it is hit it means there is some
-		// illigal programming state.
+		// illegal programming state.
 		panic("Unknown client interface")
 	}
 }
 
-// Detect converts from the an external byte into the internally
-// used ServerOpcode type.
+// Detect converts from the an external byte into
+// the internally used ServerOpcode type.
 //
-// Will return Unknown when there is no mapping for the given value.
+// Will return Unknown when there is no mapping
+// for the given value.
 func Detect(opcode uint8) ClientOpcode {
 	parsedOpcode := ClientOpcode(opcode)
 
@@ -120,13 +131,15 @@ func Detect(opcode uint8) ClientOpcode {
 	return UnknownOpcode
 }
 
-// ParsingError represents an Error that occurs trying to parse a faulty Opcode.
+// ParsingError represents an Error that occurs
+// trying to parse a faulty Opcode.
 type ParsingError struct {
 	opcode ClientOpcode
 	msg    string
 }
 
-// Error will retrieve the ParsingError and return an Errormessage.
+// Error will retrieve the ParsingError and return
+// an error message.
 func (pe *ParsingError) Error() string {
 	return fmt.Sprintf("Parsing error from %s [%s]", pe.opcode.String(), pe.msg)
 }
@@ -139,9 +152,11 @@ func NewDisconnect() Disconnect {
 	return Disconnect{}
 }
 
-// NewDisconnectByte returns a pointer from a new Disconnect object based on data.
+// NewDisconnectByte returns a pointer from a new
+// Disconnect object based on data.
 // If an error occurs Nil will be returned.
-// This should actually never be called, but is here for completion.
+// This should actually never be called, but is
+// here for completion.
 func NewDisconnectByte(data []byte) (*Disconnect, error) {
 	// checking length etc
 	// 1 Byte
@@ -163,9 +178,11 @@ func NewUnknown() Unknown {
 	return Unknown{}
 }
 
-// NewUnknownByte returns a pointer from a new Unknown object based on data.
+// NewUnknownByte returns a pointer from a new
+// Unknown object based on data.
 // If an error occurs Nil will be returned.
-// This should actually never be called, but is here for completion.
+// This should actually never be called,
+// but is here for completion.
 func NewUnknownByte(data []byte) (*Unknown, error) {
 	// checking length etc
 	// 1 Byte
@@ -185,7 +202,8 @@ func NewWhoAmI() WhoAmI {
 	return WhoAmI{}
 }
 
-// NewWhoAmIByte returns a pointer from a new WhoAmI object based on data.
+// NewWhoAmIByte returns a pointer from a new
+// WhoAmI object based on data.
 // If an error occurs Nil will be returned.
 func NewWhoAmIByte(data []byte) (*WhoAmI, error) {
 	// checking length etc
@@ -213,6 +231,7 @@ func (m Movement) CoorY() float64 {
 	return m.coorY
 }
 
+// AnglPl returns the Movements angle ad float64.
 func (m Movement) AnglPl() float64 {
 	return m.anglPl
 }
@@ -226,7 +245,8 @@ func NewMovement(coorX, coorY, anglPl float64) Movement {
 	}
 }
 
-// NewMovementByte returns a pointer from a new Movement object based on data
+// NewMovementByte returns a pointer from a
+// new Movement object based on data.
 // If an error occurs Nil will be returned
 func NewMovementByte(data []byte) (*Movement, error) {
 	if err := checkOpcodeHelper(MovementOpcode, data); err != nil {
@@ -259,7 +279,8 @@ func NewShooting(angPl float64) Shooting {
 	}
 }
 
-// NewShootingBytes returns a pointer from a new Shooting object based on data.
+// NewShootingBytes returns a pointer from
+// a new Shooting object based on data.
 // If an error occurs Nil will be returned.
 func NewShootingBytes(data []byte) (*Shooting, error) {
 	// u8 f64
@@ -269,7 +290,7 @@ func NewShootingBytes(data []byte) (*Shooting, error) {
 		return nil, err
 	}
 
-	// lenght is now correct
+	// length is now correct
 	angle := utils.BinaryToFloat(data[1:])
 
 	val := NewShooting(angle)
@@ -284,7 +305,8 @@ func NewRequestPlayerKD() RequestPlayerKD {
 	return RequestPlayerKD{}
 }
 
-// NewWhoAmIByte returns a pointer from a new WhoAmI object based on data.
+// NewWhoAmIByte returns a pointer from a
+// ew WhoAmI object based on data.
 // If an error occurs Nil will be returned.
 func NewRequestPlayerKDByte(data []byte) (*RequestPlayerKD, error) {
 	// checking length etc
@@ -297,16 +319,19 @@ func NewRequestPlayerKDByte(data []byte) (*RequestPlayerKD, error) {
 	return &val, nil
 }
 
-// RequestOtherPlayers is the opcode that Requests the name and id of the other players.
+// RequestOtherPlayers is the opcode that Requests the name
+// and id of the other players.
 type RequestOtherPlayers struct{}
 
-// NewRequestOtherPlayers creates a new RequestOtherPlayers instance.
+// NewRequestOtherPlayers creates a new RequestOtherPlayers
+// instance.
 func NewRequestOtherPlayers() RequestOtherPlayers {
 	return RequestOtherPlayers{}
 }
 
-// NewRequestOtherPlayersBytes returns a pointer from a new RequestOtherPlayers object based on data
-// If an error occurs Nil will be returned
+// NewRequestOtherPlayersBytes returns a pointer from a
+// new RequestOtherPlayers object based on data. If an
+// error occurs nil will be returned.
 func NewRequestOtherPlayersBytes(data []byte) (*RequestOtherPlayers, error) {
 	// checking length etc
 	// 1 Byte
@@ -315,21 +340,6 @@ func NewRequestOtherPlayersBytes(data []byte) (*RequestOtherPlayers, error) {
 	}
 
 	val := NewRequestOtherPlayers()
-	return &val, nil
-}
-
-type AckMap struct{}
-
-func NewAckMap() AckMap {
-	return AckMap{}
-}
-
-func NewAckMapBytes(data []byte) (*AckMap, error) {
-	if err := checkOpcodeHelper(AckMapOpcode, data); err != nil {
-		return nil, err
-	}
-
-	val := NewAckMap()
 	return &val, nil
 }
 

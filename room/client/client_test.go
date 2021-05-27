@@ -75,8 +75,6 @@ func TestClientRecv(t *testing.T) {
 	cq, hq := NewWorkQueue()
 	cmeta, mock := getClientMeta(ID)
 
-	_, funcTransferReader, _ := setupMock(mock)
-
 	_, getClientTimer := helpTimeout()
 	cT := getClientTimer(ID)
 	client := NewClient(1, cmeta, cq, cT)
@@ -92,7 +90,7 @@ func TestClientRecv(t *testing.T) {
 	// fill up the channel
 	buffer := []byte{pclient.RequestOtherPlayersOpcode.Value()}
 
-	funcTransferReader <- func() (int, io.Reader, error) {
+	mock.FuncReader <- func() (int, io.Reader, error) {
 		return websocket.BinaryMessage, bytes.NewReader(buffer), nil
 	}
 
@@ -108,7 +106,7 @@ func TestClientRecv(t *testing.T) {
 
 	// shutdown the client receive, this has to be send first
 	// as to hinder any race conditions.
-	funcTransferReader <- func() (int, io.Reader, error) {
+	mock.FuncReader <- func() (int, io.Reader, error) {
 		return 0, nil, websocket.ErrCloseSent
 	}
 
@@ -126,16 +124,15 @@ func TestClientSend(t *testing.T) {
 	_, getClientTimer := helpTimeout()
 	cT := getClientTimer(ID)
 
-	done, _, funcTransferWriter := setupMock(mock)
-
 	// send this first as to not have a race condition with
 	// the enqueue
-	funcTransferWriter <- func(messageType int) (io.WriteCloser, error) {
+	mock.FuncWriter <- func(messageType int) (io.WriteCloser, error) {
 		// shutdown the client
 		if messageType != websocket.BinaryMessage {
 			t.Errorf("Wrong message type used [%d] should be [%d]", messageType, websocket.BinaryMessage)
 		}
-		return mock.mwc, nil
+		mock.Close()
+		return mock.Mwc, nil
 	}
 
 	// send the information to the server
@@ -152,20 +149,17 @@ func TestClientSend(t *testing.T) {
 	}
 
 	client := NewClient(ID, cmeta, cq, cT)
-	defer client.Shutdown(context.TODO())
 
 	client.Run()
 
-	<-done
+	defer client.Shutdown(context.TODO())
+	<-mock.Done
 
-	// wait until the client has shutdown
-	// completely
-	client.Shutdown(context.TODO())
-
-	gotten := mock.mwc.Bytes()
+	gotten := mock.Mwc.Bytes()
 
 	compareByteSlices(exp, gotten, t)
 }
+
 func TestClientSendShutdown(t *testing.T) {
 	const ID = 1
 	cq, hq := NewWorkQueue()
@@ -173,16 +167,14 @@ func TestClientSendShutdown(t *testing.T) {
 	_, getClientTimer := helpTimeout()
 	cT := getClientTimer(ID)
 
-	done, _, funcTransferWriter := setupMock(mock)
-
 	// send this first as to not have a race condition with
 	// the enqueue
-	funcTransferWriter <- func(messageType int) (io.WriteCloser, error) {
+	mock.FuncWriter <- func(messageType int) (io.WriteCloser, error) {
 		// shutdown the client
 		if messageType != websocket.CloseMessage {
 			t.Errorf("Wrong message type used [%d] should be [%d]", messageType, websocket.BinaryMessage)
 		}
-		return mock.mwc, nil
+		return mock.Mwc, nil
 	}
 
 	exp := []byte{server.DisconnectOpcode.Value()}
@@ -194,17 +186,16 @@ func TestClientSendShutdown(t *testing.T) {
 	}
 
 	client := NewClient(ID, cmeta, cq, cT)
-	defer client.Shutdown(context.TODO())
 
 	client.Run()
 
-	<-done
+	<-mock.Done
 
 	// wait until the client has shutdown
 	// completely
 	client.Shutdown(context.TODO())
 
-	gotten := mock.mwc.Bytes()
+	gotten := mock.Mwc.Bytes()
 
 	compareByteSlices(exp, gotten, t)
 }
@@ -213,10 +204,9 @@ func TestClientSendNextWriterError(t *testing.T) {
 	const ID = 1
 	cq, hq := NewWorkQueue()
 	cmeta, mock := getClientMeta(ID)
+
 	_, getClientTimer := helpTimeout()
 	cT := getClientTimer(ID)
-
-	done, _, _ := setupMock(mock)
 
 	exp := []byte{server.PlayerJoinedOpcode.Value()}
 	err := hq.Enqueue(exp)
@@ -231,7 +221,7 @@ func TestClientSendNextWriterError(t *testing.T) {
 
 	client.Run()
 
-	close(done)
+	mock.Close()
 
 	// wait until the client has shutdown
 	// completely

@@ -9,13 +9,18 @@ import (
 	"fmt"
 )
 
+// RSABitSize is the default size of the RSA key generated.
 const RSABitSize int = 2048
 
-// ErrInvalidRSAData is the state that happens, when the rsa data
-// is not valid PEM encoding.
-var ErrInvalidPEMData = errors.New("data is not valid pem encoding")
+var (
+	// ErrInvalidRSAData is the state that happens, when the rsa data
+	// is not valid PEM encoding.
+	ErrInvalidPEMData = errors.New("data is not valid pem encoding")
 
-var ErrInvalidPEMHeader = errors.New("invalid PEM header please use `RSA PRIVATE KEY` instead")
+	// ErrInvalidPEMHeader is the error returned, when during
+	// parsing an unsupported PEM heder is used.
+	ErrInvalidPEMHeader = errors.New("invalid PEM header please use `RSA PRIVATE KEY` instead")
+)
 
 // ErrInvalidRSAKey is returned when there was an invalid
 // parsing of the input data.
@@ -70,7 +75,7 @@ func ParseRSA(data []byte) (*rsa.PrivateKey, error) {
 // RSABitSize.
 // Attention only use this function for testing
 // do not use this line in production as it can
-// not guarantie a long lasting private key.
+// not guarantee a long lasting private key.
 func GenerateRSA() (*rsa.PrivateKey, error) {
 	return rsa.GenerateKey(rand.Reader, RSABitSize)
 }

@@ -4,7 +4,7 @@ import (
 	"fmt"
 )
 
-// The configuration for the webserver
+// The configuration for the web server
 type WebConfig struct {
 	// Is the given ip, this may be either localhost or any ip4 / ip6 value.
 	Ip string
@@ -61,6 +61,7 @@ type CORSConfig struct {
 	Domains []string
 }
 
+// CheckConfiguration satisfies the CheckConfig interface.
 func (c *CORSConfig) CheckConfiguration() error {
 	if len(c.Domains) == 0 {
 		return ErrEmptyCORSDomain

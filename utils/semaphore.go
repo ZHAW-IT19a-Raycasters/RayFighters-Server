@@ -27,7 +27,7 @@ type CountingSemaphore struct {
 	// counting the values
 	sem semaphoreChan
 	// limit is the set limit of value
-	// up to wich this semaphore can
+	// up to which this semaphore can
 	// in theory count.
 	limit uint32
 }
@@ -42,8 +42,9 @@ func NewCountingSemaphore(limit uint32) CountingSemaphore {
 }
 
 // Value will return the current value of the semaphore
-// Attention this is state nto check if there
-// is still space left
+// Attention do not used this to check if there is
+// is still space left. As the value might not be
+// up to date.
 func (sem *CountingSemaphore) Value() int {
 	return len(sem.sem)
 }
@@ -55,7 +56,7 @@ func (sem *CountingSemaphore) Limit() uint32 {
 
 // Empty will return true, if the counter is at it's
 // lower limit a zero.
-// Attention this might not represents the actuall value
+// Attention this might not represents the actual value
 // due to non atomic operations.
 func (sem *CountingSemaphore) Empty() bool {
 	return len(sem.sem) == 0
@@ -63,7 +64,7 @@ func (sem *CountingSemaphore) Empty() bool {
 
 // Full will return true, if the counter reached the
 // given limit.
-// Attention this might not represents the actuall value
+// Attention this might not represents the actual value
 // due to non atomic operations.
 func (sem *CountingSemaphore) Full() bool {
 	return len(sem.sem) == int(sem.limit)

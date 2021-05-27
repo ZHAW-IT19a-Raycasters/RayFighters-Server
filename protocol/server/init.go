@@ -13,6 +13,9 @@ import (
 // A Server Opcode represents the internal representations
 // of all the defined server side operational
 // codes that control the game flow.
+//
+// see definition here:
+// https://github.zhaw.ch/raycasters/docs/wiki/Protocol#server
 type ServerOpcode uint8
 
 const (
@@ -39,6 +42,8 @@ const (
 	MapChangeOpcode         ServerOpcode = 0x8C
 )
 
+// Overview gives an iterable array over all the
+// available opcodes.
 var Overview = [...]ServerOpcode{
 	DisconnectOpcode,
 	UnknownOpcode,
@@ -113,10 +118,14 @@ type PlayerDeath struct {
 	killerId uint8
 }
 
+// KilledId will return the id of the player
+// that was killed.
 func (pd PlayerDeath) KilledId() uint8 {
 	return pd.killedId
 }
 
+// killedId will return the id of the player
+// that killed the poor other player.
 func (pd PlayerDeath) KillerId() uint8 {
 	return pd.killerId
 }
@@ -135,7 +144,7 @@ func (pq PlayerDeath) ByteSize() uint {
 
 // Bytes will turn the disconnect instance into a sendable byte stream.
 func (pd PlayerDeath) Bytes() []byte {
-	// using the buffer write interface for simplisity
+	// using the buffer write interface for simplicity
 	buffer := make([]byte, pd.ByteSize())
 
 	buffer[0] = PlayerDeathOpcode.Value()
@@ -177,6 +186,8 @@ func (mp TeleportPlayer) CoorY() float64 {
 	return mp.coorY
 }
 
+// ByteSize will return size of array
+// that has to be allocated.
 func (mp TeleportPlayer) ByteSize() int {
 	//     Op          + UserId     + CoorX + CoorY
 	return opcodeSize + userIdSize + coordSize*2
@@ -185,7 +196,7 @@ func (mp TeleportPlayer) ByteSize() int {
 // Bytes will turn the movement instance into a sendable byte stream.
 func (mp TeleportPlayer) Bytes() []byte {
 
-	// using the buffer write interface for simplisity
+	// using the buffer write interface for simplicity
 	buffer := make([]byte, mp.ByteSize())
 
 	buffer[0] = TeleportPlayerOpcode.Value()
@@ -235,10 +246,14 @@ func (mp MovementPlayer) CoorY() float64 {
 	return mp.coorY
 }
 
+// AnglePl will return the angle in which the player
+// currently is looking.
 func (mp MovementPlayer) AnglePl() float64 {
 	return mp.anglePl
 }
 
+// ByteSize will return size of array
+// that has to be allocated.
 func (mp MovementPlayer) ByteSize() int {
 	//     Op          + UserId     + CoorX + CoorY + AnglePl
 	return opcodeSize + userIdSize + coordSize*2 + angleSize
@@ -247,7 +262,7 @@ func (mp MovementPlayer) ByteSize() int {
 // Bytes will turn the movement instance into a sendable byte stream.
 func (mp MovementPlayer) Bytes() []byte {
 
-	// using the buffer write interface for simplisity
+	// using the buffer write interface for simplicity
 	buffer := make([]byte, mp.ByteSize())
 
 	buffer[0] = MovementPlayerOpcode.Value()
@@ -264,11 +279,15 @@ func (mp MovementPlayer) Bytes() []byte {
 	return buffer
 }
 
+// ShootingPlayer is the internal representation of
+// a shot fired by a given player into a given
+// angle.
 type ShootingPlayer struct {
 	userId uint8
 	anglPl float64
 }
 
+// NewShootingPlayer will construct a new ShootingPlayer object.
 func NewShootingPlayer(id uint8, angPl float64) ShootingPlayer {
 	return ShootingPlayer{
 		userId: id,
@@ -276,18 +295,24 @@ func NewShootingPlayer(id uint8, angPl float64) ShootingPlayer {
 	}
 }
 
+// UserId will return the user whom has made the shot.
 func (sp ShootingPlayer) UserId() uint8 {
 	return sp.userId
 }
 
+// AnglePl will return the angle in which the player has
+// shot.
 func (sp ShootingPlayer) AnglePl() float64 {
 	return sp.anglPl
 }
 
+// ByteSize will return size of array that has to be allocated.
 func (sp ShootingPlayer) ByteSize() int {
 	return opcodeSize + userIdSize + angleSize
 }
 
+// Bytes will turn the shooting player instance into a sendable
+// byte stream.
 func (sp ShootingPlayer) Bytes() []byte {
 	data := make([]byte, sp.ByteSize())
 
@@ -318,7 +343,7 @@ func (p Player) String() string {
 // (65'535)
 func NewPlayer(userId uint8, name string) Player {
 	if math.MaxUint16 <= len(name) {
-		panic(fmt.Sprintf("Maximum name lenght is a %d", math.MaxUint16))
+		panic(fmt.Sprintf("Maximum name length is a %d", math.MaxUint16))
 	}
 
 	return Player{userId: userId, name: name}
@@ -328,7 +353,7 @@ func NewPlayer(userId uint8, name string) Player {
 // Will return the offset where the player stops.
 //
 // Attention this function will not return an
-// error if any of the given lenghts are incorrect,
+// error if any of the given lengths are incorrect,
 // as this function should never actually be used
 // on the server side, but is primarily used for
 // testing purposes.
@@ -405,6 +430,7 @@ func (p PlayerJoined) Player() Player {
 	return p.p
 }
 
+// Bytes will turn the movement instance into a sendable byte stream.
 func (p PlayerJoined) ByteSize() int {
 	return opcodeSize + p.Player().ByteSize()
 }
@@ -448,6 +474,8 @@ func (p PlayerLeft) Bytes() []byte {
 	}
 }
 
+// YouAreCalled will be returned when the player
+// asks for his/her internally used id.
 type YouAreCalled struct {
 	userId uint8
 }
@@ -457,12 +485,15 @@ func (yac YouAreCalled) UserId() uint8 {
 	return yac.userId
 }
 
+// NewYouAreCalled will create a new object of the
+// type YouAreCalled.
 func NewYouAreCalled(userId uint8) YouAreCalled {
 	return YouAreCalled{
 		userId: userId,
 	}
 }
 
+// Bytes will turn the instance into a sendable byte stream.
 func (yac YouAreCalled) Bytes() []byte {
 	return []byte{
 		YouAreCalledOpcode.Value(),
@@ -470,61 +501,42 @@ func (yac YouAreCalled) Bytes() []byte {
 	}
 }
 
+// PlayerKD the representation of a single
+// players kills and deaths.
 type PlayerKD struct {
 	id     uint8
 	kills  uint16
 	deaths uint16
 }
 
-type PlayersKD struct {
-	playersKD []PlayerKD
-}
-
+// UserId will return the user whom
+// has achieved the given KD.
 func (pkd PlayerKD) UserId() uint8 {
 	return pkd.id
 }
 
+// Kills will return the players kill
+// count.
 func (pkd PlayerKD) Kills() uint16 {
 	return pkd.kills
 }
 
+// Deaths will return the players death
+// count.
 func (pkd PlayerKD) Deaths() uint16 {
 	return pkd.deaths
 }
 
-func NewPlayerKD(id uint8, kills, deaths uint16) PlayerKD {
-	return PlayerKD{
-		id:     id,
-		kills:  kills,
-		deaths: deaths,
-	}
-}
-
-func (p PlayersKD) ByteSize() int {
-	return opcodeSize + playerCoutnSize + len(p.playersKD)*PlayerKD{}.ByteSize()
-}
-
-func (p PlayersKD) Bytes() []byte {
-	b := make([]byte, p.ByteSize())
-	b[0] = SendAllPlayerKDOpcode.Value()
-	b[1] = byte(len(p.playersKD))
-
-	for index, playerKD := range p.playersKD {
-		playerKD.PutBytes(b[index*playerKD.ByteSize()+2:])
-	}
-	return b
-}
-
-func NewPlayersKD(players []PlayerKD) PlayersKD {
-	return PlayersKD{
-		playersKD: players,
-	}
-}
-
+// ByteSize will return size of array that has to be allocated.
 func (p PlayerKD) ByteSize() int {
 	return 1 + 2 + 2
 }
 
+// PutBytes will write the binary representation of the player
+// into the `data` parameter, from the zero position on of the
+// slice.
+// Attention this function will panic, if the data slice is not
+// at least as long as the PlayerKD.ByteSize.
 func (p PlayerKD) PutBytes(data []byte) {
 	// this eliminates the bound check below
 	// see https://go101.org/article/bounds-check-elimination.html
@@ -536,8 +548,49 @@ func (p PlayerKD) PutBytes(data []byte) {
 	binary.LittleEndian.PutUint16(data[3:5], uint16(p.deaths))
 }
 
+// NewPlayerKD will create a new instance of a player
+// KD.
+func NewPlayerKD(id uint8, kills, deaths uint16) PlayerKD {
+	return PlayerKD{
+		id:     id,
+		kills:  kills,
+		deaths: deaths,
+	}
+}
+
+// PlayersKD is the actual opcode responsible
+// for informing the client of the current
+// state of things.
+type PlayersKD struct {
+	playersKD []PlayerKD
+}
+
+// ByteSize will return size of array that has to be allocated.
+func (p PlayersKD) ByteSize() int {
+	return opcodeSize + playerCoutnSize + len(p.playersKD)*PlayerKD{}.ByteSize()
+}
+
+// Bytes will turn the players instance into a sendable byte stream.
+func (p PlayersKD) Bytes() []byte {
+	b := make([]byte, p.ByteSize())
+	b[0] = SendAllPlayerKDOpcode.Value()
+	b[1] = byte(len(p.playersKD))
+
+	for index, playerKD := range p.playersKD {
+		playerKD.PutBytes(b[index*playerKD.ByteSize()+2:])
+	}
+	return b
+}
+
+// NewPlayersKD will construct a new playersKD instance.
+func NewPlayersKD(players []PlayerKD) PlayersKD {
+	return PlayersKD{
+		playersKD: players,
+	}
+}
+
 // SendAllPlayerInfo is a request that will have to return any and
-// all player information requiered for operations.
+// all player information required for operations.
 type SendAllPlayerInfo struct {
 	players []Player
 }
@@ -582,8 +635,10 @@ func (p *SendAllPlayerInfo) Players() []Player {
 	return p.players
 }
 
+// ByteSize is a helper that will return all the players size,
+// so that a correctly sized buffer can be preallocated.
 func (p *SendAllPlayerInfo) ByteSize() int {
-	// precalculate bytesize
+	// precalculate byte size
 	size := 1 // opcode
 	size += 1 // player count
 	for _, player := range p.players {
@@ -613,7 +668,7 @@ func (p *SendAllPlayerInfo) Bytes() []byte {
 }
 
 // MapChange is the opcode that will tell the
-// frontend what map is currently chosen
+// client what map is currently chosen
 // and at what time it was chosen.
 type MapChange struct {
 	mapId    uint8
@@ -628,6 +683,7 @@ func NewMapChange(mapId uint8, unixTime int64) MapChange {
 	}
 }
 
+//  ByteSize will return size of array that has to be allocated.
 func (p MapChange) ByteSize() int {
 	// Opcode + MapId + time
 	return 1 + 1 + 8

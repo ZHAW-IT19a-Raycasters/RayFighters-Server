@@ -34,7 +34,7 @@ func newArgParser(parser *argparse.Parser, coms *commandlineArguments) argParser
 	}
 }
 
-// Will print the usage error message to the commandline.
+// Will print the usage error message to the command line.
 func (p *argParser) Usage(msg error) {
 	fmt.Fprint(p.out, p.parser.Usage(msg))
 }
@@ -45,16 +45,16 @@ func (p *argParser) Args() *commandlineArguments {
 	return p.coms
 }
 
-// Will parse the command line arguments themselfs.
+// Will parse the command line arguments themselves.
 func argParse() (argParser, error) {
 	return rawArgParse(os.Args)
 }
 
-// Will parse any agument slice.
+// Will parse any argument slice.
 // This is split into a sub function for easier testing.
 func rawArgParse(arguments []string) (argParser, error) {
-	parser := argparse.NewParser("RayServer", "Controlls all the rooms and interactions between the players.")
-	// shutdown parser if not fullfilled
+	parser := argparse.NewParser("RayServer", "Controls all the rooms and interactions between the players.")
+	// shutdown parser if not fulfilled
 	parser.ExitOnHelp(true)
 
 	// setup ip

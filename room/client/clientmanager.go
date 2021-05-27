@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -92,7 +93,7 @@ func (manager *ClientManager) Size() int {
 func (manager *ClientManager) MapId(meta ClientMeta) (uint8, bool) {
 	manager.lock.RLock()
 	defer manager.lock.RUnlock()
-	return manager.mapToInternalId(meta)
+	return manager.unsafeMapToId(meta)
 }
 
 // MapMeta will map the client internal id with the correct meta
@@ -118,11 +119,11 @@ func (manager *ClientManager) mapToExternalMeta(id uint8) (ClientMeta, bool) {
 	return client.meta.GetMeta(), ok
 }
 
-// mapToInternalId is the lock free version to the MapId function,
+// unsafeMapToId is the lock free version to the MapId function,
 // it is intended to be used, with external locking in place as
 // it itself does not lock, but assumes the caller already
 // has one.
-func (manager *ClientManager) mapToInternalId(meta ClientMeta) (uint8, bool) {
+func (manager *ClientManager) unsafeMapToId(meta ClientMeta) (uint8, bool) {
 	id, ok := manager.mapping[meta.id]
 	return id, ok
 }
@@ -142,6 +143,23 @@ func (manager *ClientManager) GetClientStatus(id uint8) (ConnectionStatus, bool)
 	return client.GetStatus(), ok
 }
 
+// SetClientStatus sets the ConnectionStatus of a Client
+// it return the new ConnectionStatus and an error
+func (manager *ClientManager) SetClientStatus(id uint8, statusNew ConnectionStatus) (ConnectionStatus, error) {
+	manager.lock.RLock()
+	defer manager.lock.RUnlock()
+	status := Offline
+	client, ok := manager.clients[id]
+	if !ok {
+		// TODO: nice error
+		return status, errors.New("client does not exist")
+	}
+	status = client.status
+	client.status = statusNew
+
+	return status, nil
+}
+
 // GetPlayers will return the senable player configuration
 // and true if it exists, else it will return an empty
 // server.Player struct and false.
@@ -155,7 +173,7 @@ func (manager *ClientManager) GetPlayer(id uint8) (server.Player, bool) {
 	return client.meta.GetPlayer(), ok
 }
 
-// GetPlayers will retuen a slice of all the currently
+// GetPlayers will return a slice of all the currently
 // registered players in the server.
 func (manager *ClientManager) GetPlayers() []server.Player {
 	manager.lock.RLock()
@@ -187,7 +205,7 @@ func (manager *ClientManager) AddClient(meta ClientMeta, queue ClientQueue, time
 	defer manager.lock.Unlock()
 
 	// check if client ID already exists.
-	if id, ok := manager.mapToInternalId(meta); ok {
+	if id, ok := manager.unsafeMapToId(meta); ok {
 		// the person already existed in the Hub
 		// add him back
 		if client, ok := manager.clients[id]; ok {
@@ -243,7 +261,6 @@ func (manager *ClientManager) RemoveClient(meta ClientMeta) error {
 		return NewErrClientDoesntExist(meta)
 	}
 	manager.lock.Lock()
-
 	val := manager.clients[id]
 
 	// make sure it is shutdown, at most wait for the timeout
@@ -317,14 +334,23 @@ func (manager *ClientManager) Shutdown(cxt context.Context) {
 		close(waiter)
 	}()
 
+	manager.lock.Lock()
+
+	clients := make([]ClientMeta, 0, len(manager.clients))
+
 	// run shutdown on all clients
 	for id := range manager.clients {
-		meta, ok := manager.mapToExternalMeta(id)
-		if !ok {
-			// if the client already has been removed
-			continue
-		}
-		manager.RemoveClient(meta)
+		// as we have the lock there is no chance
+		// of a client beeing removed so ignore
+		// the bool value
+		meta, _ := manager.mapToExternalMeta(id)
+		clients = append(clients, meta)
+	}
+
+	manager.lock.Unlock()
+	// run shutdown on all clients
+	for _, meta := range clients {
+		go manager.RemoveClient(meta)
 	}
 
 	select {

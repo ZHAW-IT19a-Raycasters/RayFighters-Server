@@ -22,7 +22,7 @@ const localhost string = "localhost"
 
 var (
 	// getCurrentUser is extracted so that
-	// it can get mocked in tests to achive
+	// it can get mocked in tests to achieve
 	// always the same result.
 	getCurrentUser = user.Current
 
@@ -65,7 +65,7 @@ type ErrInvalidCORSConfiguration struct {
 	internal error
 }
 
-// Error satisfies the errorri equirements.
+// Error satisfies the error requirements.
 func (err ErrInvalidCORSConfiguration) Error() string {
 	return fmt.Sprintf("unable to use the CORS domains because of [%s]", err.Unwrap())
 }
@@ -76,7 +76,7 @@ func (err ErrInvalidCORSConfiguration) Is(target error) bool {
 	return ok
 }
 
-// Unwrap satisfies the errors.Unrap requirements.
+// Unwrap satisfies the errors.Unwrap requirements.
 func (err ErrInvalidCORSConfiguration) Unwrap() error {
 	return err.internal
 }
@@ -90,7 +90,7 @@ type ErrUnableToParseUserHome struct {
 	internal error
 }
 
-// Error satisfies the errorri equirements.
+// Error satisfies the error requirements.
 func (err ErrUnableToParseUserHome) Error() string {
 	return fmt.Sprintf("unable to parse the path [%s] because of [%s]", err.path, err.internal)
 }
@@ -130,7 +130,7 @@ func (err InvalidIpError) Error() string {
 	return fmt.Sprintf("is not a valid IP [%s]", err.falseIp)
 }
 
-// InvalidRSAKeyPath is the error returend when there is
+// InvalidRSAKeyPath is the error returned when there is
 // no such RSA private key file found.
 type InvalidRSAKeyPath struct {
 	path     string
@@ -232,6 +232,8 @@ func fixUserHomePath(path string) (string, error) {
 	return res, nil
 }
 
+// CheckIfRSAValid will check if the file given by the path
+// is valid according to the internal requirements.
 func CheckIfRSAValid(path string) error {
 	// remove any excess
 	path = strings.TrimSpace(path)
