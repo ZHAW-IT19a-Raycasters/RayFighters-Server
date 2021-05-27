@@ -119,6 +119,7 @@ func NewHubController() *HubController {
 	return &hc
 }
 
+// run starts client Timeout Queue as well as the respawn handler
 func (hc *HubController) run() error {
 	err := hc.timeoutClientQueue.Run()
 	if err != nil {
@@ -127,6 +128,9 @@ func (hc *HubController) run() error {
 	return hc.respawnHandler.Run()
 }
 
+// NewMap changes the map of the hub if its not set it sets it instead.
+// it requires a mapTimeMeta of the new current map as the a parameter
+// it return an error if none happens it returns nil
 func (hc *HubController) NewMap(mapMeta mapTimeMeta) error {
 	if !hc.mapChanging.SetTrue() {
 		return ErrHubControllerChangingMap
@@ -172,6 +176,8 @@ func (hc *HubController) NewMap(mapMeta mapTimeMeta) error {
 	return nil
 }
 
+// respawnPlayer respawns a dead Player on a new random Location
+// if something goes wrong an error will be returned, else nil will return
 func (hc *HubController) respawnPlayer(id uint8) error {
 	if !hc.isActive.Get() {
 		return ErrHubControllerOffline
@@ -205,6 +211,8 @@ func (hc *HubController) respawnPlayer(id uint8) error {
 	return nil
 }
 
+// checkClientState checks if client has a valid state
+// if not it returns an error
 func (hc *HubController) checkClientState(id uint8, expectedState client.ConnectionStatus) error {
 	hc.lock.RLock()
 	defer hc.lock.RUnlock()
@@ -524,6 +532,9 @@ func (hc *HubController) broadCast(msg protocol.Bytefy, except helpers.IdSet) {
 	hc.unsafeBroadCast(msg, except)
 }
 
+// unsafeBroadCast is a helper function that broadcasts a message
+// without a Lock on the hubcontroller
+// it requires a protocol msg and the id's of clients which shouldn't get the message
 func (hc *HubController) unsafeBroadCast(msg protocol.Bytefy, except helpers.IdSet) {
 	// get the bytes first
 	data := msg.Bytes()
@@ -637,11 +648,13 @@ func (hc *HubController) handleRead(data []byte, id uint8) protocol.Bytefy {
 	return nil
 }
 
+// handleUnknown handles a unknown opcode received
 func (hc *HubController) handleUnknown(id uint8) protocol.Bytefy {
 	logger.Errorf("Received Unknown Opcode from Client[%d]", id)
 	return nil
 }
 
+// handleDisconnect handles a disconnect opcode received
 func (hc *HubController) handleDisconnect(t []byte, id uint8) protocol.Bytefy {
 	_, err := pclient.NewDisconnectByte(t)
 	if err != nil {
@@ -657,6 +670,7 @@ func (hc *HubController) handleDisconnect(t []byte, id uint8) protocol.Bytefy {
 	return newDisconnect
 }
 
+// handleWhoAmI handles a whoami opcode received
 func (hc *HubController) handleWhoAmI(t []byte, id uint8) protocol.Bytefy {
 	_, err := pclient.NewWhoAmIByte(t)
 	if err != nil {
@@ -668,6 +682,7 @@ func (hc *HubController) handleWhoAmI(t []byte, id uint8) protocol.Bytefy {
 	return newYouAreCalled
 }
 
+// handleMovement handles a movement opcode received
 func (hc *HubController) handleMovement(message []byte, id uint8) protocol.Bytefy {
 	movement, err := pclient.NewMovementByte(message)
 	if err != nil {
@@ -693,6 +708,7 @@ func (hc *HubController) handleMovement(message []byte, id uint8) protocol.Bytef
 	return nil
 }
 
+// handleShooting handles a shooting opcode received
 func (hc *HubController) handleShooting(t []byte, shooterId uint8) protocol.Bytefy {
 	shot, err := pclient.NewShootingBytes(t)
 	if err != nil {
@@ -733,6 +749,7 @@ func (hc *HubController) handleShooting(t []byte, shooterId uint8) protocol.Byte
 	return nil
 }
 
+// handleRequestOtherPlayer handles a RequestOtherPlayer opcode received
 func (hc *HubController) handleRequestOtherPlayer(t []byte) protocol.Bytefy {
 	_, err := pclient.NewRequestOtherPlayersBytes(t)
 	if err != nil {
@@ -745,6 +762,7 @@ func (hc *HubController) handleRequestOtherPlayer(t []byte) protocol.Bytefy {
 	return newPlayerInfo
 }
 
+// handleRequestPlayerKD handles a RequestPlayerKD opcode received
 func (hc *HubController) handleRequestPlayerKD(t []byte) protocol.Bytefy {
 	_, err := pclient.NewRequestPlayerKDByte(t)
 	if err != nil {

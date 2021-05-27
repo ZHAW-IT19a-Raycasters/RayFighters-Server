@@ -14,21 +14,26 @@ var logger = log.Log()
 
 const spawnOffset = 0.5
 
+// iRand is an interface to create new random Ints or Floats
 type iRand interface {
 	Intn(n int) int
 	Float64() float64
 }
 
+// sRand is an empty struct to generate random nr
 type sRand struct{}
 
+// Intn returns a random int
 func (r sRand) Intn(n int) int {
 	return rand.Intn(n)
 }
 
+// Float64 returns a random float64
 func (r sRand) Float64() float64 {
 	return rand.Float64()
 }
 
+// MapController is a struct to save all necessary information about a map
 type MapController struct {
 	clients     map[uint8]*gamemap.Coordinate
 	spawingarea []gamemap.Coordinate
@@ -37,6 +42,8 @@ type MapController struct {
 	lock        *sync.RWMutex
 }
 
+// NewMapController creates a new MapController element
+// it requires a filepath to the map.txt
 func NewMapController(filePath string) (MapController, error) {
 	map2d, err := gamemap.LoadMap2d(filePath)
 	if err != nil {
@@ -198,6 +205,7 @@ func (mc *MapController) GetClient(id uint8) (gamemap.Coordinate, bool) {
 	return *c, ok
 }
 
+// GetPosition returns the current position of a client
 func (mc *MapController) GetPosition(userId uint8) (x float64, y float64, ok bool) {
 	c, ok := mc.GetClient(userId)
 	if !ok {
@@ -206,6 +214,7 @@ func (mc *MapController) GetPosition(userId uint8) (x float64, y float64, ok boo
 	return c.X(), c.Y(), ok
 }
 
+// GetMapCoordinates returns the map coordinates of the square where the client is
 func (mc *MapController) GetMapCoordinates(userId uint8) (x int, y int, ok bool) {
 	c, ok := mc.GetClient(userId)
 	if !ok {
