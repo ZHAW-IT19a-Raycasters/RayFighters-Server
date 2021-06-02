@@ -182,6 +182,7 @@ func (manager *ClientManager) GetPlayers() []server.Player {
 	for _, client := range manager.clients {
 		players = append(players, client.meta.GetPlayer())
 	}
+
 	return players
 }
 

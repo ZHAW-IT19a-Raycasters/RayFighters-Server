@@ -166,6 +166,7 @@ func (hc *HubController) NewMap(mapMeta mapTimeMeta) error {
 	if err != nil {
 		return err
 	}
+
 	for id, lClient := range clients {
 		logger.Debugf("teleporting player [%d] into the map [%d]", id, mapMeta.meta.GetId())
 		// teleport the player back into the game
@@ -347,7 +348,9 @@ func (hc *HubController) RegisterClient(meta client.ClientMeta) error {
 
 	// prepare messages without the new player information
 	sendAllPLayerKd := hc.gameState.GetPlayersKD()
+
 	sendAllPlayerInfo := server.NewSendAllPlayerInfo(hc.clientManager.GetPlayers())
+
 	mapInfo := server.NewMapChange(hc.currentMap.meta.GetId(), hc.currentMap.since.UnixNano())
 
 	// directly add the client to the manager and
@@ -376,7 +379,7 @@ func (hc *HubController) RegisterClient(meta client.ClientMeta) error {
 	// Attention although the order is specified
 	// by the protocol the websocket protocol
 	// does not garantie it.
-	messages := []protocol.Bytefy{
+	messages := [...]protocol.Bytefy{
 		youAreCalled,
 		sendAllPLayerKd,
 		sendAllPlayerInfo,
@@ -494,9 +497,9 @@ func (hc *HubController) removeClient(meta client.ClientMeta) error {
 		return nil
 	}
 
-	logger.Debugf("removing client [%s] from hub", meta.GetId())
+	logger.Infof("removing client [%s] from hub", meta.GetId())
 
-	// error is not needed as per definition the client has to exists
+	// ok is not needed as per definition the client has to exists
 	// at this point
 	id, _ := hc.clientManager.MapId(meta)
 
