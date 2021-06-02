@@ -239,7 +239,7 @@ type ClientConnection interface {
 }
 ```
 
-## type [ClientGame](<https://github.zhaw.ch/raycasters/server/blob/master/room/client/client_data.go#L59-L63>)
+## type [ClientGame](<https://github.zhaw.ch/raycasters/server/blob/master/room/client/client_data.go#L61-L65>)
 
 ClientGame represents the state of the client in the game
 
@@ -250,7 +250,7 @@ type ClientGame struct {
 }
 ```
 
-### func [NewClientGame](<https://github.zhaw.ch/raycasters/server/blob/master/room/client/client_data.go#L66>)
+### func [NewClientGame](<https://github.zhaw.ch/raycasters/server/blob/master/room/client/client_data.go#L68>)
 
 ```go
 func NewClientGame() ClientGame
@@ -258,7 +258,7 @@ func NewClientGame() ClientGame
 
 NewClientGame creates the default client object\.
 
-### func \(\*ClientGame\) [GetDeaths](<https://github.zhaw.ch/raycasters/server/blob/master/room/client/client_data.go#L82>)
+### func \(\*ClientGame\) [GetDeaths](<https://github.zhaw.ch/raycasters/server/blob/master/room/client/client_data.go#L84>)
 
 ```go
 func (cg *ClientGame) GetDeaths() uint16
@@ -266,7 +266,7 @@ func (cg *ClientGame) GetDeaths() uint16
 
 GetDeaths will reutrn the death count of the client\.
 
-### func \(\*ClientGame\) [GetKills](<https://github.zhaw.ch/raycasters/server/blob/master/room/client/client_data.go#L76>)
+### func \(\*ClientGame\) [GetKills](<https://github.zhaw.ch/raycasters/server/blob/master/room/client/client_data.go#L78>)
 
 ```go
 func (cg *ClientGame) GetKills() uint16
@@ -274,7 +274,7 @@ func (cg *ClientGame) GetKills() uint16
 
 GetKills will return the current kill count of the client\.
 
-### func \(\*ClientGame\) [IncDeaths](<https://github.zhaw.ch/raycasters/server/blob/master/room/client/client_data.go#L94>)
+### func \(\*ClientGame\) [IncDeaths](<https://github.zhaw.ch/raycasters/server/blob/master/room/client/client_data.go#L96>)
 
 ```go
 func (cg *ClientGame) IncDeaths()
@@ -282,7 +282,7 @@ func (cg *ClientGame) IncDeaths()
 
 IncDeaths will increment the death counter by one
 
-### func \(\*ClientGame\) [IncKills](<https://github.zhaw.ch/raycasters/server/blob/master/room/client/client_data.go#L88>)
+### func \(\*ClientGame\) [IncKills](<https://github.zhaw.ch/raycasters/server/blob/master/room/client/client_data.go#L90>)
 
 ```go
 func (cg *ClientGame) IncKills()
@@ -290,7 +290,7 @@ func (cg *ClientGame) IncKills()
 
 IncKills will increment the kill count of the player
 
-## type [ClientManager](<https://github.zhaw.ch/raycasters/server/blob/master/room/client/clientmanager.go#L50-L64>)
+## type [ClientManager](<https://github.zhaw.ch/raycasters/server/blob/master/room/client/clientmanager.go#L49-L63>)
 
 ClientManager is the struct responsible for managing any and all client connections\.
 
@@ -300,7 +300,7 @@ type ClientManager struct {
 }
 ```
 
-### func [NewClientManager](<https://github.zhaw.ch/raycasters/server/blob/master/room/client/clientmanager.go#L67>)
+### func [NewClientManager](<https://github.zhaw.ch/raycasters/server/blob/master/room/client/clientmanager.go#L66>)
 
 ```go
 func NewClientManager() ClientManager
@@ -308,7 +308,7 @@ func NewClientManager() ClientManager
 
 NewClientManager will initialize a new clientManager instance\.
 
-### func \(\*ClientManager\) [AddClient](<https://github.zhaw.ch/raycasters/server/blob/master/room/client/clientmanager.go#L201>)
+### func \(\*ClientManager\) [AddClient](<https://github.zhaw.ch/raycasters/server/blob/master/room/client/clientmanager.go#L199>)
 
 ```go
 func (manager *ClientManager) AddClient(meta ClientMeta, queue ClientQueue, timeoutMessanger func(id uint8) ClientTimer) error
@@ -320,7 +320,7 @@ As to not have to rebuild an unneeded ClientTimer the function is only called in
 
 If there is an invariant due to some incorrect programming then this function will panic\.
 
-### func \(\*ClientManager\) [GetClientStatus](<https://github.zhaw.ch/raycasters/server/blob/master/room/client/clientmanager.go#L133>)
+### func \(\*ClientManager\) [GetClientStatus](<https://github.zhaw.ch/raycasters/server/blob/master/room/client/clientmanager.go#L132>)
 
 ```go
 func (manager *ClientManager) GetClientStatus(id uint8) (ConnectionStatus, bool)
@@ -328,7 +328,7 @@ func (manager *ClientManager) GetClientStatus(id uint8) (ConnectionStatus, bool)
 
 GetClientStatus will return the current connection status of the client if the client currently exists\.
 
-### func \(\*ClientManager\) [GetPlayer](<https://github.zhaw.ch/raycasters/server/blob/master/room/client/clientmanager.go#L166>)
+### func \(\*ClientManager\) [GetPlayer](<https://github.zhaw.ch/raycasters/server/blob/master/room/client/clientmanager.go#L164>)
 
 ```go
 func (manager *ClientManager) GetPlayer(id uint8) (server.Player, bool)
@@ -336,7 +336,7 @@ func (manager *ClientManager) GetPlayer(id uint8) (server.Player, bool)
 
 GetPlayers will return the senable player configuration and true if it exists\, else it will return an empty server\.Player struct and false\.
 
-### func \(\*ClientManager\) [GetPlayers](<https://github.zhaw.ch/raycasters/server/blob/master/room/client/clientmanager.go#L178>)
+### func \(\*ClientManager\) [GetPlayers](<https://github.zhaw.ch/raycasters/server/blob/master/room/client/clientmanager.go#L176>)
 
 ```go
 func (manager *ClientManager) GetPlayers() []server.Player
@@ -344,7 +344,7 @@ func (manager *ClientManager) GetPlayers() []server.Player
 
 GetPlayers will return a slice of all the currently registered players in the server\.
 
-### func \(\*ClientManager\) [MapId](<https://github.zhaw.ch/raycasters/server/blob/master/room/client/clientmanager.go#L93>)
+### func \(\*ClientManager\) [MapId](<https://github.zhaw.ch/raycasters/server/blob/master/room/client/clientmanager.go#L92>)
 
 ```go
 func (manager *ClientManager) MapId(meta ClientMeta) (uint8, bool)
@@ -352,7 +352,7 @@ func (manager *ClientManager) MapId(meta ClientMeta) (uint8, bool)
 
 MapId will map the client meta information with the internal value\. If there is no such person this function will return false and a zero value\. Attention this is thread safe\, but fairly slow due to the lock\.
 
-### func \(\*ClientManager\) [MapMeta](<https://github.zhaw.ch/raycasters/server/blob/master/room/client/clientmanager.go#L104>)
+### func \(\*ClientManager\) [MapMeta](<https://github.zhaw.ch/raycasters/server/blob/master/room/client/clientmanager.go#L103>)
 
 ```go
 func (manager *ClientManager) MapMeta(id uint8) (ClientMeta, bool)
@@ -360,7 +360,7 @@ func (manager *ClientManager) MapMeta(id uint8) (ClientMeta, bool)
 
 MapMeta will map the client internal id with the correct meta information\. If there is no such person this function will return false and a zero value\. Attention this is thread safe\, but fairly slow due to the lock\.
 
-### func \(\*ClientManager\) [RemoveClient](<https://github.zhaw.ch/raycasters/server/blob/master/room/client/clientmanager.go#L255>)
+### func \(\*ClientManager\) [RemoveClient](<https://github.zhaw.ch/raycasters/server/blob/master/room/client/clientmanager.go#L253>)
 
 ```go
 func (manager *ClientManager) RemoveClient(meta ClientMeta) error
@@ -368,7 +368,7 @@ func (manager *ClientManager) RemoveClient(meta ClientMeta) error
 
 RemoveClient will remove the given client from the manager\, this will return an error if the given client does not exist\.
 
-### func \(\*ClientManager\) [SetClientStatus](<https://github.zhaw.ch/raycasters/server/blob/master/room/client/clientmanager.go#L148>)
+### func \(\*ClientManager\) [SetClientStatus](<https://github.zhaw.ch/raycasters/server/blob/master/room/client/clientmanager.go#L147>)
 
 ```go
 func (manager *ClientManager) SetClientStatus(id uint8, statusNew ConnectionStatus) (ConnectionStatus, error)
@@ -376,7 +376,7 @@ func (manager *ClientManager) SetClientStatus(id uint8, statusNew ConnectionStat
 
 SetClientStatus sets the ConnectionStatus of a Client it return the new ConnectionStatus and an error
 
-### func \(\*ClientManager\) [Shutdown](<https://github.zhaw.ch/raycasters/server/blob/master/room/client/clientmanager.go#L324>)
+### func \(\*ClientManager\) [Shutdown](<https://github.zhaw.ch/raycasters/server/blob/master/room/client/clientmanager.go#L322>)
 
 ```go
 func (manager *ClientManager) Shutdown(cxt context.Context)
@@ -384,7 +384,7 @@ func (manager *ClientManager) Shutdown(cxt context.Context)
 
 Shutdown is a completed Shutdown of all the client manager there is no way to restart a manager\, as to speed up the Shutdown the clients will only partially be unregistered\.
 
-### func \(\*ClientManager\) [Size](<https://github.zhaw.ch/raycasters/server/blob/master/room/client/clientmanager.go#L83>)
+### func \(\*ClientManager\) [Size](<https://github.zhaw.ch/raycasters/server/blob/master/room/client/clientmanager.go#L82>)
 
 ```go
 func (manager *ClientManager) Size() int
@@ -392,7 +392,7 @@ func (manager *ClientManager) Size() int
 
 Size will return the current client count\. Attention although this is a thread safe locking functions it is not recommended to be used\, as it forces the usage of a reader lock and that will slow down other write processes\.
 
-## type [ClientMeta](<https://github.zhaw.ch/raycasters/server/blob/master/room/client/client_data.go#L100-L104>)
+## type [ClientMeta](<https://github.zhaw.ch/raycasters/server/blob/master/room/client/client_data.go#L102-L106>)
 
 ClientMeta contains the shared meta information of a specific client\. As well as the current connection used\.
 
@@ -402,7 +402,7 @@ type ClientMeta struct {
 }
 ```
 
-### func [NewClientMeta](<https://github.zhaw.ch/raycasters/server/blob/master/room/client/client_data.go#L107>)
+### func [NewClientMeta](<https://github.zhaw.ch/raycasters/server/blob/master/room/client/client_data.go#L109>)
 
 ```go
 func NewClientMeta(id uuid.UUID, name string, conn ClientConnection) ClientMeta
@@ -410,13 +410,13 @@ func NewClientMeta(id uuid.UUID, name string, conn ClientConnection) ClientMeta
 
 NewClientMeta creates a new client meta object\.
 
-### func \(\*ClientMeta\) [Close](<https://github.zhaw.ch/raycasters/server/blob/master/room/client/client_data.go#L126>)
+### func \(\*ClientMeta\) [Close](<https://github.zhaw.ch/raycasters/server/blob/master/room/client/client_data.go#L128>)
 
 ```go
 func (cm *ClientMeta) Close()
 ```
 
-### func \(ClientMeta\) [GetId](<https://github.zhaw.ch/raycasters/server/blob/master/room/client/client_data.go#L117>)
+### func \(ClientMeta\) [GetId](<https://github.zhaw.ch/raycasters/server/blob/master/room/client/client_data.go#L119>)
 
 ```go
 func (cm ClientMeta) GetId() uuid.UUID
@@ -424,7 +424,7 @@ func (cm ClientMeta) GetId() uuid.UUID
 
 GetId will reutrn the externally used id
 
-### func \(ClientMeta\) [GetName](<https://github.zhaw.ch/raycasters/server/blob/master/room/client/client_data.go#L122>)
+### func \(ClientMeta\) [GetName](<https://github.zhaw.ch/raycasters/server/blob/master/room/client/client_data.go#L124>)
 
 ```go
 func (cm ClientMeta) GetName() string
@@ -494,7 +494,9 @@ const (
     // Attention this state also means that the
     // previous connections is dead.
     Timeout
-    // TODO
+    // TimedOut is a state which the client is
+    // set after he hasn't moved for some time
+    // and we are about to shut him down
     Timedout
     // ShuttingDown is a temporary state where
     // the client connection is in while
@@ -506,7 +508,7 @@ const (
 )
 ```
 
-### func \(ConnectionStatus\) [String](<https://github.zhaw.ch/raycasters/server/blob/master/room/client/client_data.go#L46>)
+### func \(ConnectionStatus\) [String](<https://github.zhaw.ch/raycasters/server/blob/master/room/client/client_data.go#L48>)
 
 ```go
 func (c ConnectionStatus) String() string
@@ -514,7 +516,7 @@ func (c ConnectionStatus) String() string
 
 String satisfies the stringer interface and shows the string representations of the connection status\.
 
-## type [ErrClientDoesntExist](<https://github.zhaw.ch/raycasters/server/blob/master/room/client/clientmanager.go#L26-L28>)
+## type [ErrClientDoesntExist](<https://github.zhaw.ch/raycasters/server/blob/master/room/client/clientmanager.go#L25-L27>)
 
 ErrClientDoesntExist represents a client that does not actually in the system exist\.
 
@@ -524,13 +526,13 @@ type ErrClientDoesntExist struct {
 }
 ```
 
-### func [NewErrClientDoesntExist](<https://github.zhaw.ch/raycasters/server/blob/master/room/client/clientmanager.go#L30>)
+### func [NewErrClientDoesntExist](<https://github.zhaw.ch/raycasters/server/blob/master/room/client/clientmanager.go#L29>)
 
 ```go
 func NewErrClientDoesntExist(meta ClientMeta) ErrClientDoesntExist
 ```
 
-### func \(ErrClientDoesntExist\) [Error](<https://github.zhaw.ch/raycasters/server/blob/master/room/client/clientmanager.go#L37>)
+### func \(ErrClientDoesntExist\) [Error](<https://github.zhaw.ch/raycasters/server/blob/master/room/client/clientmanager.go#L36>)
 
 ```go
 func (err ErrClientDoesntExist) Error() string
@@ -538,7 +540,7 @@ func (err ErrClientDoesntExist) Error() string
 
 Error is the function used to fulfill the error interface\.
 
-### func \(ErrClientDoesntExist\) [Is](<https://github.zhaw.ch/raycasters/server/blob/master/room/client/clientmanager.go#L43>)
+### func \(ErrClientDoesntExist\) [Is](<https://github.zhaw.ch/raycasters/server/blob/master/room/client/clientmanager.go#L42>)
 
 ```go
 func (err ErrClientDoesntExist) Is(target error) bool
@@ -744,7 +746,7 @@ func (ht *HubTimeoutHandler) Shutdown(cxt context.Context) error
 
 Shutdown will shutdown the timer
 
-## type [Position](<https://github.zhaw.ch/raycasters/server/blob/master/room/client/client_data.go#L53-L56>)
+## type [Position](<https://github.zhaw.ch/raycasters/server/blob/master/room/client/client_data.go#L55-L58>)
 
 ```go
 type Position struct {
