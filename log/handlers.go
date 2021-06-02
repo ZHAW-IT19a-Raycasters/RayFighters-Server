@@ -1,9 +1,18 @@
 package log
 
 import (
+	"errors"
 	"io"
 	"os"
 )
+
+// ErrLevelIsNone is returned, when the builder can not create the
+// object due to the level contrainsts.
+var ErrLevelIsNone = errors.New("handler level is none")
+
+func checkNone(level Level) bool {
+	return level == None
+}
 
 // WriterHandler is a handler used as a base for
 // for any io.Writer loggers.
@@ -27,6 +36,10 @@ func NewWriterHandler(level Level, writer io.Writer) WriterHandler {
 // Build will create the internal logger handler
 // that can then be added to the system.
 func (wh WriterHandler) Build() (LogHandler, error) {
+	if checkNone(wh.level) {
+		return nil, ErrLevelIsNone
+	}
+	// check for none
 	return newRawLogger(wh.level, wh.out), nil
 
 }
@@ -85,6 +98,10 @@ func (fh FileHandler) FileName() string {
 // And if needed create the file on the file system
 // as well.
 func (fh FileHandler) Build() (LogHandler, error) {
+	if checkNone(fh.level) {
+		return nil, ErrLevelIsNone
+	}
+
 	out, err := fh.openFile()
 	if err != nil {
 		return nil, err

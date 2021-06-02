@@ -393,3 +393,25 @@ func TestMultiDestination(t *testing.T) {
 		return
 	}
 }
+
+func TestNone(t *testing.T) {
+
+	wh, _ := setupBufferLogger(Debug, t)
+	fh, err := setupTmpFile(None, t)
+	if err != nil {
+		t.Errorf("There was an error while setting up the file.\n%s", err.Error())
+		return
+	}
+
+	err = setupLogger([]BuildLogHandler{fh, wh}, t)
+	if err != nil {
+		t.Errorf("There was an error while setting up the logger.\n%s", err.Error())
+		return
+	}
+
+	// check lenght of logger handlers
+	if len(iLogger.handlers) != 1 {
+		t.Error("incorrect handler count -> None should not create a handler")
+	}
+
+}
