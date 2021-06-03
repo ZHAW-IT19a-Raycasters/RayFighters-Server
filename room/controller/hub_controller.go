@@ -168,6 +168,12 @@ func (hc *HubController) NewMap(mapMeta mapTimeMeta) error {
 	}
 	for id, lClient := range clients {
 		logger.Debugf("teleporting player [%d] into the map [%d]", id, mapMeta.meta.GetId())
+
+        // only respawn active players
+        err := hc.checkClientState(id, client.Active) 
+        if err != nil {
+            continue
+        }
 		// teleport the player back into the game
 		tp := server.NewTeleportPlayer(id, lClient.X(), lClient.Y())
 		hc.unsafeBroadCast(tp, emptySet)
