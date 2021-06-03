@@ -170,7 +170,7 @@ func (hc *HubController) NewMap(mapMeta mapTimeMeta) error {
 		logger.Debugf("teleporting player [%d] into the map [%d]", id, mapMeta.meta.GetId())
 
         // only respawn active players
-        err := hc.checkClientState(id, client.Active) 
+        err := hc.unsafeCheckClientState(id, client.Active) 
         if err != nil {
             continue
         }
@@ -222,6 +222,14 @@ func (hc *HubController) respawnPlayer(id uint8) error {
 func (hc *HubController) checkClientState(id uint8, expectedState client.ConnectionStatus) error {
 	hc.lock.RLock()
 	defer hc.lock.RUnlock()
+    return hc.unsafeCheckClientState(id, expectedState)
+}
+
+// unsafeCheckClientState checks if client has a valid state
+// if not it returns an error
+// Attention this function does not take a lock by
+// itself, so the caller has to take care of that.
+func (hc *HubController) unsafeCheckClientState(id uint8, expectedState client.ConnectionStatus) error {
 	status, ok := hc.clientManager.GetClientStatus(id)
 	if !ok {
 		return ErrClientDoesNotExist{
