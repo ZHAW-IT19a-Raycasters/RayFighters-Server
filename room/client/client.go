@@ -487,6 +487,9 @@ func (c *Client) registerTimeout() {
 
 	c.status = Timeout
 
+    // register timeout of the given client
+    c.timoutQueue.RegisterTimeout()
+    
 	c.shutdownHandler()
 }
 
