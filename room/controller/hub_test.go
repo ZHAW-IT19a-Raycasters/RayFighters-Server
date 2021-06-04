@@ -2,9 +2,10 @@ package controller
 
 import (
 	"context"
-	"github.com/gorilla/websocket"
 	"io"
 	"testing"
+
+	"github.com/gorilla/websocket"
 
 	"github.zhaw.ch/raycasters/server/room/testhelpers"
 )
@@ -58,8 +59,8 @@ func TestHub(t *testing.T) {
 
 	mock.FuncReader <- func() (int, io.Reader, error) {
 		return 0, nil, &websocket.CloseError{
-			websocket.CloseGoingAway,
-			"I fly away",
+			Code: websocket.CloseGoingAway,
+			Text: "I fly away",
 		}
 	}
 

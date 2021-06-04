@@ -33,6 +33,12 @@ Package log is an abstraction build around the standard library own \`log\` impl
 
 ## Variables
 
+ErrLevelIsNone is returned\, when the builder can not create the object due to the level contrainsts\.
+
+```go
+var ErrLevelIsNone = errors.New("handler level is none")
+```
+
 ErrLoggerAlreadySetup is the error\, that will be returned\, in the case that the logger has already been setup once before\.
 
 ```go
@@ -49,7 +55,7 @@ type BuildLogHandler interface {
 }
 ```
 
-## type [ConsoleHandler](<https://github.zhaw.ch/raycasters/server/blob/master/log/handlers.go#L35-L37>)
+## type [ConsoleHandler](<https://github.zhaw.ch/raycasters/server/blob/master/log/handlers.go#L48-L50>)
 
 ConsoleHandler will log to the console\.
 
@@ -59,7 +65,7 @@ type ConsoleHandler struct {
 }
 ```
 
-### func [NewConsoleHandler](<https://github.zhaw.ch/raycasters/server/blob/master/log/handlers.go#L41>)
+### func [NewConsoleHandler](<https://github.zhaw.ch/raycasters/server/blob/master/log/handlers.go#L54>)
 
 ```go
 func NewConsoleHandler(level Level) ConsoleHandler
@@ -93,7 +99,7 @@ func (err ErrUnknownLevel) Is(target error) bool
 
 Is satisfies the errors\.Is definition
 
-## type [FileHandler](<https://github.zhaw.ch/raycasters/server/blob/master/log/handlers.go#L49-L58>)
+## type [FileHandler](<https://github.zhaw.ch/raycasters/server/blob/master/log/handlers.go#L62-L71>)
 
 FileHandler is the handler struct for logging to the file system\.
 
@@ -103,7 +109,7 @@ type FileHandler struct {
 }
 ```
 
-### func [NewFileHandler](<https://github.zhaw.ch/raycasters/server/blob/master/log/handlers.go#L62>)
+### func [NewFileHandler](<https://github.zhaw.ch/raycasters/server/blob/master/log/handlers.go#L75>)
 
 ```go
 func NewFileHandler(level Level, fileName string) FileHandler
@@ -111,7 +117,7 @@ func NewFileHandler(level Level, fileName string) FileHandler
 
 NewFileHandler will create and open if needed a logging file on the file system\.
 
-### func \(FileHandler\) [Build](<https://github.zhaw.ch/raycasters/server/blob/master/log/handlers.go#L87>)
+### func \(FileHandler\) [Build](<https://github.zhaw.ch/raycasters/server/blob/master/log/handlers.go#L100>)
 
 ```go
 func (fh FileHandler) Build() (LogHandler, error)
@@ -119,7 +125,7 @@ func (fh FileHandler) Build() (LogHandler, error)
 
 Build will create the actual logging instance\. And if needed create the file on the file system as well\.
 
-### func \(FileHandler\) [FileName](<https://github.zhaw.ch/raycasters/server/blob/master/log/handlers.go#L80>)
+### func \(FileHandler\) [FileName](<https://github.zhaw.ch/raycasters/server/blob/master/log/handlers.go#L93>)
 
 ```go
 func (fh FileHandler) FileName() string
@@ -127,7 +133,7 @@ func (fh FileHandler) FileName() string
 
 FileName will return the file location to which the log handler will propagate the logs to\.
 
-### func \(FileHandler\) [Level](<https://github.zhaw.ch/raycasters/server/blob/master/log/handlers.go#L74>)
+### func \(FileHandler\) [Level](<https://github.zhaw.ch/raycasters/server/blob/master/log/handlers.go#L87>)
 
 ```go
 func (fh FileHandler) Level() Level
@@ -191,7 +197,7 @@ type LogHandler interface {
 }
 ```
 
-## type [WriterHandler](<https://github.zhaw.ch/raycasters/server/blob/master/log/handlers.go#L10-L16>)
+## type [WriterHandler](<https://github.zhaw.ch/raycasters/server/blob/master/log/handlers.go#L19-L25>)
 
 WriterHandler is a handler used as a base for for any io\.Writer loggers\.
 
@@ -201,7 +207,7 @@ type WriterHandler struct {
 }
 ```
 
-### func [NewWriterHandler](<https://github.zhaw.ch/raycasters/server/blob/master/log/handlers.go#L20>)
+### func [NewWriterHandler](<https://github.zhaw.ch/raycasters/server/blob/master/log/handlers.go#L29>)
 
 ```go
 func NewWriterHandler(level Level, writer io.Writer) WriterHandler
@@ -209,7 +215,7 @@ func NewWriterHandler(level Level, writer io.Writer) WriterHandler
 
 NewWriterHandler will create a new writer handler based on the writer parameter\.
 
-### func \(WriterHandler\) [Build](<https://github.zhaw.ch/raycasters/server/blob/master/log/handlers.go#L29>)
+### func \(WriterHandler\) [Build](<https://github.zhaw.ch/raycasters/server/blob/master/log/handlers.go#L38>)
 
 ```go
 func (wh WriterHandler) Build() (LogHandler, error)

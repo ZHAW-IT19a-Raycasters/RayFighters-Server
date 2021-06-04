@@ -30,7 +30,12 @@ func NewBuilder() builder {
 // This will not yet register the handler with the global logger.
 func (b *builder) RegisterHandler(handler BuildLogHandler) error {
 	lh, err := handler.Build()
+
 	if err != nil {
+		// this is not a real error
+		if errors.Is(err, ErrLevelIsNone) {
+			return nil
+		}
 		return err
 	}
 	// filter out the NONE logger levels as they are
