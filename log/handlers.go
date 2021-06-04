@@ -7,9 +7,10 @@ import (
 )
 
 // ErrLevelIsNone is returned, when the builder can not create the
-// object due to the level contrainsts.
+// object due to the level constraints.
 var ErrLevelIsNone = errors.New("handler level is none")
 
+// checkNone will check if the given level is none or not.
 func checkNone(level Level) bool {
 	return level == None
 }
