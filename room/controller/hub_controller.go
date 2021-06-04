@@ -319,33 +319,6 @@ func (hc *HubController) unsafeClientState(meta client.ClientMeta) (client.Conne
 	return c, ok
 }
 
-// IsClientState checks if the client is in the given state or
-// not.
-func (hc *HubController) IsClientState(id uint8, expectedState client.ConnectionStatus) error {
-	hc.lock.RLock()
-	defer hc.lock.RUnlock()
-	return hc.unsafeIsClientState(id, expectedState)
-}
-
-// unsafeIsClientState checks if the client is in the given state or
-// not.
-// Attention this function assumes the caller having the controller
-// lock.
-func (hc *HubController) unsafeIsClientState(id uint8, expectedState client.ConnectionStatus) error {
-	status, ok := hc.clientManager.GetClientStatus(id)
-	if !ok {
-		return ErrClientDoesNotExist{
-			id: id,
-		}
-	} else if status != expectedState {
-		return ErrClientUnexpectedState{
-			state: expectedState,
-			id:    id,
-		}
-	}
-	return nil
-}
-
 // RegisterClient will add the client to the controller
 func (hc *HubController) RegisterClient(meta client.ClientMeta) error {
 	if !hc.isActive.Get() {
