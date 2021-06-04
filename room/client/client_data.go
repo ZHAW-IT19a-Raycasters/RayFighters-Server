@@ -30,10 +30,9 @@ const (
 	// Attention this state also means that the
 	// previous connections is dead.
 	Timeout
-	// TimedOut is a state which the client is
-	// set after he hasn't moved for some time
-	// and we are about to shut him down
-	Timedout
+	// Abandoned is a state which the client is
+	// set after an unsuccessful timeout.
+	Abandoned
 	// ShuttingDown is a temporary state where
 	// the client connection is in while
 	// waiting for the workers to shutdown
@@ -50,11 +49,6 @@ func (c ConnectionStatus) String() string {
 		"Active", "Registered", "Timeout", "ShuttingDown", "Offline",
 	}
 	return vals[c]
-}
-
-type Position struct {
-	x float64
-	y float64
 }
 
 // ClientGame represents the state of the client in the game
@@ -79,7 +73,7 @@ func (cg *ClientGame) GetKills() uint16 {
 	return uint16(atomic.LoadUint32(&cg.kills))
 }
 
-// GetDeaths will reutrn the death count
+// GetDeaths will return the death count
 // of the client.
 func (cg *ClientGame) GetDeaths() uint16 {
 	return uint16(atomic.LoadUint32(&cg.deaths))
@@ -114,7 +108,7 @@ func NewClientMeta(id uuid.UUID, name string, conn ClientConnection) ClientMeta 
 	}
 }
 
-// GetId will reutrn the externally used
+// GetId will return the externally used
 // id
 func (cm ClientMeta) GetId() uuid.UUID {
 	return cm.id
@@ -125,6 +119,8 @@ func (cm ClientMeta) GetName() string {
 	return cm.name
 }
 
+// Close will terminate an open connection, if it isn't
+// already closed.
 func (cm *ClientMeta) Close() {
 	cm.conn.Close()
 }

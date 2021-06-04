@@ -5,13 +5,11 @@ import (
 	"math/rand"
 	"sync"
 
-	"github.zhaw.ch/raycasters/server/log"
-
 	"github.zhaw.ch/raycasters/server/gamemap"
 )
 
-var logger = log.Log()
-
+// spawnOffset is the offset used to move the client into the
+// center of the given field
 const spawnOffset = 0.5
 
 // iRand is an interface to create new random Ints or Floats
@@ -111,7 +109,7 @@ func (mc *MapController) AddClient(id uint8) (gamemap.Coordinate, error) {
 
 // unsafeRandomSpawn is the inner logic of the random spawn
 // functionality, this function does not assume anything
-// about the players existance or else, so be carefull
+// about the players existence or else, so be carefull
 // when using it.
 func (mc *MapController) unsafeRandomSpawn(id uint8) gamemap.Coordinate {
 	nextRand := mc.random.Intn(len(mc.spawingarea))
@@ -310,8 +308,10 @@ func calcDistToShotTrajectory(a, b, c, xTarget, yTarget float64) float64 {
 	return math.Abs(a*xTarget+b*yTarget+c) / math.Sqrt(a*a+b*b)
 }
 
-// raycasting return true if some player was hit and uid of victim, else (false, 0) is returnedx
-// shotAngle is in radians
+// CheckShooting will use raycasting to calculate the path the bullet will travel.
+// The function will return true if some player was hit as well as the uid of
+// the victim. Otherwise (false, 0) will be returned.
+// Any angle is assumed to be in radians.
 func (mc *MapController) CheckShooting(shooterID uint8, shotAngle float64) (hit bool, victimID uint8) {
 	logger.Debugf("Shot angle: %f°", 180/math.Pi*shotAngle)
 	// y axes directed vertically downwards
@@ -328,7 +328,7 @@ func (mc *MapController) CheckShooting(shooterID uint8, shotAngle float64) (hit 
 	if !hit {
 		return false, 0
 	} else {
-		foundObstacle, xObstacle, yObstacle := mc.GetNearestObstacleOnTrajectoryInShotDirection(shooterID, shotAngle, rayStartX, rayStartY)
+		foundObstacle, xObstacle, yObstacle := mc.NearestObstacleInShotTrajectory(shooterID, shotAngle, rayStartX, rayStartY)
 		if !foundObstacle {
 			// someone got hit :(
 			return true, targetID
@@ -353,7 +353,9 @@ func isTargetProtected(coordShooter, coordObstacle, coordTarget float64) bool {
 	return math.Floor(coordShooter) <= coordObstacle && coordObstacle <= math.Floor(coordTarget) || math.Floor(coordTarget) <= coordObstacle && coordObstacle <= math.Floor(coordShooter)
 }
 
-func (mc *MapController) GetNearestObstacleOnTrajectoryInShotDirection(shooterID uint8, shotAngle, rayStartX, rayStartY float64) (foundObstacle bool, xObstacle int, yObstacle int) {
+// NearestObstacleInShotTrajectory will return the nearest obstacle in the
+// shots trajectory.
+func (mc *MapController) NearestObstacleInShotTrajectory(shooterID uint8, shotAngle, rayStartX, rayStartY float64) (foundObstacle bool, xObstacle int, yObstacle int) {
 	// STEP 1: Initialization
 	// maX(mapY) are used to the cell,
 	// we are focused on.

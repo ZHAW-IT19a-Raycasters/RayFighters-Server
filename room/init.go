@@ -3,6 +3,5 @@ package room
 
 import "github.zhaw.ch/raycasters/server/log"
 
-// logger responsible for all the logging
-// happening
-var Logger = log.Log()
+// logger is the local instance responsible for all the logging
+var logger = log.Log()

@@ -50,7 +50,10 @@ func setupLogger(conf setup.LoggerConfig) error {
 	return b.Build()
 }
 
+// main is the entry point into the programs execution
 func main() {
+
+	// setup the system
 	setUp := setup.NewSetup()
 	conf := setUp.Configuration()
 
@@ -65,7 +68,9 @@ func main() {
 		return
 	}
 
+	// run the server
 	server, err := web.NewServer(&conf.Web, &conf.MapConfig)
+
 	if err != nil {
 		logger.Errorf("unable to start the server due to [%s]", err.Error())
 		return
@@ -74,6 +79,7 @@ func main() {
 	done := make(chan struct{})
 	ctx := context.Background()
 
+	// wait for any types of os signals in a different thread
 	go func() {
 		sigs := make(chan os.Signal, 1)
 		signal.Notify(sigs, os.Interrupt)
@@ -89,6 +95,7 @@ func main() {
 		close(done)
 	}()
 
+	// run the server
 	err = server.Start()
 	if !errors.Is(err, http.ErrServerClosed) {
 		close(done)

@@ -41,7 +41,7 @@ func (td respawnData) GetTime() time.Time {
 }
 
 // HubTimeoutHandler is the parent handler for all
-// respawn work requiered to be done.
+// respawn work required to be done.
 type HubRespawnHandler struct {
 	callback  func(id uint8)
 	baseTimer utils.BaseTimer

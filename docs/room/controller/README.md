@@ -290,7 +290,7 @@ RegisterClient will use the meta information given by the parameter to check if 
 func (h *Hub) Run() error
 ```
 
-Run is the main event loop of the hub\. It handles all the clients added and removed from the hub instance\. Attention this is a blocking function\, so run this in a gorutine\.
+Run is the main event loop of the hub\. It handles all the clients added and removed from the hub instance\. Attention this is a blocking function\, so run this in a goroutine\.
 
 ### func \(\*Hub\) [Shutdown](<https://github.zhaw.ch/raycasters/server/blob/master/room/controller/hub.go#L234>)
 
@@ -326,7 +326,7 @@ func NewHubController() *HubController
 
 NewHubController will create a new controller
 
-### func \(\*HubController\) [Acquire](<https://github.zhaw.ch/raycasters/server/blob/master/room/controller/hub_controller.go#L261>)
+### func \(\*HubController\) [Acquire](<https://github.zhaw.ch/raycasters/server/blob/master/room/controller/hub_controller.go#L276>)
 
 ```go
 func (hc *HubController) Acquire() error
@@ -334,7 +334,7 @@ func (hc *HubController) Acquire() error
 
 Acquire will increment the counted value for the semaphore
 
-### func \(\*HubController\) [ClientState](<https://github.zhaw.ch/raycasters/server/blob/master/room/controller/hub_controller.go#L282>)
+### func \(\*HubController\) [ClientState](<https://github.zhaw.ch/raycasters/server/blob/master/room/controller/hub_controller.go#L297>)
 
 ```go
 func (hc *HubController) ClientState(meta client.ClientMeta) (client.ConnectionStatus, bool)
@@ -342,7 +342,7 @@ func (hc *HubController) ClientState(meta client.ClientMeta) (client.ConnectionS
 
 ClientState checks if the client has a place on the map or not\.
 
-### func \(\*HubController\) [IsClientState](<https://github.zhaw.ch/raycasters/server/blob/master/room/controller/hub_controller.go#L309>)
+### func \(\*HubController\) [IsClientState](<https://github.zhaw.ch/raycasters/server/blob/master/room/controller/hub_controller.go#L324>)
 
 ```go
 func (hc *HubController) IsClientState(id uint8, expectedState client.ConnectionStatus) error
@@ -350,7 +350,7 @@ func (hc *HubController) IsClientState(id uint8, expectedState client.Connection
 
 IsClientState checks if the client is in the given state or not\.
 
-### func \(\*HubController\) [IsFull](<https://github.zhaw.ch/raycasters/server/blob/master/room/controller/hub_controller.go#L276>)
+### func \(\*HubController\) [IsFull](<https://github.zhaw.ch/raycasters/server/blob/master/room/controller/hub_controller.go#L291>)
 
 ```go
 func (hc *HubController) IsFull() bool
@@ -366,7 +366,7 @@ func (hc *HubController) NewMap(mapMeta mapTimeMeta) error
 
 NewMap changes the map of the hub if its not set it sets it instead\. it requires a mapTimeMeta of the new current map as the a parameter it return an error if none happens it returns nil
 
-### func \(\*HubController\) [RegisterClient](<https://github.zhaw.ch/raycasters/server/blob/master/room/controller/hub_controller.go#L335>)
+### func \(\*HubController\) [RegisterClient](<https://github.zhaw.ch/raycasters/server/blob/master/room/controller/hub_controller.go#L350>)
 
 ```go
 func (hc *HubController) RegisterClient(meta client.ClientMeta) error
@@ -374,7 +374,7 @@ func (hc *HubController) RegisterClient(meta client.ClientMeta) error
 
 RegisterClient will add the client to the controller
 
-### func \(\*HubController\) [Release](<https://github.zhaw.ch/raycasters/server/blob/master/room/controller/hub_controller.go#L266>)
+### func \(\*HubController\) [Release](<https://github.zhaw.ch/raycasters/server/blob/master/room/controller/hub_controller.go#L281>)
 
 ```go
 func (hc *HubController) Release() error
@@ -382,7 +382,7 @@ func (hc *HubController) Release() error
 
 Release will decrement the counterd value for the semaphore
 
-### func \(\*HubController\) [Shutdown](<https://github.zhaw.ch/raycasters/server/blob/master/room/controller/hub_controller.go#L550>)
+### func \(\*HubController\) [Shutdown](<https://github.zhaw.ch/raycasters/server/blob/master/room/controller/hub_controller.go#L567>)
 
 ```go
 func (hc *HubController) Shutdown(cxt context.Context)
@@ -390,7 +390,7 @@ func (hc *HubController) Shutdown(cxt context.Context)
 
 Shutdown will Shutdown the controller
 
-### func \(\*HubController\) [Size](<https://github.zhaw.ch/raycasters/server/blob/master/room/controller/hub_controller.go#L271>)
+### func \(\*HubController\) [Size](<https://github.zhaw.ch/raycasters/server/blob/master/room/controller/hub_controller.go#L286>)
 
 ```go
 func (hc *HubController) Size() int

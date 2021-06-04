@@ -3,7 +3,10 @@ package log
 import "sync"
 
 const (
+	// handlerStartCap the default capacity used for the logger handler array
 	handlerStartCap = 3
+
+	// handlerStartLen is the real starting length of the logger handler array
 	handlerStartLen = 0
 )
 

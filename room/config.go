@@ -19,14 +19,14 @@ func (err ErrMapConfigurationNotExist) Error() string {
 	return fmt.Sprintf("json map configuration file [%s] does not exist.", err.path)
 }
 
-// Is satisfies the erros.Is interface
+// Is satisfies the errors.Is interface
 func (err ErrMapConfigurationNotExist) Is(target error) bool {
 	_, ok := target.(ErrMapConfigurationNotExist)
 	return ok
 }
 
 // ErrMapConfigurationInvalid is the error returned, if
-// there is a directoty instead of the json file present.
+// there is a directory instead of the json file present.
 type ErrMapConfigurationInvalid struct {
 	path string
 }
@@ -36,7 +36,7 @@ func (err ErrMapConfigurationInvalid) Error() string {
 	return fmt.Sprintf("json map configuration [%s] not a file.", err.path)
 }
 
-// Is satisfies the erros.Is interface
+// Is satisfies the errors.Is interface
 func (err ErrMapConfigurationInvalid) Is(target error) bool {
 	_, ok := target.(ErrMapConfigurationInvalid)
 	return ok

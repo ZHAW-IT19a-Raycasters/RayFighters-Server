@@ -48,7 +48,9 @@ func (log *rawLogger) checkLevel(level Level) bool {
 	return level >= log.Level()
 }
 
-func (log *rawLogger) prepateBuilder(level Level) *bytes.Buffer {
+// prepareBuilder will prepare a formatter string used for logging
+// using a custom format.
+func (log *rawLogger) prepareBuilder(level Level) *bytes.Buffer {
 	// using a string builder for faster concatenation
 	builder := log.bPool.Get().(*bytes.Buffer)
 	builder.Reset()
@@ -95,7 +97,7 @@ func (log *rawLogger) log(level Level, v ...interface{}) {
 		return
 	}
 
-	builder := log.prepateBuilder(level)
+	builder := log.prepareBuilder(level)
 
 	fmt.Fprint(builder, v...)
 
@@ -109,7 +111,7 @@ func (log *rawLogger) logf(level Level, format string, v ...interface{}) {
 		return
 	}
 
-	builder := log.prepateBuilder(level)
+	builder := log.prepareBuilder(level)
 
 	// add the user defined format
 	fmt.Fprintf(builder, format, v...)

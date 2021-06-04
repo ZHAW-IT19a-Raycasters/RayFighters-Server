@@ -36,17 +36,15 @@ room is an intermediary abstraction to the inner guts of game control\.
 ## Variables
 
 ```go
-var ErrHubManagerNotActive = errors.New("the hub manager is currently not active")
-```
+var (
+    // ErrHubUnavailable is the error returned if there is no hub with the
+    // requested id available.
+    ErrHubUnavailable = errors.New("the given hub does not currently exist")
 
-```go
-var ErrHubUnavailable = errors.New("the given hub does not currnently exist")
-```
-
-logger responsible for all the logging happening
-
-```go
-var Logger = log.Log()
+    // ErrHubManagerNotActive is the error returned if the hub is deactivated
+    // or not yet started.
+    ErrHubManagerNotActive = errors.New("the hub manager is currently not active")
+)
 ```
 
 ## type [ErrHubExists](<https://github.zhaw.ch/raycasters/server/blob/master/room/helpers.go#L7-L9>)
@@ -103,7 +101,7 @@ Is satisfies the error\.Is configuration
 
 ## type [ErrMapConfigurationInvalid](<https://github.zhaw.ch/raycasters/server/blob/master/room/config.go#L30-L32>)
 
-ErrMapConfigurationInvalid is the error returned\, if there is a directoty instead of the json file present\.
+ErrMapConfigurationInvalid is the error returned\, if there is a directory instead of the json file present\.
 
 ```go
 type ErrMapConfigurationInvalid struct {
@@ -125,7 +123,7 @@ Error satisfies the error interface
 func (err ErrMapConfigurationInvalid) Is(target error) bool
 ```
 
-Is satisfies the erros\.Is interface
+Is satisfies the errors\.Is interface
 
 ## type [ErrMapConfigurationNotExist](<https://github.zhaw.ch/raycasters/server/blob/master/room/config.go#L13-L15>)
 
@@ -151,9 +149,9 @@ Error satisfies the error interface
 func (err ErrMapConfigurationNotExist) Is(target error) bool
 ```
 
-Is satisfies the erros\.Is interface
+Is satisfies the errors\.Is interface
 
-## type [HubManager](<https://github.zhaw.ch/raycasters/server/blob/master/room/hub_manager.go#L19-L24>)
+## type [HubManager](<https://github.zhaw.ch/raycasters/server/blob/master/room/hub_manager.go#L25-L30>)
 
 HubManager is a manager of all Hubs\. Is manages all running Hubs
 
@@ -163,7 +161,7 @@ type HubManager struct {
 }
 ```
 
-### func [NewHubManager](<https://github.zhaw.ch/raycasters/server/blob/master/room/hub_manager.go#L27>)
+### func [NewHubManager](<https://github.zhaw.ch/raycasters/server/blob/master/room/hub_manager.go#L33>)
 
 ```go
 func NewHubManager(filePath string) (HubManager, error)
@@ -171,33 +169,37 @@ func NewHubManager(filePath string) (HubManager, error)
 
 NewHubManager will create a new manager
 
-### func \(\*HubManager\) [AddHub](<https://github.zhaw.ch/raycasters/server/blob/master/room/hub_manager.go#L41>)
+### func \(\*HubManager\) [AddHub](<https://github.zhaw.ch/raycasters/server/blob/master/room/hub_manager.go#L47>)
 
 ```go
 func (hm *HubManager) AddHub(id int) error
 ```
 
-Create a new Hub
+AddHub will add an additional hub with the given id\.
 
-### func \(\*HubManager\) [GetHub](<https://github.zhaw.ch/raycasters/server/blob/master/room/hub_manager.go#L79>)
+### func \(\*HubManager\) [GetHub](<https://github.zhaw.ch/raycasters/server/blob/master/room/hub_manager.go#L86>)
 
 ```go
 func (hm *HubManager) GetHub(id int) (*controller.Hub, error)
 ```
 
-### func \(\*HubManager\) [RemoveHub](<https://github.zhaw.ch/raycasters/server/blob/master/room/hub_manager.go#L63>)
+GetHub will return a pointer to the requested hub\, if it exists\.
+
+### func \(\*HubManager\) [RemoveHub](<https://github.zhaw.ch/raycasters/server/blob/master/room/hub_manager.go#L69>)
 
 ```go
 func (hm *HubManager) RemoveHub(id int) error
 ```
 
-Remove Hub
+RemoveHub will remove the given hub from the manager\.
 
-### func \(\*HubManager\) [Shutdown](<https://github.zhaw.ch/raycasters/server/blob/master/room/hub_manager.go#L92>)
+### func \(\*HubManager\) [Shutdown](<https://github.zhaw.ch/raycasters/server/blob/master/room/hub_manager.go#L100>)
 
 ```go
 func (hm *HubManager) Shutdown(cxt context.Context) error
 ```
+
+Shutdown will shutdown the manager and all its children\.
 
 ## type [MapConfig](<https://github.zhaw.ch/raycasters/server/blob/master/room/config.go#L47-L49>)
 
