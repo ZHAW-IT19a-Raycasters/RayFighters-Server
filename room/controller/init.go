@@ -5,4 +5,5 @@ package controller
 
 import "github.zhaw.ch/raycasters/server/log"
 
+// logger is the logger instance here for this package
 var logger = log.Log()

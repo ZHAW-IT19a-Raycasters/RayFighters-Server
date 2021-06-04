@@ -143,8 +143,8 @@ func (hc *HubController) NewMap(mapMeta mapTimeMeta) error {
 	hc.currentMap = mapMeta
 	mapPath := mapMeta.meta.GetFilePath()
 	if hc.mapController == nil {
-		// the case where the map is currenly
-		// not completly setup
+		// the case where the map is currently
+		// not completely setup
 		ms, err := mapstate.NewMapController(mapPath)
 		if err != nil {
 			return err
@@ -170,11 +170,11 @@ func (hc *HubController) NewMap(mapMeta mapTimeMeta) error {
 	for id, lClient := range clients {
 		logger.Debugf("teleporting player [%d] into the map [%d]", id, mapMeta.meta.GetId())
 
-        // only respawn active players
-        err := hc.unsafeCheckClientState(id, client.Active) 
-        if err != nil {
-            continue
-        }
+		// only respawn active players
+		err := hc.unsafeCheckClientState(id, client.Active)
+		if err != nil {
+			continue
+		}
 		// teleport the player back into the game
 		tp := server.NewTeleportPlayer(id, lClient.X(), lClient.Y())
 		hc.unsafeBroadCast(tp, emptySet)
@@ -223,7 +223,7 @@ func (hc *HubController) respawnPlayer(id uint8) error {
 func (hc *HubController) checkClientState(id uint8, expectedState client.ConnectionStatus) error {
 	hc.lock.RLock()
 	defer hc.lock.RUnlock()
-    return hc.unsafeCheckClientState(id, expectedState)
+	return hc.unsafeCheckClientState(id, expectedState)
 }
 
 // unsafeCheckClientState checks if client has a valid state
@@ -267,7 +267,7 @@ func (hc *HubController) removeClientIfTimeout(id uint8) error {
 			id: id,
 		}
 	}
-	hc.clientManager.SetClientStatus(id, client.Timedout)
+	hc.clientManager.SetClientStatus(id, client.Abandoned)
 
 	return hc.removeClient(meta)
 }
@@ -392,7 +392,7 @@ func (hc *HubController) RegisterClient(meta client.ClientMeta) error {
 	// send all information in the specified order
 	// Attention although the order is specified
 	// by the protocol the websocket protocol
-	// does not garantie it.
+	// does not guarantied it.
 	messages := [...]protocol.Bytefy{
 		youAreCalled,
 		sendAllPLayerKd,

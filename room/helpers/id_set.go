@@ -63,7 +63,7 @@ func (is *IdSet) Add(id uint8) error {
 }
 
 // Remove will remove an id if it did
-// exist else if will retun an error
+// exist else if will return an error
 func (is *IdSet) Remove(id uint8) error {
 	if !is.Has(id) {
 		return ErrNoId{id}

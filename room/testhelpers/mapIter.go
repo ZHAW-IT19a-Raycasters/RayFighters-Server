@@ -67,14 +67,16 @@ assets/sceneries/skyline.jpg
 5 = assets/walls/slate_pink.jpg
 `
 
+// errHandle will handle the given error and
+// will stop a tests execution on an error.
 func errHandle(err error, t *testing.T) {
-
 	if err != nil {
 		t.Errorf("something went wrong while setting up the temp dir [%s]", err.Error())
 		t.SkipNow()
 	}
 }
 
+// SetupMapIterator will create an initialized test MapIterator.
 func SetupMapIterator(t *testing.T) gamemap.MapIteratorManager {
 	pathJson, _ := SetupIndexJson(t)
 	mapIter, err := gamemap.NewMapIteratorManager(pathJson)
@@ -82,8 +84,8 @@ func SetupMapIterator(t *testing.T) gamemap.MapIteratorManager {
 	return mapIter
 }
 
+// SetupIndexJson will create a testing index.json file.
 func SetupIndexJson(t *testing.T) (string, string) {
-
 	// setup main folder
 	dir, err := ioutil.TempDir("", "maps*")
 	errHandle(err, t)

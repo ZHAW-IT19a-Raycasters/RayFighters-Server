@@ -10,9 +10,15 @@ import (
 	"github.zhaw.ch/raycasters/server/utils"
 )
 
-var ErrHubUnavailable = errors.New("the given hub does not currnently exist")
+var (
+	// ErrHubUnavailable is the error returned if there is no hub with the
+	// requested id available.
+	ErrHubUnavailable = errors.New("the given hub does not currently exist")
 
-var ErrHubManagerNotActive = errors.New("the hub manager is currently not active")
+	// ErrHubManagerNotActive is the error returned if the hub is deactivated
+	// or not yet started.
+	ErrHubManagerNotActive = errors.New("the hub manager is currently not active")
+)
 
 // HubManager is a manager of all Hubs.
 // Is manages all running Hubs
@@ -37,7 +43,7 @@ func NewHubManager(filePath string) (HubManager, error) {
 	}, nil
 }
 
-// Create a new Hub
+// AddHub will add an additional hub with the given id.
 func (hm *HubManager) AddHub(id int) error {
 	if !hm.isActive.Get() {
 		return ErrHubManagerNotActive
@@ -59,7 +65,7 @@ func (hm *HubManager) AddHub(id int) error {
 	return hub.Run()
 }
 
-// Remove Hub
+// RemoveHub will remove the given hub from the manager.
 func (hm *HubManager) RemoveHub(id int) error {
 	if !hm.isActive.Get() {
 		return ErrHubManagerNotActive
@@ -76,6 +82,7 @@ func (hm *HubManager) RemoveHub(id int) error {
 	return nil
 }
 
+// GetHub will return a pointer to the requested hub, if it exists.
 func (hm *HubManager) GetHub(id int) (*controller.Hub, error) {
 	if !hm.isActive.Get() {
 		return nil, ErrHubManagerNotActive
@@ -89,6 +96,7 @@ func (hm *HubManager) GetHub(id int) (*controller.Hub, error) {
 	return hm.hubs[id], nil
 }
 
+// Shutdown will shutdown the manager and all its children.
 func (hm *HubManager) Shutdown(cxt context.Context) error {
 	if !hm.isActive.SetFalse() {
 		return ErrHubManagerNotActive
@@ -116,9 +124,9 @@ func (hm *HubManager) Shutdown(cxt context.Context) error {
 
 	select {
 	case <-waiter:
-		Logger.Info("All Hubs have finished shuttting down")
+		logger.Info("All Hubs have finished shutting down")
 	case <-cxt.Done():
-		Logger.Info("The Hub Manager has been forcefully shutdown")
+		logger.Info("The Hub Manager has been forcefully shutdown")
 	}
 	return nil
 }

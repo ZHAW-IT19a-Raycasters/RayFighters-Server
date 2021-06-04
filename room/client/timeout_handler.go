@@ -60,7 +60,7 @@ type ClientTimer struct {
 }
 
 // RegisterTimeout will register a new timeout
-// if and only if there was no prevouly registered
+// if and only if there was no previously registered
 // one.
 func (ct *ClientTimer) RegisterTimeout() error {
 	if !ct.alreadySend.SetTrue() {

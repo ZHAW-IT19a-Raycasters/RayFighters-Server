@@ -24,7 +24,7 @@ const HubClientLimit = math.MaxUint8
 
 const hubTimeLimiter = 5 * time.Minute
 
-// workerCount is the ammount of workers the
+// workerCount is the amount of workers the
 // hub it self has at all times.
 const workerCount = 1
 
@@ -58,7 +58,7 @@ type Hub struct {
 	// with this type.
 	input chan client.ClientMeta
 	// mapIterator is responsible for the iteration of all
-	// the maps accros all the hubs.
+	// the maps across all the hubs.
 	mapIterator *gamemap.MapIterator
 	// The channel that signals the main loop to shutdown.
 	shutdown chan void
@@ -141,7 +141,7 @@ func (h *Hub) RegisterClient(meta client.ClientMeta) error {
 // It handles all the clients added and removed
 // from the hub instance.
 // Attention this is a blocking function, so
-// run this in a gorutine.
+// run this in a goroutine.
 func (h *Hub) Run() error {
 	// check if the hub is active
 	if !h.isActive.SetTrue() {
