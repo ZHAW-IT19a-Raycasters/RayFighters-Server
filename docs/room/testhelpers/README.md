@@ -6,7 +6,7 @@
 import "github.zhaw.ch/raycasters/server/room/testhelpers"
 ```
 
-testhelpers is a package of testing structures like mocks and similar functions\, they are used mulitple times during testing and are only to be used for such\.
+testhelpers is a package of testing structures like mocks and similar functions\, they are used multiple times during testing and are only to be used for such\.
 
 ## Index
 
@@ -24,19 +24,25 @@ testhelpers is a package of testing structures like mocks and similar functions\
   - [func (mwc *MockedWriteCloser) Write(p []byte) (n int, err error)](<#func-mockedwritecloser-write>)
 
 
-## func [SetupIndexJson](<https://github.zhaw.ch/raycasters/server/blob/master/room/testhelpers/mapIter.go#L85>)
+## func [SetupIndexJson](<https://github.zhaw.ch/raycasters/server/blob/master/room/testhelpers/mapIter.go#L88>)
 
 ```go
 func SetupIndexJson(t *testing.T) (string, string)
 ```
 
-## func [SetupMapIterator](<https://github.zhaw.ch/raycasters/server/blob/master/room/testhelpers/mapIter.go#L78>)
+SetupIndexJson will create a testing index\.json file\.
+
+## func [SetupMapIterator](<https://github.zhaw.ch/raycasters/server/blob/master/room/testhelpers/mapIter.go#L80>)
 
 ```go
 func SetupMapIterator(t *testing.T) gamemap.MapIteratorManager
 ```
 
-## type [MockedConnection](<https://github.zhaw.ch/raycasters/server/blob/master/room/testhelpers/mockhelpers.go#L17-L23>)
+SetupMapIterator will create an initialized test MapIterator\.
+
+## type [MockedConnection](<https://github.zhaw.ch/raycasters/server/blob/master/room/testhelpers/mockhelpers.go#L23-L29>)
+
+MockedConnection is a mock of a websocket connection\.
 
 ```go
 type MockedConnection struct {
@@ -48,31 +54,41 @@ type MockedConnection struct {
 }
 ```
 
-### func [NewMockedConnection](<https://github.zhaw.ch/raycasters/server/blob/master/room/testhelpers/mockhelpers.go#L52>)
+### func [NewMockedConnection](<https://github.zhaw.ch/raycasters/server/blob/master/room/testhelpers/mockhelpers.go#L62>)
 
 ```go
 func NewMockedConnection() MockedConnection
 ```
 
-### func \(\*MockedConnection\) [Close](<https://github.zhaw.ch/raycasters/server/blob/master/room/testhelpers/mockhelpers.go#L43>)
+NewMockedConnection will initialize the mock
+
+### func \(\*MockedConnection\) [Close](<https://github.zhaw.ch/raycasters/server/blob/master/room/testhelpers/mockhelpers.go#L52>)
 
 ```go
 func (m *MockedConnection) Close() error
 ```
 
-### func \(\*MockedConnection\) [NextReader](<https://github.zhaw.ch/raycasters/server/blob/master/room/testhelpers/mockhelpers.go#L25>)
+Close will close the connection\.
+
+### func \(\*MockedConnection\) [NextReader](<https://github.zhaw.ch/raycasters/server/blob/master/room/testhelpers/mockhelpers.go#L32>)
 
 ```go
 func (m *MockedConnection) NextReader() (int, io.Reader, error)
 ```
 
-### func \(\*MockedConnection\) [NextWriter](<https://github.zhaw.ch/raycasters/server/blob/master/room/testhelpers/mockhelpers.go#L34>)
+NextReader is a blocking call for waiting for a message\.
+
+### func \(\*MockedConnection\) [NextWriter](<https://github.zhaw.ch/raycasters/server/blob/master/room/testhelpers/mockhelpers.go#L42>)
 
 ```go
 func (m *MockedConnection) NextWriter(messageType int) (io.WriteCloser, error)
 ```
 
-## type [MockedReader](<https://github.zhaw.ch/raycasters/server/blob/master/room/testhelpers/mockhelpers.go#L103-L105>)
+NextReader is a blocking call for waiting for writing interface\.
+
+## type [MockedReader](<https://github.zhaw.ch/raycasters/server/blob/master/room/testhelpers/mockhelpers.go#L120-L122>)
+
+MockedReader is a mock of the io\.Reader interface
 
 ```go
 type MockedReader struct {
@@ -80,7 +96,9 @@ type MockedReader struct {
 }
 ```
 
-## type [MockedWriteCloser](<https://github.zhaw.ch/raycasters/server/blob/master/room/testhelpers/mockhelpers.go#L68-L72>)
+## type [MockedWriteCloser](<https://github.zhaw.ch/raycasters/server/blob/master/room/testhelpers/mockhelpers.go#L80-L84>)
+
+MockedWriteCloser is an abstraction over the writer closer interface required by the mock\.
 
 ```go
 type MockedWriteCloser struct {
@@ -88,23 +106,29 @@ type MockedWriteCloser struct {
 }
 ```
 
-### func \(\*MockedWriteCloser\) [Bytes](<https://github.zhaw.ch/raycasters/server/blob/master/room/testhelpers/mockhelpers.go#L85>)
+### func \(\*MockedWriteCloser\) [Bytes](<https://github.zhaw.ch/raycasters/server/blob/master/room/testhelpers/mockhelpers.go#L99>)
 
 ```go
 func (mwc *MockedWriteCloser) Bytes() []byte
 ```
 
-### func \(\*MockedWriteCloser\) [Close](<https://github.zhaw.ch/raycasters/server/blob/master/room/testhelpers/mockhelpers.go#L97>)
+Bytes is part of the io\.WriterCloser interface
+
+### func \(\*MockedWriteCloser\) [Close](<https://github.zhaw.ch/raycasters/server/blob/master/room/testhelpers/mockhelpers.go#L113>)
 
 ```go
 func (mwc *MockedWriteCloser) Close() error
 ```
 
-### func \(\*MockedWriteCloser\) [Write](<https://github.zhaw.ch/raycasters/server/blob/master/room/testhelpers/mockhelpers.go#L91>)
+Close is part of the io\.WriterCloser interface
+
+### func \(\*MockedWriteCloser\) [Write](<https://github.zhaw.ch/raycasters/server/blob/master/room/testhelpers/mockhelpers.go#L106>)
 
 ```go
 func (mwc *MockedWriteCloser) Write(p []byte) (n int, err error)
 ```
+
+Write is part of the io\.WriterCloser interface
 
 
 

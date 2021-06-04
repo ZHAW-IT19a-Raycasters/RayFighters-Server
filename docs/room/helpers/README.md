@@ -201,7 +201,7 @@ Has checks if the map has the id or not
 func (is *IdSet) Remove(id uint8) error
 ```
 
-Remove will remove an id if it did exist else if will retun an error
+Remove will remove an id if it did exist else if will return an error
 
 
 
