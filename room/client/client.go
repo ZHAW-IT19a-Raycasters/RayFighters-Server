@@ -11,19 +11,15 @@ import (
 	"github.zhaw.ch/raycasters/server/utils"
 
 	"github.com/gorilla/websocket"
-	"github.zhaw.ch/raycasters/server/log"
 )
 
 const (
-	// MaxClientCommand is the prepared length of the opcode data slice
+	// MaxClientCommand is the maximal length of the opcode data slice
 	// Attention this value has to be changed once the protocol changes.
 	MaxClientCommand    int = 25
 	defaultMessageType  int = websocket.BinaryMessage
 	shutdownMessageType int = websocket.CloseMessage
 )
-
-// logger is responsible for logging to the system logger.
-var logger = log.Log()
 
 var (
 	// ErrClientWorkersAlreadyActive is the error that as the name implies
@@ -33,7 +29,7 @@ var (
 
 	// ErrNoBytesRead is the error returned in case that the received
 	// byte count it zero.
-	ErrNoBytesRead = errors.New("empty packge received")
+	ErrNoBytesRead = errors.New("empty package received")
 
 	// ErrClosedConnection is the error returned in case of
 	// that the connections is closed by the client.
@@ -46,12 +42,12 @@ type ErrTooLongMessage struct {
 	size int
 }
 
-// Error satisies the error interface
+// Error satisfies the error interface
 func (err ErrTooLongMessage) Error() string {
 	return fmt.Sprintf("Non binary message type was received type : [%d]", err.id)
 }
 
-// Is satisfie the errors.Is definition
+// Is satisfies the errors.Is definition
 func (err ErrTooLongMessage) Is(target error) bool {
 	_, ok := target.(ErrTooLongMessage)
 	return ok
@@ -62,47 +58,57 @@ type ErrNonBinaryMessage struct {
 	id int
 }
 
-// Error satisies the error interface
+// Error satisfies the error interface
 func (err ErrNonBinaryMessage) Error() string {
 	return fmt.Sprintf("Non binary message type was received type : [%d]", err.id)
 }
 
-// Is satisfie the errors.Is definition
+// Is satisfies the errors.Is definition
 func (err ErrNonBinaryMessage) Is(target error) bool {
 	_, ok := target.(ErrNonBinaryMessage)
 	return ok
 }
 
+// ErrRecvHandler is the error representing an error during handing of an
+// client message
 type ErrRecvHandler struct {
 	inner error
 }
 
+// Error is the error interface
 func (err ErrRecvHandler) Error() string {
 	return fmt.Sprintf("got a receiver error [%s]", err.inner.Error())
 }
 
+// Is satisfies the errors.Is definition
 func (err ErrRecvHandler) Is(target error) bool {
 	_, ok := target.(ErrRecvHandler)
 	return ok
 }
 
+// Unwrap satisfies the errors.Unwrap definition.
 func (err ErrRecvHandler) Unwrap() error {
 	return err.inner
 }
 
+// ErrRecvHandler is the error representing a shutdown of the
+// client side receiver.
 type ErrRecvReader struct {
 	inner error
 }
 
+// Error is the error interface
 func (err ErrRecvReader) Error() string {
 	return fmt.Sprintf("got a receiver error [%s]", err.inner.Error())
 }
 
+// Is satisfies the errors.Is definition
 func (err ErrRecvReader) Is(target error) bool {
 	_, ok := target.(ErrRecvReader)
 	return ok
 }
 
+// Unwrap satisfies the errors.Unwrap definition.
 func (err ErrRecvReader) Unwrap() error {
 	return err.inner
 }
@@ -255,7 +261,7 @@ func (c *Client) Run() error {
 	return nil
 }
 
-// CheckState will check if the current client state is equvalent
+// CheckState will check if the current client state is equivalent
 // to the expected value.
 func (c *Client) CheckState(exp ConnectionStatus) (ConnectionStatus, bool) {
 	// this write lock is needed in the later parts
@@ -314,7 +320,7 @@ func (c *Client) sendData() {
 	}
 }
 
-// sendDataHelper is the actuall function used to send data packages
+// sendDataHelper is the actual function used to send data packages
 // it checks for the type of message send and handles errors.
 func (c *Client) sendDataHelper(message []byte) bool {
 	// checkSendDataErr is a helper function responsible
@@ -332,6 +338,7 @@ func (c *Client) sendDataHelper(message []byte) bool {
 	}
 
 	messageType := defaultMessageType
+
 	// if there is a disconnect here
 	if message[0] == server.DisconnectOpcode.Value() {
 		messageType = shutdownMessageType
@@ -349,7 +356,7 @@ func (c *Client) sendDataHelper(message []byte) bool {
 		return false
 	}
 
-	// flush the message to the network
+	// flush the message to the network => send it
 	err = cw.Close()
 
 	return checkErr(err) && messageType == defaultMessageType
@@ -486,6 +493,9 @@ func (c *Client) registerTimeout() {
 	}
 
 	c.status = Timeout
+
+	// register timeout of the given client
+	c.timoutQueue.RegisterTimeout()
 
 	c.shutdownHandler()
 }

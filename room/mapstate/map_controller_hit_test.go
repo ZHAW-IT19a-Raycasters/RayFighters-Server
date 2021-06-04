@@ -1,11 +1,12 @@
 package mapstate
 
 import (
-	"github.zhaw.ch/raycasters/server/gamemap"
 	"math"
 	"reflect"
 	"sync"
 	"testing"
+
+	"github.zhaw.ch/raycasters/server/gamemap"
 )
 
 // NOTE:
@@ -204,7 +205,7 @@ func TestMapController_GetNearestObstacleOnTrajectoryInShotDirection(t *testing.
 				map2d:   tt.fields.map2d,
 				lock:    &sync.RWMutex{},
 			}
-			got, got1, got2 := mc.GetNearestObstacleOnTrajectoryInShotDirection(tt.args.shooterID, tt.args.shotAngle, tt.args.rayStartX, tt.args.rayStartY)
+			got, got1, got2 := mc.NearestObstacleInShotTrajectory(tt.args.shooterID, tt.args.shotAngle, tt.args.rayStartX, tt.args.rayStartY)
 			if got != tt.want_foundObstacle {
 				t.Errorf("GetNearestObstacleOnTrajectoryInShotDirection() got = %v, foundObstacle %v", got, tt.want_foundObstacle)
 			}
